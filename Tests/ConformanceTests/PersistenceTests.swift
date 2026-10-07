@@ -18,9 +18,10 @@ struct PersistenceTests {
 
     @Test("invariant 3: a failing store does not fail the call; the credential stays in memory")
     func storageFailure() async throws {
-        let harness = try await Harness()
+        let memory = InMemoryCredentialStore()
+        let harness = try await Harness(store: memory)
         let before = await harness.storedRefreshToken()
-        await harness.store.failNextSaves(1)
+        await memory.failNextSaves(1)
         harness.expireAccessTokens()
         _ = try await harness.manager.accessToken()
         let inMemory = await harness.currentRefreshToken()

@@ -37,6 +37,12 @@ public actor TokenManager {
     var flights: [TokenTarget: Flight] = [:]
     var lane = RefreshLane()
     var lastFlightIdentifier = 0
+    /// The newest change to the store. The next change waits for it (see ``changeStore(_:)``).
+    var lastStoreChange: Task<Bool, Never>?
+    /// For each session that ended with a sign-out that revokes: the newest refresh token known to belong to
+    /// it. The revocation reads it when its lane turn starts, so it sends the token that is live then, not the
+    /// one that was live when the user signed out (see ``spendRefreshToken(ticket:session:adoptsIDToken:send:)``).
+    var revocableTokens: [Int: Secret] = [:]
 
     /// Creates a manager with no session. Call ``load()`` to restore one from `store`.
     ///
@@ -136,20 +142,17 @@ public actor TokenManager {
     /// Local state is cleared first and always, whatever happens to the revocation, which is best effort and
     /// limited to five seconds. In-flight operations of the ended session are discarded.
     public func signOut(revoke: Bool = true) async -> SignOutResult {
+        let endedSession = generation
         let snapshot = current?.refreshToken
         startNewSession()
         current = nil
+        // Reported before the first suspension, so a slow store cannot order it after the events of a sign-in
+        // that follows.
+        eventHub.emit(.signedOut(reason: .userInitiated))
         // Reserved now, before any suspension, so the revocation queues behind operations that are
         // already sending the old refresh token.
-        let revocation = revoke ? snapshot.flatMap { startRevocation(of: $0) } : nil
-        var isDeleted = true
-        do {
-            try await store.delete(account)
-        } catch {
-            isDeleted = false
-            eventHub.emit(.storageFailed)
-        }
-        eventHub.emit(.signedOut(reason: .userInitiated))
+        let revocation = revoke ? snapshot.flatMap { startRevocation(of: $0, session: endedSession) } : nil
+        let isDeleted = await deleteStoredCredential()
         guard let revocation else { return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: .skipped) }
         let outcome = try? await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) {
             try await revocation.wait()
@@ -164,12 +167,42 @@ public actor TokenManager {
         flights.removeAll()
     }
 
-    func save(_ credential: Credential) async {
-        do {
-            try await store.save(credential, for: account)
-        } catch {
-            eventHub.emit(.storageFailed)
+    /// Applies `change` to the store after every earlier change has finished, and reports whether it succeeded.
+    ///
+    /// Saves and deletes are decided in the actor, in order, but a store may take a long time for each and
+    /// finish them in any order if they overlap. Running them one after the other, in the order they were
+    /// requested, means the store always ends in the state the manager last decided: a sign-out is never undone
+    /// by a save that was still on its way. The change is registered before this returns and runs in a task of
+    /// its own, so cancelling the caller neither skips it nor interrupts it. A failure is reported as
+    /// ``SessionEvent/storageFailed``.
+    func changeStore(_ change: @escaping @Sendable () async throws -> Void) -> Task<Bool, Never> {
+        let previous = lastStoreChange
+        let task = Task {
+            _ = await previous?.value
+            do {
+                try await change()
+                return true
+            } catch {
+                eventHub.emit(.storageFailed)
+                return false
+            }
         }
+        lastStoreChange = task
+        return task
+    }
+
+    @discardableResult
+    func save(_ credential: Credential) async -> Bool {
+        let store = self.store
+        let account = self.account
+        return await changeStore { try await store.save(credential, for: account) }.value
+    }
+
+    @discardableResult
+    func deleteStoredCredential() async -> Bool {
+        let store = self.store
+        let account = self.account
+        return await changeStore { try await store.delete(account) }.value
     }
 
     static func storageError(_ error: any Error) -> PassportError {

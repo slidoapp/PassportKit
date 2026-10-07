@@ -16,6 +16,8 @@ struct ServerUserAgent: UserAgent {
 actor RequestGauge {
     private var current = 0
     private(set) var peak = 0
+    /// The refresh tokens the server issued, in order, as seen on the wire.
+    private(set) var issuedRefreshTokens: [String] = []
 
     func enter() {
         current += 1
@@ -23,6 +25,11 @@ actor RequestGauge {
     }
 
     func leave() { current -= 1 }
+
+    func record(_ response: HTTPResponse) {
+        let object = try? JSONSerialization.jsonObject(with: response.body) as? [String: Any]
+        if let token = object?["refresh_token"] as? String { issuedRefreshTokens.append(token) }
+    }
 }
 
 struct GaugedTransport: HTTPTransport {
@@ -34,6 +41,7 @@ struct GaugedTransport: HTTPTransport {
         do {
             let response = try await server.send(request)
             await gauge.leave()
+            await gauge.record(response)
             return response
         } catch {
             await gauge.leave()
@@ -56,7 +64,7 @@ struct Harness {
     let clock = ManualClock()
     let wallClock = FixedWallClock()
     let gauge = RequestGauge()
-    let store = InMemoryCredentialStore()
+    let store: any CredentialStore
     let account = CredentialAccount(service: "conformance", account: "user")
     let client: OAuthClient
     let manager: TokenManager
@@ -70,8 +78,10 @@ struct Harness {
         minimumTokenLifetime: Duration = .seconds(60),
         defaultTokenLifetime: Duration? = nil,
         accessTokenLifetime: TimeInterval = 900,
+        store: any CredentialStore = InMemoryCredentialStore(),
         signedIn: Bool = true
     ) async throws {
+        self.store = store
         let registration = FakeAuthorizationServer.ClientRegistration(
             id: "app", allowedGrants: [.authorizationCode, .refreshToken, .tokenExchange],
             scope: ["read", "write", "admin"], rotatesRefreshTokens: rotates, rotationLeeway: leeway,
@@ -110,7 +120,12 @@ struct Harness {
 
     /// The refresh token in the store, or `nil`.
     func storedRefreshToken() async -> String? {
-        await store.load(account)?.refreshToken?.reveal()
+        (try? await store.load(account))?.refreshToken?.reveal()
+    }
+
+    /// The newest refresh token the server has issued, whether or not the manager saw it.
+    func newestIssuedRefreshToken() async -> String? {
+        await gauge.issuedRefreshTokens.last
     }
 
     /// The refresh token the manager holds, or `nil`.
