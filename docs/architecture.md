@@ -4,8 +4,8 @@ This document records invariants and boundaries, not an inventory of
 types. If code and this document disagree, fix one of them in the same
 change.
 
-> Status: the module layout below is the planned target. It becomes
-> binding once the first `Package.swift` lands.
+> Status: the module layout below is binding. `Package.swift` implements
+> it; changing a module boundary needs an ADR.
 
 ## Modules
 

@@ -5,7 +5,7 @@
 | Layer | Location | What it covers |
 |---|---|---|
 | Unit | `Tests/PassportKitTests` | Request building, response and error parsing, PKCE, form encoding, `WWW-Authenticate` parsing, metadata parsing |
-| Conformance | `Tests/ConformanceTests` | End-to-end flows against the fake authorization server: rotation, coalesced refresh, device polling, token exchange, resource indicators, error handling |
+| Conformance | `Tests/ConformanceTests` | End-to-end flows against the fake authorization server: rotation, coalesced refresh, device polling, token exchange, resource indicators, error handling, and the redaction canary |
 | Integration | `Tests/IntegrationTests` | The real flows against a local `oidc-provider` server (`Tools/integration-server`): discovery, authorization code with PKCE and `iss`, device flow, refresh rotation and reuse rejection, token exchange, the underscoped-200 case, client credentials, revocation, Keychain; macOS |
 | Apple adapters | `Tests/PassportKitAppleTests` | Keychain storage, redirect handling; macOS only |
 
@@ -46,6 +46,25 @@ Rules specific to this layer:
   `withKnownIssue` with a pointer to the defect, not deleted.
 
 CI runs the same target in the `integration` job.
+
+## Redaction canary
+
+`RedactionCanaryTests` runs every flow against the fake server with a client
+secret and every token, code, verifier and device code that crosses the wire
+treated as a canary. Error paths make the server repeat the secrets it was
+sent in `error_description` and in `WWW-Authenticate`. The test then renders
+every public value and error (`String(describing:)`, `String(reflecting:)`,
+`dump`, `localizedDescription`) and every `PassportEvent` and `SessionEvent`,
+and fails if any canary appears. A new flow or public value that holds a
+secret is added to it. `Foundation`'s own `URLRequest` is excluded: it prints
+the headers it carries.
+
+## Documentation samples
+
+The code in the DocC articles is compiled in
+`Tests/ConformanceTests/DocumentationSnippets.swift` (and, for Apple adapters,
+`Tests/PassportKitAppleTests/DocumentationSnippets.swift`). They are never run; they keep the samples
+in step with the API. Change both together.
 
 ## Rules
 

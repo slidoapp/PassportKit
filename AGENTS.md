@@ -41,10 +41,12 @@ Run from the repository root. Every command is non-interactive and offline.
 ```sh
 make setup     # once per clone: installs git hooks
 make format    # format Sources, Tests, Package.swift in place
-make lint      # formatting check, fails on any finding
+make lint      # formatting check and scripts/check-determinism.sh, fails on any finding
 make build     # build including tests; warnings are errors
 make test      # run all tests in parallel
 make check     # lint + build + test — the definition of done
+make docs      # DocC archives of all libraries; fails on any warning (needs Xcode)
+make integration  # real flows against Tools/integration-server (needs Node.js)
 swift test --filter <Suite>/<test>   # a single test
 ```
 
@@ -53,7 +55,10 @@ swift test --filter <Suite>/<test>   # a single test
 1. `make check` passes; quote its final summary line.
 2. New behaviour has a test; new protocol behaviour has a row in
    `docs/rfc-matrix.md`.
-3. Public symbols have DocC comments referencing the RFC section.
+3. Public symbols have DocC comments referencing the RFC section. After
+   changing public API or an article, `make docs` passes (no warnings) and
+   the article samples in `Tests/ConformanceTests/DocumentationSnippets.swift`
+   still match.
 4. User-visible changes have an entry under `Unreleased` in `CHANGELOG.md`.
 
 ## Where things are
@@ -65,6 +70,12 @@ swift test --filter <Suite>/<test>   # a single test
 - `docs/rfc-matrix.md` — RFC requirement → code → test traceability.
 - `docs/security-model.md` — threats, redaction and storage rules.
 - `docs/testing.md` — test layers, fake authorization server, fixtures.
+- `Sources/*/*.docc` — DocC catalogs; the articles are in
+  `Sources/PassportKit/PassportKit.docc`.
+- `Tools/integration-server` — the local authorization server that
+  `make integration` runs the `IntegrationTests` against (Node.js).
+- `scripts/` — `check-determinism.sh` (run by `make lint`) and
+  `build-docs.sh` (run by `make docs`).
 - `docs/decisions/` — ADRs. Check them before proposing a design change;
   do not re-propose rejected designs without new information.
 

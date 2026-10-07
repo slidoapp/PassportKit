@@ -4,23 +4,24 @@ Every protocol behaviour in PassportKit maps to a row here. Add or update
 rows in the same change as the code and its test.
 
 Status values: `planned`, `partial`, `done`, `not planned` (give the
-reason in Notes).
+reason in Notes). In the Scope table, `done` means every requirement row
+for the RFC is done; features left out on purpose are listed in Notes.
 
 ## Scope
 
 | RFC | Title | Status | Notes |
 |---|---|---|---|
-| 6749 | OAuth 2.0 Authorization Framework | partial | Authorization code, refresh, client credentials. No implicit or password grants. |
-| 6750 | Bearer Token Usage | partial | Authorization header only; `WWW-Authenticate` challenge parsing; `RequestAuthorizer`. No form-body or query-parameter tokens. |
+| 6749 | OAuth 2.0 Authorization Framework | done | Authorization code, refresh, client credentials and extension grants. Implicit and resource owner password grants are not planned. |
+| 6750 | Bearer Token Usage | done | Authorization header only; `WWW-Authenticate` challenge parsing; `RequestAuthorizer`. No form-body or query-parameter tokens. |
 | 7636 | PKCE | done | S256 always; `plain` not supported. |
-| 8252 | OAuth 2.0 for Native Apps | partial | System browser, loopback and claimed HTTPS redirects. |
-| 8628 | Device Authorization Grant | planned | |
-| 8693 | Token Exchange | partial | Access-token and refresh-token subjects. |
+| 8252 | OAuth 2.0 for Native Apps | done | System browser (`ASWebAuthenticationSession`), loopback and claimed HTTPS redirects, in `PassportKitApple`. |
+| 8628 | Device Authorization Grant | done | |
+| 8693 | Token Exchange | done | Access-token and refresh-token subjects; claims inside tokens are not interpreted. |
 | 8707 | Resource Indicators | done | |
 | 8414 | Authorization Server Metadata | done | Configurable issuer validation. |
-| 7009 | Token Revocation | planned | |
+| 7009 | Token Revocation | done | |
 | 9207 | Authorization Server Issuer Identification | done | |
-| 9700 | OAuth 2.0 Security Best Current Practice | planned | Applied across all flows. |
+| 9700 | OAuth 2.0 Security Best Current Practice | partial | PKCE on every code flow, exact redirect matching, single-use codes, refresh token rotation handling. Sender-constrained tokens need DPoP (RFC 9449), which is not planned yet. |
 | 7662 | Token Introspection | not planned | Resource-server concern. |
 | 9449 | DPoP | not planned | Candidate for a later version. |
 | 9126 | Pushed Authorization Requests | not planned | Candidate for a later version. |
@@ -94,10 +95,11 @@ reason in Notes).
 | SES-7 | 7009 §2.1; ADR 0005 | SHOULD | Sign-out clears local state first, then revokes the refresh token in the lane, best effort within a time limit | done | `Sources/PassportKit/Session/TokenManager.swift` | `LifecycleTests` |
 | SES-8 | 6750 §3.1 | SHOULD | A token reported as rejected is dropped only if it is still the cached one, so concurrent 401s cause one refresh | done | `Sources/PassportKit/Session/TokenCache.swift` | `LaneTests` |
 | SES-9 | 7009 §2.1; ADR 0007 | MUST | Saves and deletes of the stored credential are applied in the order decided, so a late save cannot revive a signed-out session; a sign-out revokes the newest refresh token of the session even when a request rotated it meanwhile | done | `Sources/PassportKit/Session/TokenManager.swift`, `TokenManager+Lane.swift` | `StoreOrderingTests` |
-| RES-1 | 6750 §2.1; 6750 §5.3 | MUST | Protected requests carry `Authorization: Bearer <token>`; no request is ever sent without a token, and a token is sent only over `https` or to a loopback host | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
-| RES-2 | 6750 §3.1 | MUST | 401 with `invalid_token` or no Bearer error: invalidate the token and retry once; a second 401 fails with `unauthorized` | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
-| RES-3 | 6750 §3.1 | MUST | `insufficient_scope` and every 403 are never refreshed; the session survives | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
-| RES-4 | 6750 §3.1 | SHOULD | Concurrent 401s for one token cause one refresh; a 401 after another caller refreshed retries with the new token without a refresh | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerConformanceTests` |
+| AUZ-1 | 6750 §2.1; 6750 §5.3 | MUST | Protected requests carry `Authorization: Bearer <token>`; no request is ever sent without a token, and a token is sent only over `https` or to a loopback host | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
+| AUZ-2 | 6750 §3.1 | MUST | 401 with `invalid_token` or no Bearer error: invalidate the token and retry once; a second 401 fails with `unauthorized` | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
+| AUZ-3 | 6750 §3.1 | MUST | `insufficient_scope` and every 403 are never refreshed; the session survives | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
+| AUZ-4 | 6750 §3.1 | SHOULD | Concurrent 401s for one token cause one refresh; a 401 after another caller refreshed retries with the new token without a refresh | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerConformanceTests` |
+| AUZ-5 | 6750 §2.1 | MUST | Only tokens whose type is `Bearer` (case-insensitive) are sent as bearer credentials; another type, such as a sender-constrained one, is `invalidConfiguration` and nothing is sent | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerConformanceTests` |
 | APL-1 | 8252 §6, §7.1, §8.12 | MUST | A private-use scheme redirect is delivered by `ASWebAuthenticationSession`, which runs in the system browser context, not an embedded web view; a dismissed sheet is `.userCancelled` | done | `Sources/PassportKitApple/WebAuthenticationSessionUserAgent.swift` | `WebAuthenticationSessionUserAgentTests` |
 | APL-2 | 8252 §7.2 | SHOULD | An `https` (claimed URL) redirect is accepted where the OS supports it and rejected with `.invalidConfiguration` where it does not | done | `Sources/PassportKitApple/WebAuthenticationSessionUserAgent.swift` | `WebAuthenticationSessionUserAgentTests` |
 | APL-3 | 8252 §7.3, §8.3 | MUST | The loopback listener binds the IPv4 literal `127.0.0.1` (never `localhost`) on an ephemeral port and the redirect URI carries the real port | done | `Sources/PassportKitApple/LoopbackRedirectListener.swift` | `LoopbackRedirectListenerTests` |
