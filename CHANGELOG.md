@@ -47,6 +47,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   token exchange with a refresh-token subject, can issue a refresh token
   (`requested_token_type`), and delays responses with `Controls.responseDelay`.
 
+- `ClientConfiguration.init(metadata:authentication:)` takes the endpoints and
+  issuer from discovered metadata and turns on `iss` checking when the server
+  advertises it (RFC 9207 §3).
+- `AuthorizationRequest.lifetime` (default 10 minutes);
+  `URLSessionTransport.init(configuration:requestTimeout:resourceTimeout:)`
+  with 30 s and 60 s defaults; `Discovery.fetchMetadata(observer:clock:)`;
+  `ManualClock.waitForSleeper(timeout:)`.
+- `Retry-After` is also read as an HTTP-date.
+
+### Changed
+
+- A token exchange response without `issued_token_type` is rejected
+  (RFC 8693 §2.2.1).
+- The `resource` indicators of an authorization request are repeated on its
+  token request (RFC 8707 §2.2).
+- `additionalParameters` may not use `client_id` or `client_secret`.
+- A device authorization response needs an `https` (or loopback `http`)
+  verification URI and an `interval` of at most one hour.
+- A redirect callback with userinfo is rejected, and a query on the registered
+  redirect URI must be present in the callback.
+- Server error codes that are not well-formed RFC 6749 §5.2 values become
+  `invalidResponse`; `error_uri` keeps only `http(s)` URLs; descriptions lose
+  invisible format characters.
+- `URLSessionTransport` drops all non-standard headers on cross-origin
+  redirects and returns a complete response even when the caller cancelled.
+- `ManualClock.waitForSleeper()` stops with a clear message after 10 s
+  instead of spinning forever.
+
+### Security
+
+- `HTTPHeaders` no longer prints header values (names only) in descriptions,
+  `debugDescription` and reflection.
+- Hostile `interval`, `expires_in` and `slow_down` values can no longer trap
+  device polling.
+- `Secret` documents that `Codable` encodes plaintext.
+
 ### Fixed
 
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization
