@@ -27,7 +27,7 @@ func signIn(client: OAuthClient) async throws -> TokenResponse {
 }
 ```
 
-Use a private-use URI scheme that you own, written in reverse domain order,
+Use a private-use URI scheme that you own, written in reverse domain order (RFC 8252 §7.1; the library does not check the form),
 or an `https` claimed URL where the OS supports it (macOS 14.4, iOS 17.4,
 visionOS 1.1). Register the redirect URI at the server exactly as written:
 the library compares it exactly. Pass
@@ -52,9 +52,17 @@ func signIn(client: OAuthClient) async throws -> TokenResponse {
 }
 ```
 
-The listener binds the loopback interface only, accepts the first matching
-request, answers with a short page that does not echo the query, and stops.
+The listener binds `127.0.0.1` on an ephemeral port, accepts the first
+request that looks like the authorization response (the right path and `Host`,
+`state`, and `code` or `error`, not marked as a background fetch by
+`Sec-Fetch-*` headers, and with the `state` of your request), answers with a
+short page that does not echo the query, and stops. Any other request gets an
+error status and the listener keeps waiting, so a web page cannot use up the
+redirect. It serves at most 8 connections and closes each after 5 seconds.
 The authorization server must accept a loopback redirect URI with any port.
+A listener you never wait on stays open until you call `cancel()` or release
+it. RFC 8252 §7.3 advises against `localhost` in a redirect URI; the listener
+always uses `127.0.0.1`.
 `LoopbackUserAgent` opens the system browser by default; pass `openURL:` to
 open the URL yourself, for example to print it.
 

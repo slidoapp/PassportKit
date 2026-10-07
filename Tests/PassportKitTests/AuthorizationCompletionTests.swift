@@ -237,6 +237,14 @@ struct AuthorizationCompletionTests {
             pending, callbackURL: code([("iss", "https://anything.example.com")], for: pending))
     }
 
+    @Test("RFC 6749 §4.1.2: unknown response parameters are ignored")
+    func unknownResponseParametersAreIgnored() async throws {
+        let (client, _, pending) = try start()
+        let response = try await client.completeAuthorization(
+            pending, callbackURL: code([("session_state", "abc"), ("x", "y")], for: pending))
+        #expect(response.accessToken.reveal() == "at")
+    }
+
     // MARK: Code
 
     @Test(arguments: [[("state", "S")], [("state", "S"), ("code", "")]])

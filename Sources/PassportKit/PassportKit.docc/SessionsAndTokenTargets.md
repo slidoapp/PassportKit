@@ -95,6 +95,14 @@ happened to the revocation; the in-memory session is always cleared.
 
 ## After a 401
 
+The cache keeps at most 256 tokens and 256 remembered rejections, dropping
+expired entries first and then the oldest, so targets built from request URLs
+cannot grow it without bound.
+
+The stored ``Credential`` keeps the ID token, if one was issued, without
+validating it: PassportKit is an OAuth 2.0 client, not an OpenID Connect
+relying party. Do not treat it as proof of identity.
+
 ``TokenManager/invalidate(_:)`` drops a cached token that a resource server
 rejected. Pass the exact ``AccessToken`` that was used: only that token is
 dropped, so many concurrent 401s for one token cause one refresh.

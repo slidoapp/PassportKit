@@ -9,7 +9,7 @@
     ///
     /// The redirect URI must carry the port the listener actually got, so the flow has two steps: start
     /// the listener, put ``redirectURI`` into the `AuthorizationRequest`, then let a ``LoopbackUserAgent``
-    /// (or your own code) call ``waitForCallback(timeout:)``.
+    /// (or your own code) call ``waitForCallback(timeout:accept:)``.
     ///
     /// The listener binds `127.0.0.1` on an ephemeral port only. It answers every request itself and
     /// returns the first `GET` request for ``redirectURI``'s path whose `Host` is the loopback address on
@@ -37,7 +37,7 @@
         ///
         /// - Parameters:
         ///   - path: The redirect path, such as `/callback`. It must start with `/` and have no query.
-        ///   - clock: Times ``waitForCallback(timeout:)``.
+        ///   - clock: Times ``waitForCallback(timeout:accept:)``.
         /// - Throws: `PassportError` with `.invalidConfiguration` for an invalid `path`, and
         ///   `.transportFailure` when the socket cannot be opened.
         public static func start(

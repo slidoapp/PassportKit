@@ -217,6 +217,22 @@ struct DiscoveryTests {
         #expect(endpoints.revocation?.path == "/revoke")
     }
 
+    @Test("RFC 9700 §2.1.1: PKCE with S256 is sent whatever code_challenge_methods_supported says")
+    func pkceIsSentWhateverTheMetadataAdvertises() throws {
+        for methods in [#"["plain"]"#, "[]"] {
+            let json = Self.metadataJSON().replacingOccurrences(of: #"["S256"]"#, with: methods)
+            let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: Data(json.utf8))
+            let configuration = try ClientConfiguration(
+                metadata: metadata, authentication: .publicClient(clientID: "app"))
+            let client = try OAuthClient(configuration: configuration, transport: RecordingTransport())
+            let pending = try client.beginAuthorization(
+                AuthorizationRequest(redirectURI: try #require(URL(string: "https://app.example.com/callback"))))
+            let query = AuthorizationFixtures.query(of: pending.url)
+            #expect(query.contains { $0.0 == "code_challenge_method" && $0.1 == "S256" })
+            #expect(query.contains { $0.0 == "code_challenge" })
+        }
+    }
+
     @Test func endpointsNeedATokenEndpointAndSecureURLs() throws {
         let issuer = URL(string: "https://as.example.com")!
         let missing = try #require(throws: PassportError.self) {

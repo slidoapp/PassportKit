@@ -113,8 +113,10 @@ Rules:
   that collides with a parameter the library sets, or with `client_id` or
   `client_secret` in any authentication mode (RFC 6749 §2.3: one method per
   request), throws `PassportError` with code `.invalidConfiguration`.
-- Resource indicators are `URL`s; they must be absolute and have no
-  fragment (RFC 8707 §2), otherwise `.invalidConfiguration`.
+- Resource indicators are `URL`s; they must be absolute URIs and have no
+  fragment (RFC 8707 §2), otherwise `.invalidConfiguration`. A host is not
+  required (`urn:example:api` is valid) and a query is allowed although the
+  RFC says it SHOULD NOT be used.
 
 ## 4. HTTP
 
@@ -204,7 +206,12 @@ then validates. Prefer it over assembling a configuration by hand so the
 mix-up defence follows what the server advertises.
 
 HTTP `http` endpoints are rejected unless the host is a loopback address
-(`localhost`, `127.0.0.1`, `::1`).
+(`localhost`, `127.0.0.1`, `::1`). RFC 6749 §3.1, §3.2, RFC 7009 §2.1 and
+RFC 8414 §3 require TLS for these endpoints, so loopback `http` is a
+documented deviation for development servers; it is not a recommendation.
+`localhost` is also accepted in a redirect URI although RFC 8252 §7.3 says
+NOT RECOMMENDED (registered redirects exist); `LoopbackRedirectListener`
+always uses `127.0.0.1`.
 
 ## 6. Errors
 
@@ -363,6 +370,8 @@ public struct TokenTypeHint: RawRepresentable, Sendable, Hashable {   // open: R
 
 ```swift
 public struct DeviceAuthorization: Sendable {
+    /// At most 64 characters without control, line-separator or invisible format characters, else the
+    /// response is `invalidResponse`. Showing it to the person is the app's job (RFC 8628 §3.3).
     public internal(set) var userCode: String
     public internal(set) var verificationURI: URL
     public internal(set) var verificationURIComplete: URL?     // used verbatim; may already contain a query
@@ -599,6 +608,11 @@ Invariants (each has a conformance test):
    `defaultTokenLifetime`, or are refreshed on every use when nil.
    Exchanged tokens never outlive their subject token: the subject is
    refreshed first if it would expire within `minimumTokenLifetime`.
+   An omitted `scope` in a refresh response means the requested scope,
+   and when the target names none, the scope recorded on the credential
+   (RFC 6749 §5.1, §6). A refresh that names neither scope nor resource
+   renews the whole grant, so a `scope` in its response replaces the
+   credential's recorded scope; narrower targets never change it.
 9. **Derived tokens.** `.tokenExchange` targets (`TokenTarget.exchange`) obtain the
    default access token, exchange it (`subject_token_type` and
    `requested_token_type` = access token), and cache the result per
@@ -609,6 +623,10 @@ Invariants (each has a conformance test):
 10. **Invalidation.** `invalidate(token)` drops the cached token only if
    its `generation` is still current, so N concurrent 401s for the same
    token cause one refresh.
+   The cached tokens and the remembered rejections are each limited to
+   256 targets: every insertion drops what has expired and then the oldest
+   entries, so targets built from request URLs cannot grow memory without
+   bound.
 
 `exchangeRefreshToken` is not coalesced (each call sends one request) and its
 result is not cached or run through the acceptance policy: the issued token is
@@ -705,7 +723,8 @@ and `OAuthClient.wallClock` are public read-only properties.
 
 ```swift
 public struct RequestAuthorizer: Sendable {
-    public init(manager: TokenManager, transport: any HTTPTransport = URLSessionTransport())
+    /// `allowedOrigins`: when not nil, the only origins (scheme, host, port; path ignored) a request may name.
+    public init(manager: TokenManager, transport: any HTTPTransport = URLSessionTransport(), allowedOrigins: Set<URL>? = nil)
     /// Adds `Authorization: Bearer <token>`. Throws if no token can be obtained; never returns an unsigned request.
     public func sign(_ request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
     public func sign(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)
@@ -745,15 +764,28 @@ challenge yields an empty array.
 | 401 with `error="invalid_token"` or no Bearer error, `attempt == 0` | invalidate `token`, `.retry` |
 | 401, `attempt >= 1` | `.fail(.unauthorized, recovery: .resourceDenied)` |
 | 401 at `attempt == 0` with any other Bearer error (`invalid_request`) | `.deliver` |
+| 401 at `attempt == 0` whose challenges are all for another scheme (`Basic`, `DPoP`) | `.deliver` |
 
-`authorize` throws `.invalidConfiguration` for a URL that is neither `https`
-nor `http` on a loopback host, before asking for a token. It also throws
+RFC 6750 §3.1 prescribes no retry; retrying once after `invalid_token`, or
+after a 401 without any challenge (treated like a bare Bearer challenge), is
+library policy.
+
+`sign` throws `.invalidConfiguration` for a URL that is neither `https`
+nor `http` on a loopback host, or whose origin is not in `allowedOrigins`
+when that is set, before asking for a token. A token that is not a valid
+`b64token` (RFC 6750 §2.1) fails with `.invalidResponse` and is never put
+into a header. The token goes to whatever host the request names unless
+`allowedOrigins` is set: pass it whenever request URLs can come from
+untrusted data. It also throws
 `.invalidConfiguration`, after obtaining the token and before anything is
 sent, when `AccessToken.tokenType` is not `Bearer` (compared
 case-insensitively): a sender-constrained type such as `DPoP` needs a proof
 this authorizer cannot make, and a token must never be sent as a bearer
 credential it was not issued as. The session is not affected. `send` and
-`data(for:target:session:)` inherit both rules.
+`data(for:target:session:)` inherit these rules. `data(for:target:session:)`
+also attaches a per-task delegate with the redirect policy of
+`URLSessionTransport` (never HTTPS to HTTP; a redirect to another origin
+drops every header but `Accept`, `Accept-Language`, `User-Agent`).
 
 The `error_description` of an `insufficient_scope` challenge goes through the
 same description rules as server errors (see §6) and has the bearer token
@@ -856,16 +888,23 @@ secrets.
 - `LoopbackRedirectListener`: `static func start(path: String = "/callback", clock:)`
   binds an `NWListener` to `127.0.0.1` on an ephemeral port and returns
   once it is ready; `redirectURI` carries the real port (RFC 8252 §7.3).
-  `waitForCallback(timeout:)` accepts requests whose path matches (others
-  get 404), answers with a short HTML page without echoing the query,
-  closes, and returns the full redirect URL; it throws `.timedOut`. The
+  `waitForCallback(timeout:accept:)` claims the first `GET` for the path on
+  the loopback `Host` whose query has `state` and `code` or `error`, that
+  `Sec-Fetch-Mode`/`Sec-Fetch-Dest` do not mark as a background fetch (400
+  otherwise) and that `accept` allows (default: all); other requests get an
+  error status and the listener keeps waiting. It answers with a short HTML
+  page without echoing the query, closes, and returns the full redirect URL;
+  it throws `.timedOut`. At most 8 connections are open, each closes after 5
+  s on the injected clock, `cancel()` and delivery close them all, and
+  releasing a listener cancels it. The
   listener is started first so that its `redirectURI` goes into the
   `AuthorizationRequest`.
 - `LoopbackUserAgent(listener:timeout:openURL:)`: a `AuthorizationUserAgent` for a
   running listener; opens the URL through an injected
   `@Sendable (URL) async throws -> Void` (default `NSWorkspace` /
-  `UIApplication`), then `waitForCallback(timeout:)` (default 5 minutes).
-  It rejects a request whose `redirectURI` is not the listener's.
+  `UIApplication`), then `waitForCallback(timeout:accept:)` (default 5 minutes).
+  It rejects a request whose `redirectURI` is not the listener's and passes
+  an `accept` that matches the `state` of the authorization URL.
 
 ## 14. Testing module
 
@@ -877,6 +916,7 @@ endpoints well enough to run every flow, and is scriptable:
   leeway (a `Duration` window and a reuse count, like real servers that allow one
   reuse within 120 s); every lifetime and interval in the registration and in the
   controls is a `Duration`;
+- `omitsScope`: token responses leave out `scope` (RFC 6749 §5.1);
 - per-request hooks to override responses (status, body, headers, delay) and to
   delay the answer of a request the server has already handled (`responseDelay`);
 - token exchange with a refresh token subject spends and rotates it like a
