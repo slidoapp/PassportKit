@@ -10,9 +10,10 @@ extension PassportError {
         statusCode: Int,
         headers: HTTPHeaders,
         body: Data,
-        context: ErrorResponseContext
+        context: ErrorResponseContext,
+        now: Date? = nil
     ) -> PassportError {
-        let retryAfter = retryAfter(in: headers)
+        let retryAfter = retryAfter(in: headers, now: now)
         guard case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: body),
             case .string(let code)? = members["error"], !code.isEmpty
         else {
@@ -86,12 +87,28 @@ extension PassportError {
         }
     }
 
-    /// Parses `Retry-After` given as delta-seconds (RFC 9110 §10.2.3). HTTP-date values are ignored.
-    static func retryAfter(in headers: HTTPHeaders) -> Duration? {
-        guard let text = headers["Retry-After"]?.trimmingCharacters(in: .whitespaces),
-            !text.isEmpty, text.allSatisfy(\.isASCII), text.allSatisfy(\.isNumber),
-            let seconds = Int(text)
+    /// Parses `Retry-After` (RFC 9110 §10.2.3): delta-seconds, or an HTTP-date relative to `now`. A date in the
+    /// past means zero. Without `now`, HTTP-date values are ignored.
+    static func retryAfter(in headers: HTTPHeaders, now: Date? = nil) -> Duration? {
+        guard let text = headers["Retry-After"]?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
+            text.allSatisfy(\.isASCII)
         else { return nil }
-        return .seconds(seconds)
+        if text.allSatisfy(\.isNumber) { return Int(text).map { .seconds($0) } }
+        guard let now, let date = parseHTTPDate(text) else { return nil }
+        return .seconds(max(0, Int(min(date.timeIntervalSince(now), 31_536_000_000).rounded(.up))))
+    }
+
+    /// The three HTTP-date formats a recipient must accept (RFC 9110 §5.6.7).
+    private static func parseHTTPDate(_ text: String) -> Date? {
+        for format in [
+            "EEE, dd MMM yyyy HH:mm:ss 'GMT'", "EEEE, dd-MMM-yy HH:mm:ss 'GMT'", "EEE MMM d HH:mm:ss yyyy",
+        ] {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(identifier: "GMT")
+            formatter.dateFormat = format
+            if let date = formatter.date(from: text) { return date }
+        }
+        return nil
     }
 }

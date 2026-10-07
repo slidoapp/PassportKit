@@ -259,4 +259,40 @@ struct AuthorizationCompletionTests {
         clock.advance(by: .seconds(599))
         _ = try await client.completeAuthorization(pending, callbackURL: code(for: pending))
     }
+
+    @Test func lifetimeIsConfigurable() async throws {
+        let clock = ManualClock()
+        let client = try ClientFixtures.client(RecordingTransport([.tokens()]), clock: clock)
+        let pending = try client.beginAuthorization(
+            AuthorizationRequest(redirectURI: Fixtures.redirectURI, lifetime: .seconds(30)))
+        clock.advance(by: .seconds(29))
+        let early = pending
+        #expect(!early.isExpired)
+        clock.advance(by: .seconds(1))
+        let error = try #require(await failure(client, pending, code(for: pending)))
+        #expect(error.code == .timedOut)
+    }
+
+    @Test func nonPositiveLifetimeIsInvalidConfiguration() throws {
+        let client = try ClientFixtures.client(RecordingTransport())
+        #expect {
+            try client.beginAuthorization(AuthorizationRequest(redirectURI: Fixtures.redirectURI, lifetime: .zero))
+        } throws: { ($0 as? PassportError)?.code == .invalidConfiguration }
+    }
+
+    @Test func resourcesAreRepeatedOnTheTokenRequest() async throws {
+        let transport = RecordingTransport([.tokens()])
+        let client = try ClientFixtures.client(transport, random: CountingRandomSource())
+        let pending = try client.beginAuthorization(
+            AuthorizationRequest(
+                redirectURI: Fixtures.redirectURI,
+                resources: [URL(string: "https://api.example.com/a")!, URL(string: "https://api.example.com/b")!]))
+        _ = try await client.completeAuthorization(pending, callbackURL: code(for: pending))
+        let sent = try #require(await transport.requests.first)
+        #expect(
+            sent.form.filter { $0.0 == "resource" }.map(\.1) == [
+                "https://api.example.com/a", "https://api.example.com/b",
+            ]
+        )
+    }
 }
