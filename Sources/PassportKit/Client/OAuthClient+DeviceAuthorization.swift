@@ -11,7 +11,7 @@ extension OAuthClient {
     /// Show ``DeviceAuthorization/userCode`` and ``DeviceAuthorization/verificationURI`` to the user, then call
     /// ``completeDeviceAuthorization(_:additionalParameters:)``. The library never opens a browser.
     /// Throws `invalidConfiguration` when no device authorization endpoint is configured.
-    public func startDeviceAuthorization(
+    public func beginDeviceAuthorization(
         scope: ScopeSet? = nil,
         resources: [URL] = [],
         additionalParameters: AdditionalParameters = [:]

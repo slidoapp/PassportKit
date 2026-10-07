@@ -4,7 +4,7 @@ import PassportKitTesting
 import Testing
 
 /// Plays the user: approves every authorization request at the fake server.
-struct ServerUserAgent: UserAgent {
+struct ServerUserAgent: AuthorizationUserAgent {
     let server: FakeAuthorizationServer
 
     func present(_ url: URL, redirectURI: URL) async throws -> URL {

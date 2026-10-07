@@ -8,7 +8,7 @@
         import UIKit
     #endif
 
-    /// A `UserAgent` that opens the authorization URL in the system browser and waits for the redirect on
+    /// A `AuthorizationUserAgent` that opens the authorization URL in the system browser and waits for the redirect on
     /// a running ``LoopbackRedirectListener`` (RFC 8252 §7.3).
     ///
     /// ```swift
@@ -16,7 +16,7 @@
     /// let request = AuthorizationRequest(redirectURI: listener.redirectURI, scope: scope)
     /// let tokens = try await client.authorize(request, using: LoopbackUserAgent(listener: listener))
     /// ```
-    public struct LoopbackUserAgent: UserAgent {
+    public struct LoopbackUserAgent: AuthorizationUserAgent {
         private let listener: LoopbackRedirectListener
         private let timeout: Duration
         private let openURL: @Sendable (URL) async throws -> Void

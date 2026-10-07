@@ -43,10 +43,10 @@ func makeClient() throws -> (OAuthClient, FakeAuthorizationServer) {
 ```
 
 Sign in without a person: `authorizeInteractively(_:)` plays the user, so a
-``UserAgent`` for tests is a few lines:
+``AuthorizationUserAgent`` for tests is a few lines:
 
 ```swift
-struct ApprovingUserAgent: UserAgent {
+struct ApprovingUserAgent: AuthorizationUserAgent {
     let server: FakeAuthorizationServer
 
     func present(_ url: URL, redirectURI: URL) async throws -> URL {

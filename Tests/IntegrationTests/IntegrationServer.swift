@@ -105,7 +105,7 @@ func passportError(_ body: () async throws -> Void) async -> PassportError? {
 
 /// A user agent that follows the authorization server's redirects with HTTP and stops at the redirect URI,
 /// returning it. The server's test interaction logs in and consents without a page.
-struct RedirectFollowingUserAgent: UserAgent {
+struct RedirectFollowingUserAgent: AuthorizationUserAgent {
     func present(_ url: URL, redirectURI: URL) async throws -> URL {
         let session = URLSession(configuration: .ephemeral)  // keeps the interaction cookies for this flow only
         defer { session.finishTasksAndInvalidate() }

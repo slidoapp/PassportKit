@@ -96,7 +96,7 @@ struct RedactionCanaryTests {
         rig.renderings.look(pending)
         let grant = try #require(await rig.renderings.observe { try await rig.authorize() })
         let refreshed = try #require(
-            await rig.renderings.observe { try await client.refresh(refreshToken: grant.refreshToken!) })
+            await rig.renderings.observe { try await client.refresh(grant.refreshToken!) })
         _ = await rig.renderings.observe { try await client.clientCredentials(scope: ["read"]) }
 
         // Token exchange with both subject token types; the refresh token subject rotates.
@@ -116,7 +116,7 @@ struct RedactionCanaryTests {
 
         // The device flow, driven with the manual clock.
         let device = try #require(
-            await rig.renderings.observe { try await client.startDeviceAuthorization(scope: ["read"]) })
+            await rig.renderings.observe { try await client.beginDeviceAuthorization(scope: ["read"]) })
         try await rig.server.approve(userCode: device.userCode)
         async let polled = client.completeDeviceAuthorization(device)
         _ = await rig.clock.advanceToNextSleeper()
@@ -126,7 +126,7 @@ struct RedactionCanaryTests {
         // client secret covers both the 24-character run rule and the request-specific redaction.
         let spent = try #require(grant.refreshToken)
         rig.echo("invalid_grant", of: ["refresh_token", "client_secret", "basic_secret"])
-        _ = await rig.renderings.observe { try await client.refresh(refreshToken: spent) }
+        _ = await rig.renderings.observe { try await client.refresh(spent) }
         rig.echo("access_denied", status: 401, of: ["subject_token", "client_secret", "basic_secret"])
         _ = await rig.renderings.observe {
             try await client.exchange(
@@ -138,10 +138,10 @@ struct RedactionCanaryTests {
         rig.echo("unsupported_token_type", of: ["token", "client_secret", "basic_secret"])
         _ = await rig.renderings.observe { try await client.revoke(spent) }
         rig.echo("invalid_scope", path: "/device_authorization", of: ["client_secret", "basic_secret"])
-        _ = await rig.renderings.observe { try await client.startDeviceAuthorization(scope: ["read"]) }
+        _ = await rig.renderings.observe { try await client.beginDeviceAuthorization(scope: ["read"]) }
 
         rig.echo("access_denied", of: ["device_code", "client_secret", "basic_secret"])
-        let denied = try await client.startDeviceAuthorization(scope: ["read"])
+        let denied = try await client.beginDeviceAuthorization(scope: ["read"])
         async let deniedPoll = rig.renderings.observe { try await client.completeDeviceAuthorization(denied) }
         _ = await rig.clock.advanceToNextSleeper()
         _ = await deniedPoll
@@ -173,7 +173,7 @@ struct RedactionCanaryTests {
 
         // Transport failure.
         await rig.server.configure { $0.override = { _ in .init(failure: URLError(.notConnectedToInternet)) } }
-        _ = await rig.renderings.observe { try await client.refresh(refreshToken: spent) }
+        _ = await rig.renderings.observe { try await client.refresh(spent) }
 
         Self.assertNoCanary(rig)
     }
@@ -213,7 +213,7 @@ struct RedactionCanaryTests {
         await rig.renderings.observe {
             try await manager.accessToken(for: TokenTarget.exchange(audiences: ["service"]))
         }
-        await rig.renderings.observe { try await manager.exchangeRefreshToken(audience: "service") }
+        await rig.renderings.observe { try await manager.exchangeRefreshToken(audiences: ["service"]) }
         // The signed `URLRequest` of the other overload is Foundation's own type and prints its headers; the
         // token that came with it is ours.
         rig.renderings.look(try await authorizer.sign(URLRequest(url: resource.url)).1)
