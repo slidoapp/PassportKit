@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(make setup)",
+      "Bash(make format)",
+      "Bash(make lint)",
+      "Bash(make build)",
+      "Bash(make test)",
+      "Bash(make check)",
+      "Bash(swift build:*)",
+      "Bash(swift test:*)",
+      "Bash(swift format:*)",
+      "Bash(swift package describe:*)",
+      "Bash(swift package resolve)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git switch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git fetch:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "WebFetch(domain:www.rfc-editor.org)",
+      "WebFetch(domain:datatracker.ietf.org)",
+      "WebFetch(domain:openid.net)",
+      "WebFetch(domain:developer.apple.com)",
+      "WebFetch(domain:docs.swift.org)",
+      "WebFetch(domain:www.swift.org)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr review:*)",
+      "Bash(gh issue comment:*)",
+      "Edit(/.github/**)",
+      "Edit(/LICENSE)",
+      "Edit(/Package.swift)",
+      "Edit(/Tests/Fixtures/**)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git tag:*)",
+      "Bash(gh release:*)",
+      "Read(/.env)",
+      "Read(/.env.*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-swift.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
