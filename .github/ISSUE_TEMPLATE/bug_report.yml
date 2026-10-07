@@ -1,0 +1,40 @@
+name: Bug report
+description: Something does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Never paste real tokens, authorization codes, or client secrets. Report security issues privately (see SECURITY.md).
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: What you expected and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: flow
+    attributes:
+      label: Flow
+      description: For example authorization code with PKCE, device authorization, refresh, token exchange.
+    validations:
+      required: true
+  - type: textarea
+    id: exchange
+    attributes:
+      label: Redacted HTTP exchange
+      description: Requests and responses with secrets replaced by placeholders.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: PassportKit version
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Platform and Swift version
+      description: For example macOS 15, Swift 6.2.
+    validations:
+      required: true
