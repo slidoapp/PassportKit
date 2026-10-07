@@ -30,7 +30,9 @@ extension FakeAuthorizationServer {
     public func authorizeInteractively(
         _ authorizationURL: URL, subject: String = "user-1", decision: Decision = .approve
     ) throws -> URL {
-        let items = URLComponents(url: authorizationURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        // Form decoding, so that both `+` and `%20` mean a space, whichever a client chose.
+        let query = URLComponents(url: authorizationURL, resolvingAgainstBaseURL: false)?.percentEncodedQuery ?? ""
+        let items = (FormEncoding.decode(Data(query.utf8)) ?? []).map { (name: $0.0, value: $0.1) }
         func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
         guard let client = value("client_id").flatMap({ clients[$0] }) else {
             throw ControlError(description: "The authorization request names an unknown client.")
@@ -62,7 +64,7 @@ extension FakeAuthorizationServer {
         }
         let scope = ScopeSet(parsing: value("scope") ?? client.scope?.rawValue ?? "")
         if let allowed = client.scope, !scope.isSubset(of: allowed) { return try failure("invalid_scope") }
-        let resources = items.filter { $0.name == "resource" }.compactMap { $0.value.flatMap { URL(string: $0) } }
+        let resources = items.filter { $0.name == "resource" }.compactMap { URL(string: $0.value) }
         guard decision == .approve else { return try failure("access_denied") }
 
         let code = nextIdentifier("code")
