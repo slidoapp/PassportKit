@@ -20,6 +20,9 @@ public struct AuthorizationRequest: Sendable {
     public var prompt: String?
     /// Extension parameters appended after the standard ones; a colliding name is an `invalidConfiguration` error.
     public var additionalParameters: AdditionalParameters
+    /// How long the user has to complete the request, measured on the client's injected clock; 10 minutes by
+    /// default. Must be positive.
+    public var lifetime: Duration
 
     /// Creates a request.
     public init(
@@ -28,7 +31,8 @@ public struct AuthorizationRequest: Sendable {
         resources: [URL] = [],
         loginHint: String? = nil,
         prompt: String? = nil,
-        additionalParameters: AdditionalParameters = [:]
+        additionalParameters: AdditionalParameters = [:],
+        lifetime: Duration = .seconds(600)
     ) {
         self.redirectURI = redirectURI
         self.scope = scope
@@ -36,6 +40,7 @@ public struct AuthorizationRequest: Sendable {
         self.loginHint = loginHint
         self.prompt = prompt
         self.additionalParameters = additionalParameters
+        self.lifetime = lifetime
     }
 }
 

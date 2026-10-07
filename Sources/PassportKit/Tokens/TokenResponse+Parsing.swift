@@ -10,9 +10,11 @@ extension TokenResponse {
     /// mean zero), a `null` member (treated as absent), and any unknown member (kept in ``additionalFields``).
     /// A known member of an unexpected type stays in ``additionalFields`` unparsed.
     /// With `exchange` set, a missing `token_type` is tolerated (and reported as `N_A`) when `issued_token_type`
-    /// names something other than an access token (RFC 8693 §2.2.1).
+    /// names something other than an access token. With `exchange` set, `issued_token_type` is required
+    /// (RFC 8693 §2.2.1).
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidResponse`` when the body is
-    /// not a JSON object or lacks a non-empty `access_token` or a `token_type` string (RFC 6749 §5.1).
+    /// not a JSON object or lacks a non-empty `access_token` or a `token_type` string (RFC 6749 §5.1), or, for an exchange, lacks
+    /// `issued_token_type`.
     init(parsing data: Data, exchange: Bool = false) throws {
         guard case .object(var members)? = try? JSONDecoder().decode(JSONValue.self, from: data) else {
             throw PassportError(.invalidResponse, errorDescription: "The token response is not a JSON object.")
@@ -34,6 +36,9 @@ extension TokenResponse {
             throw PassportError(.invalidResponse, errorDescription: "The token response has no access_token.")
         }
         let issuedTokenType = takeString("issued_token_type").map { TokenTypeIdentifier(rawValue: $0) }
+        if exchange, issuedTokenType == nil || issuedTokenType?.rawValue.isEmpty == true {
+            throw PassportError(.invalidResponse, errorDescription: "The exchange response has no issued_token_type.")
+        }
         var tokenType = takeString("token_type") ?? ""
         if tokenType.isEmpty, exchange, let issuedTokenType, issuedTokenType != .accessToken {
             tokenType = "N_A"
