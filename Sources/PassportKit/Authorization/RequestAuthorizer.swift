@@ -9,15 +9,30 @@ import Foundation
 ///
 /// A request is never sent without a token, and a rejected request is retried at most once. A 403, or a
 /// challenge with `insufficient_scope`, never refreshes a token: a new token would not carry more scope.
+///
+/// A bearer token is sent to whatever host the request names. When requests are built from URLs that a server
+/// or a user can influence (links in a response, a redirect target stored earlier), pass `allowedOrigins`.
 public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     private let manager: TokenManager
     private let transport: any HTTPTransport
+    private let allowedOrigins: Set<OriginKey>?
 
     /// Creates an authorizer that obtains tokens from `manager` and sends ``send(_:for:)`` requests on
     /// `transport`.
-    public init(manager: TokenManager, transport: any HTTPTransport = URLSessionTransport()) {
+    ///
+    /// - Parameter allowedOrigins: When not `nil`, the only origins a request may name. An origin is a URL whose
+    ///   scheme, host and port count and whose path is ignored, such as `https://api.example.com`; a default port
+    ///   equals an explicit one. Any other request fails with
+    ///   ``PassportError/Code-swift.struct/invalidConfiguration`` before a token is obtained. An entry
+    ///   without a scheme and host allows nothing.
+    public init(
+        manager: TokenManager,
+        transport: any HTTPTransport = URLSessionTransport(),
+        allowedOrigins: Set<URL>? = nil
+    ) {
         self.manager = manager
         self.transport = transport
+        self.allowedOrigins = allowedOrigins.map { Set($0.map(OriginKey.init)) }
     }
 
     /// A fixed summary: the injected transport is never reached, so a dump cannot show what it holds.
@@ -31,9 +46,11 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
 
     /// Adds `Authorization: Bearer <token>` (RFC 6750 §2.1) and returns the token that was used.
     ///
-    /// Throws what ``TokenManager/accessToken(for:)`` throws when no token can be obtained, and
-    /// ``PassportError/Code-swift.struct/invalidConfiguration`` when the URL is neither `https` nor
-    /// `http` on a loopback host, so a token never travels in clear text, or when the token's
+    /// Throws what ``TokenManager/accessToken(for:)`` throws when no token can be obtained,
+    /// ``PassportError/Code-swift.struct/invalidResponse`` when the token is not a valid `b64token`
+    /// (RFC 6750 §2.1), and ``PassportError/Code-swift.struct/invalidConfiguration`` when the URL is neither
+    /// `https` nor `http` on a loopback host, so a token never travels in clear text, when its origin is not in
+    /// `allowedOrigins`, or when the token's
     /// ``AccessToken/tokenType`` is not `Bearer` (compared case-insensitively): other types, such as
     /// sender-constrained `DPoP` tokens, need proof this authorizer cannot produce. Never returns an
     /// unsigned request.
@@ -41,7 +58,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         _ request: URLRequest,
         for target: TokenTarget = .default
     ) async throws -> (URLRequest, AccessToken) {
-        try Self.requireSecureTransport(request.url)
+        try requireDestination(request.url)
         let token = try await manager.accessToken(for: target)
         try Self.requireBearer(token)
         var signed = request
@@ -56,7 +73,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         _ request: HTTPRequest,
         for target: TokenTarget = .default
     ) async throws -> (HTTPRequest, AccessToken) {
-        try Self.requireSecureTransport(request.url)
+        try requireDestination(request.url)
         let token = try await manager.accessToken(for: target)
         try Self.requireBearer(token)
         var signed = request
@@ -70,6 +87,9 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     /// - A 401 with `error="invalid_token"` or without a Bearer error code, at `attempt` 0, invalidates
     ///   `token` and answers ``RetryDecision/retry``. Only that exact token is dropped, so concurrent
     ///   requests that were rejected with it cause one refresh.
+    /// - A 401 whose challenges are all for another scheme (`Basic`, `DPoP`) is delivered at `attempt` 0: a
+    ///   new bearer token would not change the answer. A 401 without any challenge is treated like one with a
+    ///   bare Bearer challenge, which is library policy: RFC 6750 §3.1 does not describe it.
     /// - Any other 401 at `attempt` 1 or more fails with ``PassportError/Code-swift.struct/unauthorized``.
     /// - Everything else, including every 403, is delivered.
     public func evaluate(
@@ -79,8 +99,8 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         attempt: Int
     ) async -> RetryDecision {
         guard statusCode == 401 else { return .deliver }
-        let challenge = AuthenticationChallenge.parse(headers.values(for: "WWW-Authenticate"))
-            .first { $0.scheme == "bearer" && $0.parameters["error"] != nil }
+        let challenges = AuthenticationChallenge.parse(headers.values(for: "WWW-Authenticate"))
+        let challenge = challenges.first { $0.scheme == "bearer" && $0.parameters["error"] != nil }
         let code = challenge?.parameters["error"]
         if code == PassportError.Code.insufficientScope.rawValue {
             return .fail(
@@ -92,6 +112,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         guard attempt == 0 else {
             return .fail(PassportError(.unauthorized, recovery: .resourceDenied, statusCode: statusCode))
         }
+        if !challenges.isEmpty, !challenges.contains(where: { $0.scheme == "bearer" }) { return .deliver }
         guard code == nil || code == PassportError.Code.invalidToken.rawValue else { return .deliver }
         await manager.invalidate(token)
         return .retry
@@ -121,6 +142,10 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     /// Like ``send(_:for:)`` for `URLSession`, with the session supplied by the caller: the library
     /// never reaches for `URLSession.shared`.
     ///
+    /// Redirects follow the same rules as ``URLSessionTransport``: never from HTTPS to HTTP, and a redirect to
+    /// another scheme, host or port drops every header but `Accept`, `Accept-Language` and `User-Agent`, so the
+    /// token does not follow. This holds whatever the session's own delegate does.
+    ///
     /// A transport failure is reported as ``PassportError/Code-swift.struct/transportFailure``; cancellation
     /// propagates unchanged.
     public func data(
@@ -134,7 +159,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
             let data: Data
             let response: URLResponse
             do {
-                (data, response) = try await session.data(for: signed)
+                (data, response) = try await session.data(for: signed, delegate: RedirectPolicyDelegate())
             } catch let error as CancellationError {
                 throw error
             } catch {
@@ -161,13 +186,35 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
                 .invalidConfiguration,
                 detail: "Only Bearer tokens can be sent; the server issued another type.")
         }
+        // RFC 6750 §2.1: b64token = 1*( ALPHA / DIGIT / "-" / "." / "_" / "~" / "+" / "/" ) *"=". Anything else,
+        // such as a line break, could not be a credential and must not reach a header.
+        let value = Array(token.value.reveal().utf8)
+        let body = value.prefix { $0 != UInt8(ascii: "=") }
+        guard !body.isEmpty, value.dropFirst(body.count).allSatisfy({ $0 == UInt8(ascii: "=") }),
+            body.allSatisfy({ isTokenCharacter($0) })
+        else {
+            throw PassportError(.invalidResponse, detail: "The access token is not a valid bearer token.")
+        }
     }
 
-    private static func requireSecureTransport(_ url: URL?) throws {
+    private static func isTokenCharacter(_ byte: UInt8) -> Bool {
+        switch byte {
+        case UInt8(ascii: "a")...UInt8(ascii: "z"), UInt8(ascii: "A")...UInt8(ascii: "Z"),
+            UInt8(ascii: "0")...UInt8(ascii: "9"):
+            return true
+        default:
+            return "-._~+/".utf8.contains(byte)
+        }
+    }
+
+    private func requireDestination(_ url: URL?) throws {
         let scheme = url?.scheme?.lowercased()
         guard scheme == "https" || (scheme == "http" && LoopbackHost.isLoopback(url?.host)) else {
             throw PassportError(
                 .invalidConfiguration, detail: "Bearer tokens are only sent over https or to loopback.")
+        }
+        if let allowedOrigins, let url, !allowedOrigins.contains(OriginKey(url)) {
+            throw PassportError(.invalidConfiguration, detail: "The request URL is not an allowed origin.")
         }
     }
 }
