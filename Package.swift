@@ -45,5 +45,10 @@ let package = Package(
             dependencies: ["PassportKitApple", "PassportKitTesting"],
             swiftSettings: swiftSettings
         ),
+        .executableTarget(
+            name: "passportkit-example",
+            dependencies: ["PassportKit", "PassportKitApple"],
+            swiftSettings: swiftSettings
+        ),
     ]
 )
