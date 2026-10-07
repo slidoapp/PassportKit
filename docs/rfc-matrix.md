@@ -10,16 +10,16 @@ reason in Notes).
 
 | RFC | Title | Status | Notes |
 |---|---|---|---|
-| 6749 | OAuth 2.0 Authorization Framework | planned | Authorization code, refresh, client credentials. No implicit or password grants. |
-| 6750 | Bearer Token Usage | planned | Authorization header only; `WWW-Authenticate` challenge parsing. |
-| 7636 | PKCE | planned | S256 always; `plain` not supported. |
-| 8252 | OAuth 2.0 for Native Apps | planned | System browser, loopback and claimed HTTPS redirects. |
+| 6749 | OAuth 2.0 Authorization Framework | partial | Authorization code, refresh, client credentials. No implicit or password grants. |
+| 6750 | Bearer Token Usage | partial | Authorization header only; `WWW-Authenticate` challenge parsing. |
+| 7636 | PKCE | done | S256 always; `plain` not supported. |
+| 8252 | OAuth 2.0 for Native Apps | partial | System browser, loopback and claimed HTTPS redirects. |
 | 8628 | Device Authorization Grant | planned | |
 | 8693 | Token Exchange | planned | Access-token and refresh-token subjects. |
 | 8707 | Resource Indicators | planned | |
-| 8414 | Authorization Server Metadata | planned | Configurable issuer validation. |
+| 8414 | Authorization Server Metadata | done | Configurable issuer validation. |
 | 7009 | Token Revocation | planned | |
-| 9207 | Authorization Server Issuer Identification | planned | |
+| 9207 | Authorization Server Issuer Identification | done | |
 | 9700 | OAuth 2.0 Security Best Current Practice | planned | Applied across all flows. |
 | 7662 | Token Introspection | not planned | Resource-server concern. |
 | 9449 | DPoP | not planned | Candidate for a later version. |
@@ -74,3 +74,8 @@ reason in Notes).
 | DISC-3 | 8414 §3.3 | MUST | Metadata `issuer` must be identical to the requested issuer; expected-issuer and disabled modes are explicit | done | `Sources/PassportKit/Discovery/Discovery.swift` | `DiscoveryTests` |
 | DISC-4 | 8414 §2 | MUST | Metadata members use their RFC names; unknown members are preserved and re-encoded | done | `Sources/PassportKit/Discovery/AuthorizationServerMetadata.swift` | `DiscoveryTests` |
 | DISC-5 | 8414 §2; 6749 §3.2 | MUST | Endpoints derived from metadata need a token endpoint and TLS | done | `Sources/PassportKit/Configuration/Endpoints+Metadata.swift` | `DiscoveryTests` |
+| CHAL-1 | 9110 §11.6.1; 6750 §3 | MUST | Challenges parsed from several header lines and several per line; auth-params as tokens or quoted strings with backslash escapes; commas inside quotes do not split | done | `Sources/PassportKit/HTTP/AuthenticationChallenge.swift` | `AuthenticationChallengeTests` |
+| CHAL-2 | 9110 §11.1, §11.2 | MUST | Scheme and parameter names are case-insensitive and stored lower-cased | done | `Sources/PassportKit/HTTP/AuthenticationChallenge.swift` | `AuthenticationChallengeTests` |
+| CHAL-3 | 9110 §11.2 | MUST | The `token68` form is recognised, including `=` padding | done | `Sources/PassportKit/HTTP/AuthenticationChallenge.swift` | `AuthenticationChallengeTests` |
+| CHAL-4 | 6750 §3.1; 9449 §7.1 | MUST | `error`, `error_description`, `scope`, `algs` and other parameters are exposed verbatim; empty or malformed input never crashes | done | `Sources/PassportKit/HTTP/AuthenticationChallenge.swift` | `AuthenticationChallengeTests` |
+
