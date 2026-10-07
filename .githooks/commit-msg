@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Validates commit messages: `<type>(<scope>): <summary>` subject of at most
+# 72 characters, a blank line before the body, and a body wrapped at 72
+# columns. Lines containing URLs and trailers (Key: value) are exempt.
+
+message_file="$1"
+subject=$(head -n 1 "$message_file")
+pattern='^(feat|fix|refactor|test|docs|chore)(\([a-zA-Z0-9-]+\))?: [^ ].*$'
+
+# Allow git-generated messages.
+if [[ "$subject" =~ ^(Merge|Revert|fixup!|squash!) ]]; then
+    exit 0
+fi
+
+fail() {
+    echo "commit-msg: $1" >&2
+    echo "See AGENTS.md, section 'Git and pull requests'." >&2
+    exit 1
+}
+
+[[ "$subject" =~ $pattern ]] || fail "subject must match '<type>(<scope>): <summary>' with type feat|fix|refactor|test|docs|chore"
+(( ${#subject} <= 72 )) || fail "subject is longer than 72 characters"
+
+second_line=$(sed -n '2p' "$message_file")
+[[ -z "$second_line" ]] || fail "second line must be blank"
+
+line_number=0
+while IFS= read -r line; do
+    line_number=$((line_number + 1))
+    (( line_number <= 2 )) && continue
+    [[ "$line" =~ ^# ]] && continue
+    [[ "$line" =~ https?:// ]] && continue
+    [[ "$line" =~ ^[A-Za-z-]+:\  ]] && continue
+    (( ${#line} <= 72 )) || fail "body line $line_number is longer than 72 characters"
+done < "$message_file"
+
+exit 0
