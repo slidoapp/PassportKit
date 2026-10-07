@@ -75,7 +75,8 @@ struct PersistenceTests {
                 .signedIn, .tokenRejected(target: target, grantedScope: ["none"]),
             ])
 
-        // The useless token was not cached: asking again goes back to the server instead of looping on it.
+        // The useless token was not cached: once the rejection is forgotten, asking again goes to the server.
+        harness.wallClock.advance(by: .seconds(31))
         _ = await thrownError { try await harness.manager.accessToken(for: target) }
         #expect(await harness.tokenRequests(.refreshToken).count == 2)
         // An accessible resource still works on the persisted token.
