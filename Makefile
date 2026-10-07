@@ -3,7 +3,7 @@
 INTEGRATION_SERVER := Tools/integration-server
 SWIFT_FORMAT_PATHS := $(wildcard Sources Tests Package.swift)
 
-.PHONY: setup format lint build test check integration
+.PHONY: setup format lint build test check integration docs
 
 setup:
 	git config core.hooksPath .githooks
@@ -13,6 +13,7 @@ format:
 
 lint:
 	swift format lint --strict --recursive --parallel $(SWIFT_FORMAT_PATHS)
+	scripts/check-determinism.sh
 
 build:
 	swift build --build-tests
