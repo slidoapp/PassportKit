@@ -20,11 +20,14 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     /// Creates an authorizer that obtains tokens from `manager` and sends ``send(_:for:)`` requests on
     /// `transport`.
     ///
-    /// - Parameter allowedOrigins: When not `nil`, the only origins a request may name. An origin is a URL whose
-    ///   scheme, host and port count and whose path is ignored, such as `https://api.example.com`; a default port
-    ///   equals an explicit one. Any other request fails with
-    ///   ``PassportError/Code-swift.struct/invalidConfiguration`` before a token is obtained. An entry
-    ///   without a scheme and host allows nothing.
+    /// - Parameters:
+    ///   - manager: Supplies the access tokens.
+    ///   - transport: Sends the requests of ``send(_:for:)``.
+    ///   - allowedOrigins: When not `nil`, the only origins a request may name. An origin is a URL whose
+    ///     scheme, host and port count and whose path is ignored, such as `https://api.example.com`; a default
+    ///     port equals an explicit one. Any other request fails with
+    ///     ``PassportError/Code-swift.struct/invalidConfiguration`` before a token is obtained. An entry
+    ///     without a scheme and host allows nothing.
     public init(
         manager: TokenManager,
         transport: any HTTPTransport = URLSessionTransport(),

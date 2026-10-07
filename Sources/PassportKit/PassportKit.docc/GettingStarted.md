@@ -44,6 +44,12 @@ let tokens = try await client.completeDeviceAuthorization(authorization)
 the server's interval, honours `slow_down`, backs off on server errors, stops
 at the deadline and stops immediately when its task is cancelled.
 
+Showing the code is your app's job (RFC 8628 §3.3). The library refuses a
+`user_code` with control or invisible characters, or longer than 64
+characters, so it is safe to display as plain text. Text from a server that
+you print in other places, such as scopes, is not sanitized; do not write it
+to a terminal unfiltered.
+
 ## Sign in with the authorization code flow
 
 Interactive apps use the authorization code grant with PKCE. A
@@ -92,14 +98,14 @@ credential in the Keychain with `PassportKitApple`'s
 rejects it, and never sends a request without a token:
 
 ```swift
-let authorizer = RequestAuthorizer(manager: manager)
+let authorizer = RequestAuthorizer(manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
 let session = URLSession(configuration: .ephemeral)
 let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
 let (data, response) = try await authorizer.data(for: request, session: session)
 ```
 
-Tokens are only sent over `https` or to a loopback host, and only when the
-token type is `Bearer`. A 403 is delivered to you unchanged: a new token
+Tokens are only sent over `https` or to a loopback host, to the origins you
+list in `allowedOrigins`, and only when the token type is `Bearer`. A 403 is delivered to you unchanged: a new token
 would not carry more scope. Read <doc:ResourceAccessAndScopes> before you
 rely on a token for a particular resource.
 

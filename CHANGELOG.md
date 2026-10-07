@@ -43,19 +43,22 @@ First development cycle; nothing is released yet.
   loopback only), decide what a 401 or 403 means (RFC 6750 §3.1), `send(_:for:)` and
   `data(for:target:session:)` with at most one retry.
 - `Retry-After` is also read as an HTTP-date.
+- `RequestAuthorizer(manager:transport:allowedOrigins:)` limits the origins a token may be sent to.
 
 #### Apple platforms (`PassportKitApple`)
 
 - `KeychainCredentialStore`: non-synchronizable generic password items updated in place, an accessibility class
   option, optional data protection keychain on macOS and a `decodeLegacy` migration hook.
 - `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and
-  `LoopbackUserAgent` (RFC 8252).
+  `LoopbackUserAgent` (RFC 8252). `waitForCallback(timeout:accept:)` takes a predicate that decides which
+  authorization-response-shaped request ends the wait; `LoopbackUserAgent` passes one that matches `state`.
 
 #### Testing (`PassportKitTesting`)
 
 - `FakeAuthorizationServer`, `ManualClock` (`waitForSleeper(timeout:)`), `ManualWallClock`, `SequenceRandomSource`
   and `RecordingTransport`. The server rotates refresh tokens on token exchange with a refresh-token subject, can
-  issue a refresh token (`requested_token_type`), and delays responses with `Controls.responseDelay`.
+  issue a refresh token (`requested_token_type`), delays responses with `Controls.responseDelay`, and can leave
+  `scope` out of token responses with `Controls.omitsScope`.
 
 #### Documentation and tooling
 
@@ -149,8 +152,24 @@ First development cycle; nothing is released yet.
 - Error descriptions lose control, line-separator and invisible format characters.
 - Hostile `interval`, `expires_in` and `slow_down` values can no longer trap device polling.
 - `Secret` documents that `Codable` encodes plaintext.
+- The loopback listener ignores requests that are not authorization responses (no `state`, or neither `code` nor
+  `error`) and requests that `Sec-Fetch-Mode` or `Sec-Fetch-Dest` mark as background fetches, so a web page cannot use
+  up the one-shot redirect. It serves at most 8 connections, closes each after 5 seconds, closes them on `cancel()`
+  and on delivery, and stops when it is released.
+- `RequestAuthorizer` refuses a token that is not a valid `b64token` (RFC 6750 §2.1) instead of writing it into a
+  header, and `data(for:target:session:)` applies the library's redirect policy (no HTTPS to HTTP, credential
+  headers dropped across origins) whatever the session's own delegate does.
+- A device `user_code` with control or invisible format characters, or over 64 characters, is an invalid response;
+  the example executable prints server text through a sanitizer.
+- The token cache drops expired tokens and rejections when it grows and keeps at most 256 of each.
+- The integration server listens on `127.0.0.1` only.
 
 ### Fixed
 
+- A refresh without `scope` against a server that also omits `scope` from the response now yields a token with the
+  originally granted scope (RFC 6749 §5.1, §6), and a refresh that renews the whole grant records the scope the
+  server returned in the credential. Before, the token's scope was unknown and `RequireAnyScope` rejected it.
+- A `resource` indicator may be any absolute URI, such as `urn:example:api`, not only a URL with a host (RFC 8707 §2).
+- A 401 that carries challenges for other schemes only (`Basic`, `DPoP`) is delivered instead of refreshing the token.
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization request query as form data, so a `+` in
   `scope` is a space.

@@ -41,6 +41,11 @@ everything past 200 characters.
 | CSRF on redirect | `state` generated per request and validated exactly |
 | Mix-up attacks | Validate `iss` in the authorization response when present (RFC 9207) |
 | Open redirect / redirect injection | Exact redirect URI matching; loopback listener binds to loopback interfaces only |
+| Web page races or floods the loopback listener | The listener claims only a `GET` for its path with the loopback `Host`, `state` and `code` or `error`, no background `Sec-Fetch-*` metadata and an `accept` match on `state`; at most 8 connections, closed after 5 s, on `cancel()` and on delivery; a released listener stops (RFC 8252 §8.3) |
+| Token sent to an attacker-chosen host | `RequestAuthorizer` sends only over `https` or to loopback; `allowedOrigins` limits the hosts, and must be set when request URLs come from untrusted data; redirects never leave HTTPS and drop credential headers across origins, also for `data(for:target:session:)` |
+| Header injection through a token | A token that is not a `b64token` (RFC 6750 §2.1) is refused before it reaches a header |
+| Memory growth from many targets | The token cache and the remembered rejections are limited to 256 entries each |
+| Server text shown to a person | Error text is sanitized; a device `user_code` with control or invisible characters, or over 64 characters, is an invalid response; apps show it themselves (RFC 8628 §3.3), and the example executable prints server text through a sanitizer |
 | Token theft from logs | Redaction rules above, enforced by tests and by the redaction canary, which searches every error, event and description of every flow for the secrets it used |
 | Token sent with the wrong scheme | Only `Bearer` tokens are sent by `RequestAuthorizer`; sender-constrained types fail before any request |
 | Token theft from storage | Platform secure storage (Keychain) with the strictest workable accessibility class |
@@ -50,7 +55,11 @@ everything past 200 characters.
 
 ## Transport
 
-- HTTPS only for all endpoints, except loopback redirect URIs (RFC 8252).
+- HTTPS for all endpoints and for tokens sent to resources. Two loopback exceptions: redirect URIs
+  (RFC 8252 §7.3) and, as a development deviation from RFC 6749 §3.1, §3.2, RFC 7009 §2.1 and RFC 8414 §3,
+  endpoints and resources on a loopback host (`localhost`, `127.0.0.1`, `::1`). The `localhost` name is also
+  accepted in a redirect URI although RFC 8252 §7.3 says NOT RECOMMENDED (RFC 8252 §8.3 prefers the IP literal);
+  the library's own listener uses `127.0.0.1`.
 - Token requests do not follow redirects.
 - Other redirects never leave HTTPS for HTTP. When a redirect changes
   scheme, host or port, every request header except `Accept`,
@@ -59,3 +68,13 @@ everything past 200 characters.
 - Additional parameters can never carry `client_id` or `client_secret`
   (RFC 6749 §2.3: one authentication method per request).
 - A verification URI shown to a person must be `https` (or loopback `http`).
+
+## Known limits
+
+- **ID tokens are stored, never validated.** PassportKit is an OAuth 2.0 client, not an OpenID Connect relying
+  party: an `id_token` is kept in the credential without checking its signature, issuer, audience or nonce. Do not
+  treat it as proof of identity.
+- **401-triggered invalidation is not rate limited.** A resource that answers 401 `invalid_token` to every fresh
+  token makes each request cost one refresh (a request retries once; concurrent requests for the same token share
+  one refresh). A rate limit needs a policy for what to do over the limit and is left to the app, which can wrap
+  `RequestAuthorizer.evaluate` or stop on repeated `unauthorized` errors.

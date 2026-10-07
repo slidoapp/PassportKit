@@ -29,7 +29,7 @@ enum DocumentationSnippets {
         let token = try await manager.accessToken()
         _ = token
 
-        let authorizer = RequestAuthorizer(manager: manager)
+        let authorizer = RequestAuthorizer(manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
         let session = URLSession(configuration: .ephemeral)
         let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
         let (data, response) = try await authorizer.data(for: request, session: session)
@@ -53,6 +53,13 @@ enum DocumentationSnippets {
         let exchanged = try await manager.accessToken(
             for: .exchange(audiences: ["reports"]))
         _ = (general, bound, exchanged)
+    }
+
+    // ResourceAccessAndScopes.md
+    static func origins(manager: TokenManager) {
+        let authorizer = RequestAuthorizer(
+            manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
+        _ = authorizer
     }
 
     // ResourceAccessAndScopes.md
