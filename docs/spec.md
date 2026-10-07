@@ -41,7 +41,7 @@ DPoP and PAR (see §11).
 |---|---|---|
 | `PassportKit` | Everything protocol-level: types, client, token manager, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store | Foundation (FoundationNetworking on Linux); CryptoKit when available |
 | `PassportKitApple` | `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | `PassportKit`, Security, AuthenticationServices, Network, AppKit/UIKit |
-| `PassportKitTesting` | `FakeAuthorizationServer`, `ManualClock`, `FixedWallClock`, `SequenceRandomSource`, `RecordingTransport` | `PassportKit` |
+| `PassportKitTesting` | `FakeAuthorizationServer`, `ManualClock`, `ManualWallClock`, `SequenceRandomSource`, `RecordingTransport` | `PassportKit` |
 
 Test targets: `PassportKitTests` (unit), `PassportKitTestingTests` (the
 fake server itself), `ConformanceTests` (scenarios against the fake
@@ -874,8 +874,9 @@ implements the token, device authorization, revocation and metadata
 endpoints well enough to run every flow, and is scriptable:
 
 - clients with flags: public/confidential, rotation on/off, rotation
-  leeway (seconds and reuse count, like real servers that allow one reuse
-  within 120 s);
+  leeway (a `Duration` window and a reuse count, like real servers that allow one
+  reuse within 120 s); every lifetime and interval in the registration and in the
+  controls is a `Duration`;
 - per-request hooks to override responses (status, body, headers, delay) and to
   delay the answer of a request the server has already handled (`responseDelay`);
 - token exchange with a refresh token subject spends and rotates it like a
@@ -887,12 +888,16 @@ endpoints well enough to run every flow, and is scriptable:
   returning `401 access_denied` for a denied resource;
 - device flow: approve, deny, or leave pending per device code; emits
   `slow_down` on demand;
-- records every request with decoded form parameters.
+- records every request with decoded form parameters;
+- `makeClient(clientID:wallClock:clock:)` builds an `OAuthClient` for a registered
+  client, and `userAgent(subject:decision:)` returns an `AuthorizationUserAgent` that
+  plays the user; the token helpers `revoke(token:)`, `expire(token:)` and
+  `details(of:)` take a `Secret` (a `String` overload serves raw response bodies).
 
 `ManualClock` implements `Clock<Duration>`; `sleep` suspends until the
 test advances time. `waitForSleeper()` and `advanceToNextSleeper()` wait for a
 sleeper in real time and stop the process with a clear message after 10 s
-instead of hanging; `waitForSleeper(timeout:)` returns `false` instead. `FixedWallClock` returns a settable `Date`.
+instead of hanging; `waitForSleeper(timeout:)` returns `false` instead. `ManualWallClock` returns a settable `Date` and moves only when told to.
 
 ## 15. Quality gates
 

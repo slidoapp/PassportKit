@@ -3,15 +3,6 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-/// Plays the user: approves every authorization request at the fake server.
-struct ServerUserAgent: AuthorizationUserAgent {
-    let server: FakeAuthorizationServer
-
-    func present(_ url: URL, redirectURI: URL) async throws -> URL {
-        try await server.authorizeInteractively(url)
-    }
-}
-
 /// Counts how many requests are in flight at once, to prove the refresh token lane never overlaps.
 actor RequestGauge {
     private var current = 0
@@ -62,7 +53,7 @@ let deniedResource = URL(string: "https://api.example.com/denied/x")!
 struct Harness {
     let server: FakeAuthorizationServer
     let clock = ManualClock()
-    let wallClock = FixedWallClock()
+    let wallClock = ManualWallClock()
     let gauge = RequestGauge()
     let store: any CredentialStore
     let account = CredentialAccount(service: "conformance", account: "user")
@@ -77,7 +68,7 @@ struct Harness {
         policy: any TokenAcceptancePolicy = AcceptAnyToken(),
         minimumTokenLifetime: Duration = .seconds(60),
         defaultTokenLifetime: Duration? = nil,
-        accessTokenLifetime: TimeInterval = 900,
+        accessTokenLifetime: Duration = .seconds(900),
         store: any CredentialStore = InMemoryCredentialStore(),
         rejectedTokenCacheDuration: Duration = .seconds(30),
         signedIn: Bool = true
@@ -110,7 +101,7 @@ struct Harness {
     func grant() async throws -> TokenResponse {
         try await client.authorize(
             AuthorizationRequest(redirectURI: redirectURI, scope: ["read", "write"]),
-            using: ServerUserAgent(server: server))
+            using: server.userAgent())
     }
 
     /// Signs in with a new grant.

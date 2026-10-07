@@ -30,12 +30,13 @@ extension FakeAuthorizationServer.ClientRegistration {
     /// A public client that may use every user-facing grant.
     static func app(
         rotates: Bool = false, leeway: FakeAuthorizationServer.RotationLeeway? = nil,
-        revokesGrantOnReuse: Bool = false, refreshLifetime: TimeInterval? = nil
+        revokesGrantOnReuse: Bool = false, refreshLifetime: Duration? = nil
     ) -> Self {
         Self(
             id: "app", allowedGrants: [.authorizationCode, .refreshToken, .deviceCode, .tokenExchange],
             scope: ["read", "write", "admin"], rotatesRefreshTokens: rotates, rotationLeeway: leeway,
-            revokesGrantOnReuse: revokesGrantOnReuse, accessTokenLifetime: 900, refreshTokenLifetime: refreshLifetime)
+            revokesGrantOnReuse: revokesGrantOnReuse, accessTokenLifetime: .seconds(900),
+            refreshTokenLifetime: refreshLifetime)
     }
 
     /// A confidential client for `client_credentials`.
@@ -46,7 +47,7 @@ extension FakeAuthorizationServer.ClientRegistration {
 /// A server plus helpers that speak to it through raw requests.
 struct Fixture {
     let server: FakeAuthorizationServer
-    let wallClock = FixedWallClock()
+    let wallClock = ManualWallClock()
 
     init(_ clients: [FakeAuthorizationServer.ClientRegistration] = [.app(), .service]) {
         server = FakeAuthorizationServer(clients: clients, wallClock: wallClock)

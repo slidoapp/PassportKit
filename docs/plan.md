@@ -11,7 +11,7 @@ and one or more commits. "Spec" refers to `docs/spec.md`.
 | M2 | `OAuthClient`: refresh, client credentials, exchange, revoke, extension grant, client authentication, observer events | §5, §8 | request/response tests against a recording transport | done |
 | M3 | Device authorization grant with poller | §8 | poller tests with `ManualClock`: pending, `slow_down`, backoff, expiry, denial, cancellation | done |
 | M4 | Authorization code + PKCE, `AuthorizationUserAgent`, callback validation incl. `iss`; discovery + issuer validation; `AuthenticationChallenge` parser | §8, §10, §11 | tests for every callback check, RFC 8414 URL construction, challenge corpus | done |
-| M5 | `PassportKitTesting`: `FakeAuthorizationServer`, `ManualClock`, `FixedWallClock`, `SequenceRandomSource`, `RecordingTransport` | §14 | fake server covers every endpoint and toggle; self-tests | done |
+| M5 | `PassportKitTesting`: `FakeAuthorizationServer`, `ManualClock`, `ManualWallClock`, `SequenceRandomSource`, `RecordingTransport` | §14 | fake server covers every endpoint and toggle; self-tests | done |
 | M6 | `TokenManager`, `CredentialStore`, `InMemoryCredentialStore`, acceptance policies, events | §9 | one conformance test per invariant against the fake server | done |
 | M7 | `RequestAuthorizer` | §10 | 401/403/`insufficient_scope` matrix, never unsigned, single refresh for concurrent 401s | done |
 | M8 | `PassportKitApple`: Keychain store, `ASWebAuthenticationSession` agent, loopback agent | §13 | Keychain round trip with unique service, loopback agent end-to-end against `URLSession` | done |

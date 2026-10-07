@@ -107,7 +107,7 @@ the DocC archives locally.
 ## Testing your app
 
 The `PassportKitTesting` library contains `FakeAuthorizationServer`, an in-process authorization server and
-protected resource that plugs in as the HTTP transport, plus `ManualClock`, `FixedWallClock` and
+protected resource that plugs in as the HTTP transport, plus `ManualClock`, `ManualWallClock` and
 `RecordingTransport`. Add it to test targets only. See the Testing article above.
 
 ## Contributing

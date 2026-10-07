@@ -87,7 +87,7 @@ named vendors.
 
 Two hooks control expiry and response timing without sleeping:
 
-- `expire(token:)` makes the server treat one issued token as expired as of
+- `expire(token:)` (a `Secret`, or a `String` read from a raw body) makes the server treat one issued token as expired as of
   the injected wall clock's current time, without moving that clock. Use it
   to test a rejection of a token the client still believes is fresh.
 - `Controls.responseDelay` holds back the answer to a request, on the

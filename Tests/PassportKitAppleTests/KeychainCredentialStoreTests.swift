@@ -164,8 +164,8 @@
             defer { cleanUp() }
             let registration = FakeAuthorizationServer.ClientRegistration(
                 id: "app", allowedGrants: [.authorizationCode, .refreshToken], scope: ["read"],
-                rotatesRefreshTokens: true, revokesGrantOnReuse: true, accessTokenLifetime: 900)
-            let wallClock = FixedWallClock()
+                rotatesRefreshTokens: true, revokesGrantOnReuse: true, accessTokenLifetime: .seconds(900))
+            let wallClock = ManualWallClock()
             let server = FakeAuthorizationServer(
                 clients: [registration], wallClock: wallClock, clock: ManualClock())
             let client = try OAuthClient(
@@ -182,7 +182,7 @@
             let response = try await client.authorize(
                 AuthorizationRequest(
                     redirectURI: try #require(URL(string: "https://app.example.com/callback")), scope: ["read"]),
-                using: ServerAgent(server: server))
+                using: server.userAgent())
             try await manager.signIn(with: response, requestedScope: ["read"])
             let first = try await #require(store.load(account)?.refreshToken?.reveal())
 
@@ -205,14 +205,6 @@
                     kSecAttrService as String: account.service,
                     kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
                 ] as CFDictionary)
-        }
-    }
-
-    private struct ServerAgent: AuthorizationUserAgent {
-        let server: FakeAuthorizationServer
-
-        func present(_ url: URL, redirectURI: URL) async throws -> URL {
-            try await server.authorizeInteractively(url)
         }
     }
 #endif

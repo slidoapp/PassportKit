@@ -27,33 +27,23 @@ Add the library to your test target only:
 import PassportKit
 import PassportKitTesting
 
-func makeClient() throws -> (OAuthClient, FakeAuthorizationServer) {
+func signIn() async throws -> (OAuthClient, FakeAuthorizationServer, TokenResponse) {
     let server = FakeAuthorizationServer(clients: [
         .init(id: "app", rotatesRefreshTokens: true)
     ])
-    let configuration = ClientConfiguration(
-        endpoints: Endpoints(
-            authorization: FakeAuthorizationServer.authorizationEndpoint,
-            token: FakeAuthorizationServer.tokenEndpoint),
-        authentication: .publicClient(clientID: "app"),
-        issuer: FakeAuthorizationServer.issuer)
-    let client = try OAuthClient(configuration: configuration, transport: server)
-    return (client, server)
+    let client = try await server.makeClient(clientID: "app")
+    let request = AuthorizationRequest(
+        redirectURI: URL(string: "https://app.example.com/callback")!, scope: ["read"])
+    let tokens = try await client.authorize(request, using: server.userAgent())
+    return (client, server, tokens)
 }
 ```
 
-Sign in without a person: `authorizeInteractively(_:)` plays the user, so a
-``AuthorizationUserAgent`` for tests is a few lines:
-
-```swift
-struct ApprovingUserAgent: AuthorizationUserAgent {
-    let server: FakeAuthorizationServer
-
-    func present(_ url: URL, redirectURI: URL) async throws -> URL {
-        try await server.authorizeInteractively(url)
-    }
-}
-```
+`makeClient(clientID:wallClock:clock:)` builds a client for a registered
+client that talks to the server, with the server's endpoints and issuer.
+`userAgent(subject:decision:)` returns an ``AuthorizationUserAgent`` that plays
+the person: it approves, or with `.deny` declines, every authorization request.
+`authorizeInteractively(_:)` is the same step for a URL you hold.
 
 ## Controlling the scenario
 
@@ -78,7 +68,7 @@ struct ApprovingUserAgent: AuthorizationUserAgent {
 `ManualClock` implements `Clock`. Pass it as the client's `clock`, and
 polling intervals, time limits and delays wait until your test advances it.
 `advanceToNextSleeper()` waits for a sleeper and moves time to its deadline.
-`FixedWallClock` is the calendar clock whose date you set, which decides when
+`ManualWallClock` is the calendar clock whose date you set, which decides when
 tokens expire. `SequenceRandomSource` makes `state` and PKCE values
 deterministic.
 
