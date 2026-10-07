@@ -23,11 +23,11 @@ struct RequestAuthorizerConformanceTests {
     @Test("RFC 6750 §3.1: an expired token is refreshed and the request succeeds")
     func endToEnd() async throws {
         let harness = try await Harness()
-        let authorizer = RequestAuthorizer(manager: harness.manager)
+        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
         let stale = try await harness.manager.accessToken()
         await harness.server.expire(token: stale.value.reveal())
 
-        let response = try await authorizer.send(resource, using: harness.server)
+        let response = try await authorizer.send(resource)
         #expect(response.statusCode == 200)
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
         let sent = await resourceRequests(harness)
@@ -41,14 +41,13 @@ struct RequestAuthorizerConformanceTests {
     @Test("RFC 6750 §3.1: concurrent 401s for one token cause one refresh and each request retries once")
     func concurrentRejections() async throws {
         let harness = try await Harness()
-        let authorizer = RequestAuthorizer(manager: harness.manager)
+        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
         let stale = try await harness.manager.accessToken()
         await harness.server.expire(token: stale.value.reveal())
-        let server = harness.server
         let request = resource
 
         let statuses = try await withThrowingTaskGroup(of: Int.self) { group in
-            for _ in 0..<8 { group.addTask { try await authorizer.send(request, using: server).statusCode } }
+            for _ in 0..<8 { group.addTask { try await authorizer.send(request).statusCode } }
             return try await group.reduce(into: []) { $0.append($1) }
         }
         #expect(statuses == Array(repeating: 200, count: 8))
@@ -62,7 +61,7 @@ struct RequestAuthorizerConformanceTests {
     func lateRejection() async throws {
         let harness = try await Harness()
         let authorizer = RequestAuthorizer(manager: harness.manager)
-        let (signed, stale) = try await authorizer.authorize(resource)
+        let (signed, stale) = try await authorizer.sign(resource)
         await harness.server.expire(token: stale.value.reveal())
         let rejection = try await harness.server.send(signed)
         #expect(rejection.statusCode == 401)
@@ -75,7 +74,7 @@ struct RequestAuthorizerConformanceTests {
         let decision = await authorizer.evaluate(
             statusCode: rejection.statusCode, headers: rejection.headers, token: stale, attempt: 0)
         #expect(decision == .retry)
-        let (retried, token) = try await authorizer.authorize(resource)
+        let (retried, token) = try await authorizer.sign(resource)
         #expect(token.value == fresh.value)
         #expect(try await harness.server.send(retried).statusCode == 200)
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
@@ -85,9 +84,9 @@ struct RequestAuthorizerConformanceTests {
     func forbidden() async throws {
         let harness = try await Harness()
         await harness.server.configure { $0.requiredScope = ["admin"] }
-        let authorizer = RequestAuthorizer(manager: harness.manager)
+        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
 
-        let response = try await authorizer.send(resource, using: harness.server)
+        let response = try await authorizer.send(resource)
         #expect(response.statusCode == 403)
         #expect(response.headers["WWW-Authenticate"]?.contains("insufficient_scope") == true)
         #expect(await harness.tokenRequests(.refreshToken).isEmpty)
@@ -98,9 +97,9 @@ struct RequestAuthorizerConformanceTests {
     func insufficientScope() async throws {
         let harness = try await Harness()
         await rejectAtResource(harness, challenge: #"Bearer error="insufficient_scope""#)
-        let authorizer = RequestAuthorizer(manager: harness.manager)
+        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
 
-        let error = await thrownError { try await authorizer.send(resource, using: harness.server) }
+        let error = await thrownError { try await authorizer.send(resource) }
         #expect(error?.code == .insufficientScope)
         #expect(error?.recovery == .resourceDenied)
         #expect(await harness.tokenRequests(.refreshToken).isEmpty)
@@ -112,9 +111,9 @@ struct RequestAuthorizerConformanceTests {
     func persistentRejection() async throws {
         let harness = try await Harness()
         await rejectAtResource(harness, challenge: #"Bearer error="invalid_token""#)
-        let authorizer = RequestAuthorizer(manager: harness.manager)
+        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
 
-        let error = await thrownError { try await authorizer.send(resource, using: harness.server) }
+        let error = await thrownError { try await authorizer.send(resource) }
         #expect(error?.code == .unauthorized)
         #expect(error?.recovery == .resourceDenied)
         #expect(await resourceRequests(harness).count == 2)
@@ -126,9 +125,9 @@ struct RequestAuthorizerConformanceTests {
     func signedOut() async throws {
         let harness = try await Harness(signedIn: false)
         let transport = RecordingTransport()
-        let authorizer = RequestAuthorizer(manager: harness.manager)
+        let authorizer = RequestAuthorizer(manager: harness.manager, transport: transport)
 
-        let error = await thrownError { try await authorizer.send(resource, using: transport) }
+        let error = await thrownError { try await authorizer.send(resource) }
         #expect(error?.code == .notAuthenticated)
         #expect(await transport.requests.isEmpty)
     }
@@ -137,14 +136,14 @@ struct RequestAuthorizerConformanceTests {
     func tokenType() async throws {
         let harness = try await Harness(signedIn: false)
         let transport = RecordingTransport()
-        let authorizer = RequestAuthorizer(manager: harness.manager)
+        let authorizer = RequestAuthorizer(manager: harness.manager, transport: transport)
 
         try await harness.manager.signIn(
             with: TokenResponse(
                 accessToken: Secret("sender-constrained"), tokenType: "DPoP", expiresIn: .seconds(600),
                 refreshToken: Secret("refresh")),
             requestedScope: ["read"])
-        let error = await thrownError { try await authorizer.send(resource, using: transport) }
+        let error = await thrownError { try await authorizer.send(resource) }
         #expect(error?.code == .invalidConfiguration)
         #expect(await transport.requests.isEmpty)
         #expect(await harness.manager.credential != nil, "a configuration error does not end the session")
@@ -154,7 +153,7 @@ struct RequestAuthorizerConformanceTests {
                 accessToken: Secret("plain"), tokenType: "bEaReR", expiresIn: .seconds(600),
                 refreshToken: Secret("refresh")),
             requestedScope: ["read"])
-        let (signed, _) = try await authorizer.authorize(resource)
+        let (signed, _) = try await authorizer.sign(resource)
         #expect(signed.headers["Authorization"] == "Bearer plain")
     }
 
@@ -162,10 +161,10 @@ struct RequestAuthorizerConformanceTests {
     func insecureURL() async throws {
         let harness = try await Harness()
         let transport = RecordingTransport()
-        let authorizer = RequestAuthorizer(manager: harness.manager)
+        let authorizer = RequestAuthorizer(manager: harness.manager, transport: transport)
         let request = HTTPRequest(method: .get, url: URL(string: "http://api.example.com/items")!)
 
-        let error = await thrownError { try await authorizer.send(request, using: transport) }
+        let error = await thrownError { try await authorizer.send(request) }
         #expect(error?.code == .invalidConfiguration)
         #expect(await transport.requests.isEmpty)
         #expect(await harness.tokenRequests(.refreshToken).isEmpty)

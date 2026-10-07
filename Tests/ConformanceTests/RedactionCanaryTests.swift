@@ -196,7 +196,7 @@ struct RedactionCanaryTests {
         let account = CredentialAccount(service: "canary", account: "user")
         let manager = TokenManager(client: rig.client, store: store, account: account)
         let events = Self.collect(manager.events)
-        let authorizer = RequestAuthorizer(manager: manager)
+        let authorizer = RequestAuthorizer(manager: manager, transport: rig.server)
         let resource = HTTPRequest(method: .get, url: URL(string: "https://api.example.com/items")!)
 
         let grant = try await rig.authorize()
@@ -216,16 +216,16 @@ struct RedactionCanaryTests {
         await rig.renderings.observe { try await manager.exchangeRefreshToken(audience: "service") }
         // The signed `URLRequest` of the other overload is Foundation's own type and prints its headers; the
         // token that came with it is ours.
-        rig.renderings.look(try await authorizer.authorize(URLRequest(url: resource.url)).1)
-        let (signed, token) = try await authorizer.authorize(resource)
+        rig.renderings.look(try await authorizer.sign(URLRequest(url: resource.url)).1)
+        let (signed, token) = try await authorizer.sign(resource)
         rig.renderings.look(signed)
         rig.renderings.look(token)
-        await rig.renderings.observe { try await authorizer.send(resource, using: rig.server) }
+        await rig.renderings.observe { try await authorizer.send(resource) }
         await manager.invalidate(root)
 
         // The resource answers with a challenge that repeats the bearer token.
         rig.harvest.challenging(true)
-        await rig.renderings.observe { try await authorizer.send(resource, using: rig.server) }
+        await rig.renderings.observe { try await authorizer.send(resource) }
         rig.harvest.challenging(false)
 
         // The server rejects the refresh token and echoes it; the session ends.

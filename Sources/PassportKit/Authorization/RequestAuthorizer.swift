@@ -9,13 +9,25 @@ import Foundation
 ///
 /// A request is never sent without a token, and a rejected request is retried at most once. A 403, or a
 /// challenge with `insufficient_scope`, never refreshes a token: a new token would not carry more scope.
-public struct RequestAuthorizer: Sendable {
+public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     private let manager: TokenManager
+    private let transport: any HTTPTransport
 
-    /// Creates an authorizer that obtains tokens from `manager`.
-    public init(manager: TokenManager) {
+    /// Creates an authorizer that obtains tokens from `manager` and sends ``send(_:for:)`` requests on
+    /// `transport`.
+    public init(manager: TokenManager, transport: any HTTPTransport = URLSessionTransport()) {
         self.manager = manager
+        self.transport = transport
     }
+
+    /// A fixed summary: the injected transport is never reached, so a dump cannot show what it holds.
+    public var description: String { "RequestAuthorizer()" }
+
+    /// Same as ``description``.
+    public var debugDescription: String { description }
+
+    /// A mirror exposing the summary only.
+    public var customMirror: Mirror { Mirror(self, children: ["summary": description], displayStyle: .struct) }
 
     /// Adds `Authorization: Bearer <token>` (RFC 6750 §2.1) and returns the token that was used.
     ///
@@ -25,7 +37,7 @@ public struct RequestAuthorizer: Sendable {
     /// ``AccessToken/tokenType`` is not `Bearer` (compared case-insensitively): other types, such as
     /// sender-constrained `DPoP` tokens, need proof this authorizer cannot produce. Never returns an
     /// unsigned request.
-    public func authorize(
+    public func sign(
         _ request: URLRequest,
         for target: TokenTarget = .default
     ) async throws -> (URLRequest, AccessToken) {
@@ -40,7 +52,7 @@ public struct RequestAuthorizer: Sendable {
     /// Adds `Authorization: Bearer <token>` (RFC 6750 §2.1) and returns the token that was used.
     ///
     /// Same rules as the `URLRequest` overload.
-    public func authorize(
+    public func sign(
         _ request: HTTPRequest,
         for target: TokenTarget = .default
     ) async throws -> (HTTPRequest, AccessToken) {
@@ -85,17 +97,16 @@ public struct RequestAuthorizer: Sendable {
         return .retry
     }
 
-    /// Authorizes, sends, evaluates and, after a rejected token, retries once with a fresh one.
+    /// Signs, sends on the transport given at creation, evaluates and, after a rejected token, retries once with a fresh one.
     ///
     /// Returns the response for every status the decision table delivers, including 403.
     public func send(
         _ request: HTTPRequest,
-        for target: TokenTarget = .default,
-        using transport: any HTTPTransport
+        for target: TokenTarget = .default
     ) async throws -> HTTPResponse {
         var attempt = 0
         while true {
-            let (signed, token) = try await authorize(request, for: target)
+            let (signed, token) = try await sign(request, for: target)
             let response = try await transport.send(signed)
             switch await evaluate(
                 statusCode: response.statusCode, headers: response.headers, token: token, attempt: attempt)
@@ -107,7 +118,7 @@ public struct RequestAuthorizer: Sendable {
         }
     }
 
-    /// Like ``send(_:for:using:)`` for `URLSession`, with the session supplied by the caller: the library
+    /// Like ``send(_:for:)`` for `URLSession`, with the session supplied by the caller: the library
     /// never reaches for `URLSession.shared`.
     ///
     /// A transport failure is reported as ``PassportError/Code-swift.struct/transportFailure``; cancellation
@@ -119,7 +130,7 @@ public struct RequestAuthorizer: Sendable {
     ) async throws -> (Data, HTTPURLResponse) {
         var attempt = 0
         while true {
-            let (signed, token) = try await authorize(request, for: target)
+            let (signed, token) = try await sign(request, for: target)
             let data: Data
             let response: URLResponse
             do {

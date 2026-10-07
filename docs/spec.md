@@ -682,14 +682,14 @@ and `OAuthClient.wallClock` are public read-only properties.
 
 ```swift
 public struct RequestAuthorizer: Sendable {
-    public init(manager: TokenManager)
+    public init(manager: TokenManager, transport: any HTTPTransport = URLSessionTransport())
     /// Adds `Authorization: Bearer <token>`. Throws if no token can be obtained; never returns an unsigned request.
-    public func authorize(_ request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
-    public func authorize(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)
+    public func sign(_ request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
+    public func sign(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)
     /// Decides what to do with a resource-server response for a request sent with `token`.
     public func evaluate(statusCode: Int, headers: HTTPHeaders, token: AccessToken, attempt: Int) async -> RetryDecision
-    /// Convenience: authorize, send, evaluate, retry at most once.
-    public func send(_ request: HTTPRequest, for target: TokenTarget = .default, using transport: any HTTPTransport) async throws -> HTTPResponse
+    /// Convenience: sign, send on the transport given at creation, evaluate, retry at most once.
+    public func send(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> HTTPResponse
     /// The same for `URLSession`; the session is required, the library never uses `URLSession.shared`.
     public func data(for request: URLRequest, target: TokenTarget = .default, session: URLSession) async throws -> (Data, HTTPURLResponse)
 }
