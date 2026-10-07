@@ -41,7 +41,7 @@ extension OAuthClient {
         if (exchange.actorToken == nil) != (exchange.actorTokenType == nil) {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "actor_token and actor_token_type must be given together."
+                detail: "actor_token and actor_token_type must be given together."
             )
         }
         var request = FormRequest(tokenEndpoint: configuration.endpoints.token, grantType: .tokenExchange)

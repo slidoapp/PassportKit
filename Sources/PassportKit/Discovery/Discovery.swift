@@ -58,7 +58,7 @@ public enum Discovery {
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
             throw PassportError(
                 .transportFailure,
-                errorDescription: "The metadata request failed.",
+                detail: "The metadata request failed.",
                 underlying: error
             )
         }
@@ -82,7 +82,7 @@ public enum Discovery {
         do {
             metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: response.body)
         } catch {
-            throw PassportError(.invalidResponse, errorDescription: "The metadata response is not valid metadata.")
+            throw PassportError(.invalidResponse, detail: "The metadata response is not valid metadata.")
         }
         switch validation {
         case .strict: try require(metadata.issuer, equals: issuer)
@@ -104,7 +104,7 @@ public enum Discovery {
         else {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "The issuer must not contain a query, fragment or userinfo."
+                detail: "The issuer must not contain a query, fragment or userinfo."
             )
         }
         var path = components.percentEncodedPath
@@ -114,7 +114,7 @@ public enum Discovery {
         case .openIDConnect: components.percentEncodedPath = path + "/.well-known/openid-configuration"
         }
         guard let url = components.url else {
-            throw PassportError(.invalidConfiguration, errorDescription: "The metadata URL could not be built.")
+            throw PassportError(.invalidConfiguration, detail: "The metadata URL could not be built.")
         }
         return url
     }
@@ -123,7 +123,7 @@ public enum Discovery {
         guard actual.absoluteString == expected.absoluteString else {
             throw PassportError(
                 .issuerMismatch,
-                errorDescription: "The metadata issuer differs from the expected issuer."
+                detail: "The metadata issuer differs from the expected issuer."
             )
         }
     }

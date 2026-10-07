@@ -4,7 +4,9 @@ import Foundation
 ///
 /// Descriptions and reflection show which members are present, never token values or the
 /// values of ``additionalFields``.
-public struct TokenResponse: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+public struct TokenResponse: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible,
+    CustomReflectable
+{
     /// The access token (`access_token`).
     public var accessToken: Secret
     /// The token type (`token_type`), for example `Bearer`. Compare case-insensitively.

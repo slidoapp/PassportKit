@@ -5,7 +5,7 @@ extension Endpoints {
     /// metadata has no `token_endpoint`, or an endpoint is not `https`.
     public init(metadata: AuthorizationServerMetadata) throws {
         guard let token = metadata.tokenEndpoint else {
-            throw PassportError(.invalidConfiguration, errorDescription: "The metadata has no token endpoint.")
+            throw PassportError(.invalidConfiguration, detail: "The metadata has no token endpoint.")
         }
         self.init(
             authorization: metadata.authorizationEndpoint,

@@ -92,7 +92,7 @@ extension DeviceAuthorization {
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidResponse``.
     init(parsing data: Data, wallClock: any WallClock, clock: any Clock<Duration>) throws {
         guard case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: data) else {
-            throw PassportError(.invalidResponse, errorDescription: "The device authorization response is not JSON.")
+            throw PassportError(.invalidResponse, detail: "The device authorization response is not JSON.")
         }
         func text(_ names: String...) -> String? {
             for name in names {
@@ -121,14 +121,14 @@ extension DeviceAuthorization {
         else {
             throw PassportError(
                 .invalidResponse,
-                errorDescription: "The device authorization response lacks a required member."
+                detail: "The device authorization response lacks a required member."
             )
         }
         let pollInterval = seconds("interval").flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         if let pollInterval, pollInterval > Double(Self.maximumInterval.components.seconds) {
             throw PassportError(
                 .invalidResponse,
-                errorDescription: "The device authorization response has an unusable polling interval."
+                detail: "The device authorization response has an unusable polling interval."
             )
         }
         let expiresIn = Duration.seconds(min(lifetime, 3_153_600_000))

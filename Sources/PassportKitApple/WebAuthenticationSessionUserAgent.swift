@@ -70,21 +70,21 @@
         /// Derives the callback matcher from the redirect URI.
         static func callback(for redirectURI: URL) throws -> WebAuthenticationCallback {
             guard let scheme = redirectURI.scheme?.lowercased(), !scheme.isEmpty else {
-                throw PassportError(.invalidConfiguration, errorDescription: "The redirect URI has no scheme.")
+                throw PassportError(.invalidConfiguration, detail: "The redirect URI has no scheme.")
             }
             switch scheme {
             case "https":
                 guard let host = redirectURI.host, !host.isEmpty, !redirectURI.path.isEmpty else {
                     throw PassportError(
                         .invalidConfiguration,
-                        errorDescription: "An https redirect URI needs a host and a path."
+                        detail: "An https redirect URI needs a host and a path."
                     )
                 }
                 return .https(host: host, path: redirectURI.path)
             case "http":
                 throw PassportError(
                     .invalidConfiguration,
-                    errorDescription: "Use LoopbackUserAgent for http loopback redirect URIs."
+                    detail: "Use LoopbackUserAgent for http loopback redirect URIs."
                 )
             default:
                 return .scheme(scheme)
@@ -97,11 +97,11 @@
             if let sessionError = error as? ASWebAuthenticationSessionError {
                 switch sessionError.code {
                 case .canceledLogin:
-                    return PassportError(.userCancelled, errorDescription: "The user cancelled the sign-in.")
+                    return PassportError(.userCancelled, detail: "The user cancelled the sign-in.")
                 case .presentationContextNotProvided, .presentationContextInvalid:
                     return PassportError(
                         .invalidConfiguration,
-                        errorDescription: "No window is available to present the sign-in.",
+                        detail: "No window is available to present the sign-in.",
                         underlying: error
                     )
                 @unknown default:
@@ -110,7 +110,7 @@
             }
             return PassportError(
                 .transportFailure,
-                errorDescription: "The web authentication session failed.",
+                detail: "The web authentication session failed.",
                 underlying: error
             )
         }

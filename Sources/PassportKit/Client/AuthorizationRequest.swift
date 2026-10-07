@@ -4,7 +4,7 @@ import Foundation
 ///
 /// PKCE (S256), `state` and the client identifier are added by
 /// ``OAuthClient/beginAuthorization(_:)``.
-public struct AuthorizationRequest: Sendable {
+public struct AuthorizationRequest: Sendable, Hashable {
     /// One value of the `prompt` parameter (OpenID Connect Core §3.1.2.1). An open set: servers define more.
     public struct Prompt: RawRepresentable, Sendable, Hashable {
         /// The `prompt` value as sent.

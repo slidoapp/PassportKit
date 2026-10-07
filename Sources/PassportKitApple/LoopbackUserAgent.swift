@@ -47,7 +47,7 @@
                 listener.cancel()
                 throw PassportError(
                     .invalidConfiguration,
-                    errorDescription: "The redirect URI is not the loopback listener's."
+                    detail: "The redirect URI is not the loopback listener's."
                 )
             }
             do {
@@ -57,7 +57,7 @@
                 if error is CancellationError || error is PassportError { throw error }
                 throw PassportError(
                     .invalidConfiguration,
-                    errorDescription: "The browser could not be opened.",
+                    detail: "The browser could not be opened.",
                     underlying: error
                 )
             }
@@ -77,7 +77,7 @@
             guard opened else {
                 throw PassportError(
                     .invalidConfiguration,
-                    errorDescription: "The system browser could not be opened on this platform."
+                    detail: "The system browser could not be opened on this platform."
                 )
             }
         }
