@@ -21,6 +21,26 @@ struct ObserverTests {
             ])
     }
 
+    @Test func discoveryReportsMetadataEvents() async throws {
+        let observer = RecordingObserver()
+        let issuer = URL(string: "https://as.example.com")!
+        let ok = RecordingTransport([.json(200, #"{"issuer":"https://as.example.com"}"#)])
+        _ = try await Discovery.fetchMetadata(issuer: issuer, transport: ok, observer: observer)
+        let failing = RecordingTransport([.oauthError("invalid_request"), .fail(URLError(.timedOut))])
+        _ = try? await Discovery.fetchMetadata(issuer: issuer, transport: failing, observer: observer)
+        _ = try? await Discovery.fetchMetadata(issuer: issuer, transport: failing, observer: observer)
+        let events = observer.events
+        #expect(events.count == 6)
+        #expect(events[0] == .request(endpoint: .metadata, grantType: nil))
+        guard case .response(.metadata, 200, nil, _) = events[1],
+            case .response(.metadata, 400, "invalid_request", _) = events[3],
+            case .transportFailure(.metadata, nil, _) = events[5]
+        else {
+            Issue.record("unexpected events \(events)")
+            return
+        }
+    }
+
     @Test func errorResponsesCarryTheErrorCode() async throws {
         let observer = RecordingObserver()
         let transport = RecordingTransport([.oauthError("invalid_grant"), .json(200, "")])

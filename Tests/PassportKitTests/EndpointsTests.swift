@@ -61,3 +61,30 @@ struct EndpointsTests {
         #expect(configuration.additionalHeaders.names.isEmpty)
     }
 }
+
+struct ConfigurationFromMetadataTests {
+    private func metadata(issuerParameter: Bool?) -> AuthorizationServerMetadata {
+        AuthorizationServerMetadata(
+            issuer: URL(string: "https://as.example.com")!,
+            authorizationEndpoint: URL(string: "https://as.example.com/authorize")!,
+            tokenEndpoint: URL(string: "https://as.example.com/token")!,
+            authorizationResponseIssParameterSupported: issuerParameter
+        )
+    }
+
+    @Test(arguments: [(true as Bool?, true), (false, false), (nil, false)])
+    func requiresIssuerWhenAdvertised(advertised: Bool?, expected: Bool) throws {
+        let configuration = try ClientConfiguration(
+            metadata: metadata(issuerParameter: advertised), authentication: .none(clientID: "app"))
+        #expect(configuration.requiresIssuerInAuthorizationResponse == expected)
+        #expect(configuration.issuer == URL(string: "https://as.example.com"))
+        #expect(configuration.endpoints.token == URL(string: "https://as.example.com/token"))
+    }
+
+    @Test func rejectsMetadataWithoutTokenEndpoint() {
+        let bare = AuthorizationServerMetadata(issuer: URL(string: "https://as.example.com")!)
+        #expect(throws: PassportError.self) {
+            try ClientConfiguration(metadata: bare, authentication: .none(clientID: "app"))
+        }
+    }
+}

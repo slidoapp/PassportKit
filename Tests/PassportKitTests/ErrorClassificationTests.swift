@@ -134,6 +134,19 @@ struct ErrorClassificationTests {
         #expect(PassportError.retryAfter(in: ["Retry-After": header]) == expected)
     }
 
+    @Test(arguments: [
+        ("Wed, 21 Oct 2026 07:28:30 GMT", Duration?.some(.seconds(30))),  // IMF-fixdate
+        ("Wednesday, 21-Oct-26 07:29:00 GMT", .some(.seconds(60))),  // obsolete RFC 850
+        ("Wed Oct 21 07:30:00 2026", .some(.seconds(120))),  // obsolete asctime
+        ("Wed, 21 Oct 2026 07:00:00 GMT", .some(.seconds(0))),  // in the past
+        ("Wed, 21 Oct 2026 07:28:30 PST", nil), ("tomorrow", nil),
+    ])
+    func retryAfterHTTPDate(header: String, expected: Duration?) {
+        let now = Date(timeIntervalSince1970: 1_792_567_680)  // Wed, 21 Oct 2026 07:28:00 GMT
+        #expect(PassportError.retryAfter(in: ["Retry-After": header], now: now) == expected)
+        #expect(PassportError.retryAfter(in: ["Retry-After": header]) == nil)  // dates need a clock
+    }
+
     @Test func retryAfterIsHonouredForTemporaryJSONErrors() {
         let body = Data(#"{"error":"temporarily_unavailable"}"#.utf8)
         let error = PassportError.fromErrorResponse(

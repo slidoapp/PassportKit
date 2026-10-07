@@ -70,7 +70,7 @@ public struct OAuthClient: Sendable {
     }
 
     /// The OAuth `error` member of a non-2xx response, only when it is a short plain token.
-    private static func errorCode(in response: HTTPResponse) -> String? {
+    static func errorCode(in response: HTTPResponse) -> String? {
         guard !(200..<300).contains(response.statusCode),
             case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: response.body),
             case .string(let code)? = members["error"],
@@ -94,7 +94,8 @@ public struct OAuthClient: Sendable {
                 statusCode: response.statusCode,
                 headers: response.headers,
                 body: response.body,
-                context: context
+                context: context,
+                now: wallClock.now()
             )
         }
         return try TokenResponse(parsing: response.body, exchange: exchange)

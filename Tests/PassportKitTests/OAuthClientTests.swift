@@ -65,8 +65,18 @@ struct OAuthClientTests {
         #expect(sent.request.headers["Authorization"] == nil)
     }
 
+    @Test func exchangeResponseWithoutIssuedTokenTypeIsInvalid() async throws {
+        let client = try ClientFixtures.client(RecordingTransport([.tokens()]))
+        let error = await #expect(throws: PassportError.self) {
+            try await client.exchange(TokenExchangeRequest(subjectToken: Secret("s"), subjectTokenType: .accessToken))
+        }
+        #expect(error?.code == .invalidResponse)
+    }
+
     @Test func exchangeRequestShape() async throws {
-        let transport = RecordingTransport([.tokens()])
+        let transport = RecordingTransport([
+            .tokens(extra: #","issued_token_type":"urn:ietf:params:oauth:token-type:access_token""#)
+        ])
         let client = try ClientFixtures.client(transport)
         _ = try await client.exchange(
             TokenExchangeRequest(

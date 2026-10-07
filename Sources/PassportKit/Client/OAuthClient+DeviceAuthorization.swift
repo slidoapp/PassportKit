@@ -29,7 +29,8 @@ extension OAuthClient {
                 statusCode: response.statusCode,
                 headers: response.headers,
                 body: response.body,
-                context: .other
+                context: .other,
+                now: wallClock.now()
             )
         }
         return try DeviceAuthorization(parsing: response.body, wallClock: wallClock, clock: clock)
@@ -84,7 +85,8 @@ extension OAuthClient {
                 statusCode: response.statusCode,
                 headers: response.headers,
                 body: response.body,
-                context: .deviceAuthorizationPoll
+                context: .deviceAuthorizationPoll,
+                now: wallClock.now()
             )
             switch error.code {
             case .authorizationPending:
@@ -105,7 +107,7 @@ extension OAuthClient {
                 }
                 guard isTransient else { throw error }
                 backoff = nextBackoff(after: backoff, interval: interval)
-                wait = max(backoff ?? interval, PassportError.retryAfter(in: response.headers) ?? .zero)
+                wait = max(backoff ?? interval, PassportError.retryAfter(in: response.headers, now: wallClock.now()) ?? .zero)
             }
         }
     }

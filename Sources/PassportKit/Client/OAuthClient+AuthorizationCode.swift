@@ -12,10 +12,13 @@ extension OAuthClient {
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when no
     /// authorization endpoint is configured, the endpoint carries a fragment or a query item the request also
     /// sets, the redirect URI is not absolute, has a fragment, or is plain `http` on a non-loopback host
-    /// (RFC 8252 §7.3, §8.3), a resource is invalid, or an additional parameter collides.
+    /// (RFC 8252 §7.3, §8.3), a resource is invalid, the lifetime is not positive, or an additional parameter collides.
     public func beginAuthorization(_ request: AuthorizationRequest) throws -> PendingAuthorization {
         let endpoint = try requireEndpoint(configuration.endpoints.authorization, name: "authorization")
         try Self.validate(redirectURI: request.redirectURI)
+        guard request.lifetime > .zero else {
+            throw PassportError(.invalidConfiguration, errorDescription: "The authorization lifetime must be positive.")
+        }
         guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false), components.fragment == nil
         else {
             throw PassportError(
@@ -58,6 +61,8 @@ extension OAuthClient {
             redirectURI: request.redirectURI,
             state: state,
             codeVerifier: verifier,
+            resources: request.resources,
+            lifetime: request.lifetime,
             stopwatch: Stopwatch(clock: clock)
         )
     }
@@ -78,8 +83,8 @@ extension OAuthClient {
     /// 5. An `error` response becomes the matching error (RFC 6749 §4.1.2.1); `access_denied` has recovery `none`.
     /// 6. `code` is present (`invalidResponse`).
     ///
-    /// Then the code is redeemed with `grant_type`, `code`, `redirect_uri`, `code_verifier` and client
-    /// authentication.
+    /// Then the code is redeemed with `grant_type`, `code`, `redirect_uri`, `code_verifier`, the request's
+    /// `resource` indicators (RFC 8707 §2.2) and client authentication.
     public func completeAuthorization(
         _ pending: PendingAuthorization,
         callbackURL: URL,
@@ -90,6 +95,7 @@ extension OAuthClient {
         request.add("code", code.reveal())
         request.add("redirect_uri", pending.redirectURI.absoluteString)
         request.add("code_verifier", pending.codeVerifier.reveal())
+        try request.add(resources: pending.resources)
         request.additionalParameters = additionalParameters
         return try await performTokenRequest(request, context: .other)
     }
