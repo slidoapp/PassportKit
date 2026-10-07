@@ -35,7 +35,8 @@ public struct OAuthClient: Sendable {
 
     /// Sends a request, emitting observer events, and returns any HTTP response.
     ///
-    /// Transport failures become ``PassportError/Code-swift.struct/transportFailure``; `CancellationError`
+    /// Transport failures become ``PassportError/Code-swift.struct/transportFailure`` and are reported to the
+    /// observer as ``PassportEvent/transportFailure(endpoint:grantType:duration:)``; `CancellationError`
     /// propagates unchanged, also when the transport reports cancellation as another error.
     func send(_ request: FormRequest) async throws -> HTTPResponse {
         let httpRequest = try request.build(configuration: configuration)
@@ -44,10 +45,11 @@ public struct OAuthClient: Sendable {
         let response: HTTPResponse
         do {
             response = try await transport.send(httpRequest)
-        } catch is CancellationError {
-            throw CancellationError()
         } catch {
-            if Task.isCancelled { throw CancellationError() }
+            observer?.record(
+                .transportFailure(endpoint: request.endpoint, grantType: request.grantType, duration: stopwatch.elapsed)
+            )
+            if error is CancellationError || Task.isCancelled { throw CancellationError() }
             throw PassportError(
                 .transportFailure,
                 errorDescription: "The request to the authorization server failed.",
