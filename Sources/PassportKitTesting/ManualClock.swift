@@ -82,9 +82,33 @@ public final class ManualClock: Clock, @unchecked Sendable {
         for sleeper in due { sleeper.continuation.resume() }
     }
 
-    /// Suspends until at least one task is sleeping, or the calling task is cancelled.
+    /// Waits until at least one task is sleeping, the calling task is cancelled, or `timeout` of real time passes.
+    ///
+    /// Returns whether a task is sleeping. The wait yields without sleeping for a while, then polls every
+    /// millisecond, so a code path that never reaches `sleep` ends the wait instead of hanging.
+    public func waitForSleeper(timeout: Duration) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        var spins = 0
+        while sleeperCount == 0 {
+            if Task.isCancelled || ContinuousClock.now >= deadline { return sleeperCount > 0 }
+            if spins < 1_000 {
+                spins += 1
+                await Task.yield()
+            } else {
+                try? await Task.sleep(for: .milliseconds(1))
+            }
+        }
+        return true
+    }
+
+    /// Suspends until at least one task is sleeping or the calling task is cancelled.
+    ///
+    /// Stops the process with a clear message when no task slept within 10 seconds of real time: the code under
+    /// test never reached `sleep`, and waiting longer would only hang the test run. Use
+    /// ``waitForSleeper(timeout:)`` to handle that case yourself.
     public func waitForSleeper() async {
-        while sleeperCount == 0 && !Task.isCancelled { await Task.yield() }
+        let slept = await waitForSleeper(timeout: .seconds(10))
+        precondition(slept || Task.isCancelled, "ManualClock: no task slept within 10 seconds of real time.")
     }
 
     /// Waits for a sleeper, then advances exactly to the earliest deadline. Returns how long that was.

@@ -1,4 +1,5 @@
 import Foundation
+import PassportKitTesting
 import Testing
 
 @testable import PassportKit
