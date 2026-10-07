@@ -29,7 +29,7 @@ func handle(_ error: PassportError) {
     case .fixConfiguration:
         // A bug in the client setup or the request. Retrying cannot help; log it.
         break
-    case .none:
+    case .noAction:
         // Nothing to recover from, for example the person declined.
         break
     }
@@ -42,7 +42,7 @@ func handle(_ error: PassportError) {
 | ``PassportError/Recovery-swift.enum/resourceDenied`` | `access_denied`, `invalid_target`, `insufficient_scope`, `token_rejected`, `unauthorized` | Treat the resource as unavailable. Keep the session and everything else working. |
 | ``PassportError/Recovery-swift.enum/retryLater(after:)`` | `temporarily_unavailable`, `server_error`, `transport_failure` | Retry with back-off, no sooner than `after`. |
 | ``PassportError/Recovery-swift.enum/fixConfiguration`` | `invalid_client`, `unauthorized_client`, `unsupported_grant_type`, `invalid_request`, `invalid_scope`, `invalid_configuration` | Do not retry. The client registration, the configuration or the request is wrong. |
-| ``PassportError/Recovery-swift.enum/none`` | `access_denied` when the person declined, `user_cancelled`, `invalid_response` | Nothing to do or retry; report if unexpected. |
+| ``PassportError/Recovery-swift.enum/noAction`` | `access_denied` when the person declined, `user_cancelled`, `invalid_response` | Nothing to do or retry; report if unexpected. |
 
 Classification follows the `error` member of the response body, not the HTTP
 status (RFC 6749 §5.2). The status is recorded in ``PassportError/statusCode``

@@ -38,7 +38,7 @@ extension TokenManager {
     /// caller always finds the flight registered by the first.
     func resolveToken(for target: TokenTarget) async throws -> AccessToken {
         guard current != nil else { throw Self.signedOut }
-        if target.method == .refreshGrant, !target.audiences.isEmpty {
+        if target.derivation == .refreshGrant, !target.audiences.isEmpty {
             throw PassportError(
                 .invalidConfiguration, errorDescription: "A refresh grant target cannot name audiences.")
         }
@@ -72,7 +72,7 @@ extension TokenManager {
         let flight = registerFlight(for: target)
         let session = generation
         // The lane turn is reserved here, synchronously, so turns follow the order of calls.
-        let turn = target.method == .refreshGrant ? lane.reserve() : nil
+        let turn = target.derivation == .refreshGrant ? lane.reserve() : nil
         Task {
             let result: Result<AccessToken, any Error>
             do {

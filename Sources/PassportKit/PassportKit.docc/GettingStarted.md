@@ -15,11 +15,11 @@ import PassportKit
 let issuer = URL(string: "https://as.example.com")!
 let metadata = try await Discovery.fetchMetadata(issuer: issuer)
 let configuration = try ClientConfiguration(
-    metadata: metadata, authentication: .none(clientID: "my-app"))
+    metadata: metadata, authentication: .publicClient(clientID: "my-app"))
 let client = try OAuthClient(configuration: configuration)
 ```
 
-Use `.none` for a public client such as a native app, which cannot keep a
+Use ``ClientAuthentication/publicClient(clientID:)`` for a public client such as a native app, which cannot keep a
 secret. A confidential client uses ``ClientAuthentication/clientSecretBasic(clientID:secret:)``
 or ``ClientAuthentication/clientSecretPost(clientID:secret:)``. Without
 discovery, build an ``Endpoints`` value by hand.

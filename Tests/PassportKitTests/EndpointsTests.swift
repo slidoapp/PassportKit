@@ -41,7 +41,7 @@ struct EndpointsTests {
 
     @Test func configurationValidatesEndpointsAndIssuer() {
         let endpoints = Endpoints(token: URL(string: "https://as.example.com/token")!)
-        var configuration = ClientConfiguration(endpoints: endpoints, authentication: .none(clientID: "app"))
+        var configuration = ClientConfiguration(endpoints: endpoints, authentication: .publicClient(clientID: "app"))
         #expect((try? configuration.validate()) != nil)
         configuration.issuer = URL(string: "http://as.example.com")
         #expect {
@@ -54,7 +54,7 @@ struct EndpointsTests {
     @Test func configurationDefaults() {
         let configuration = ClientConfiguration(
             endpoints: Endpoints(token: URL(string: "https://as.example.com/token")!),
-            authentication: .none(clientID: "app")
+            authentication: .publicClient(clientID: "app")
         )
         #expect(configuration.minimumTokenLifetime == .seconds(60))
         #expect(configuration.defaultTokenLifetime == nil)
@@ -75,7 +75,7 @@ struct ConfigurationFromMetadataTests {
     @Test(arguments: [(true as Bool?, true), (false, false), (nil, false)])
     func requiresIssuerWhenAdvertised(advertised: Bool?, expected: Bool) throws {
         let configuration = try ClientConfiguration(
-            metadata: metadata(issuerParameter: advertised), authentication: .none(clientID: "app"))
+            metadata: metadata(issuerParameter: advertised), authentication: .publicClient(clientID: "app"))
         #expect(configuration.requiresIssuerInAuthorizationResponse == expected)
         #expect(configuration.issuer == URL(string: "https://as.example.com"))
         #expect(configuration.endpoints.token == URL(string: "https://as.example.com/token"))
@@ -84,7 +84,7 @@ struct ConfigurationFromMetadataTests {
     @Test func rejectsMetadataWithoutTokenEndpoint() {
         let bare = AuthorizationServerMetadata(issuer: URL(string: "https://as.example.com")!)
         #expect(throws: PassportError.self) {
-            try ClientConfiguration(metadata: bare, authentication: .none(clientID: "app"))
+            try ClientConfiguration(metadata: bare, authentication: .publicClient(clientID: "app"))
         }
     }
 }

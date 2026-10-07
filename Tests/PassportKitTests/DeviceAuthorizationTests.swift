@@ -144,7 +144,7 @@ struct DeviceAuthorizationTests {
 
     @Test func startWithoutEndpointIsInvalidConfiguration() async throws {
         let configuration = ClientConfiguration(
-            endpoints: Endpoints(token: ClientFixtures.tokenURL), authentication: .none(clientID: "app"))
+            endpoints: Endpoints(token: ClientFixtures.tokenURL), authentication: .publicClient(clientID: "app"))
         let client = try OAuthClient(configuration: configuration, transport: RecordingTransport())
         let error = await #expect(throws: PassportError.self) { try await client.startDeviceAuthorization() }
         #expect(error?.code == .invalidConfiguration)
@@ -260,7 +260,7 @@ struct DeviceAuthorizationTests {
         let outcome = await poll(client, authorization, clock: clock, sleeps: 1)
         let error = failure(outcome.result)
         #expect(error?.code == .accessDenied)
-        #expect(error?.recovery == PassportError.Recovery.none)
+        #expect(error?.recovery == PassportError.Recovery.noAction)
         #expect(await transport.requests.count == 2)
     }
 

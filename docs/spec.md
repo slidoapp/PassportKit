@@ -174,11 +174,12 @@ public struct Endpoints: Sendable, Hashable {
     public init(metadata: AuthorizationServerMetadata) throws   // throws if the token endpoint is missing or an endpoint is not https
 }
 
-public enum ClientAuthentication: Sendable, Hashable {
-    case none(clientID: String)                                       // public client: client_id in body
-    case clientSecretPost(clientID: String, secret: Secret)
-    case clientSecretBasic(clientID: String, secret: Secret)          // RFC 6749 §2.3.1: form-encode id and secret before base64
+public struct ClientAuthentication: Sendable, Hashable {            // open: factories, not cases
+    public static func publicClient(clientID: String) -> ClientAuthentication            // client_id in body
+    public static func clientSecretPost(clientID: String, secret: Secret) -> ClientAuthentication
+    public static func clientSecretBasic(clientID: String, secret: Secret) -> ClientAuthentication   // RFC 6749 §2.3.1: form-encode id and secret before base64
     public var clientID: String { get }
+}
 }
 
 public struct ClientConfiguration: Sendable {
@@ -225,7 +226,7 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
         case resourceDenied        // this resource/audience is not accessible; session intact
         case retryLater(after: Duration?)
         case fixConfiguration
-        case none
+        case noAction
     }
     public var code: Code
     public var recovery: Recovery
@@ -252,12 +253,12 @@ Classification rules (tested exhaustively):
 | Code | Context | Recovery |
 |---|---|---|
 | `invalidGrant` | refresh grant, or refresh token as exchange subject | `.reauthenticate` |
-| `invalidGrant` | other grants | `.none` |
+| `invalidGrant` | other grants | `.noAction` |
 | `accessDenied`, `invalidTarget`, `insufficientScope`, `tokenRejected` | any | `.resourceDenied` |
 | `invalidClient`, `unauthorizedClient`, `unsupportedGrantType`, `invalidRequest`, `invalidScope`, `invalidConfiguration` | any | `.fixConfiguration` |
 | `temporarilyUnavailable`, `serverError`, `transportFailure` | any | `.retryLater(after:)` |
 | `expiredToken` | device flow | `.reauthenticate` |
-| `accessDenied` | device flow or authorization response | `.none` (the user declined) |
+| `accessDenied` | device flow or authorization response | `.noAction` (the user declined) |
 
 Cancellation is not wrapped: `CancellationError` propagates unchanged.
 User cancellation of a browser sheet is `.userCancelled`.
@@ -353,7 +354,9 @@ public struct TokenExchangeRequest: Sendable {
     public var scope: ScopeSet?
     public var additionalParameters: AdditionalParameters = [:]
 }
-public enum TokenTypeHint: String, Sendable { case accessToken = "access_token", refreshToken = "refresh_token" }
+public struct TokenTypeHint: RawRepresentable, Sendable, Hashable {   // open: RFC 7009 §4.1.2 registry
+    public static let accessToken, refreshToken: TokenTypeHint     // "access_token", "refresh_token"
+}
 ```
 
 ### Device authorization (RFC 8628)
@@ -439,7 +442,7 @@ redirect URI carries the actual port; the callback is compared with it.
    response `iss` is accepted unchecked. This runs before step 5 because RFC
    9207 §2.4 requires the check for error responses too;
 5. an `error` parameter becomes a `PassportError` through the authorization
-   response context (recovery `.none` for `access_denied`);
+   response context (recovery `.noAction` for `access_denied`);
 6. `code` present, else `.invalidResponse`;
 
 then it redeems the code with `grant_type`, `code`, `redirect_uri`,
@@ -480,17 +483,19 @@ public actor TokenManager {
     public nonisolated var events: AsyncStream<SessionEvent> { get }   // multiple subscribers supported
 }
 
-public struct TokenTarget: Sendable, Hashable {   // == and hash: method, scope and the SETS of resources and audiences
-    public enum Method: Sendable, Hashable {
-        case refreshGrant             // refresh_token grant with `resources` (narrowing, RFC 8707 §2.2)
-        case exchangeAccessToken      // RFC 8693: exchange the default access token for one bound to `resources`/`audiences`
+public struct TokenTarget: Sendable, Hashable {   // == and hash: derivation, scope and the SETS of resources and audiences
+    public struct Derivation: Sendable, Hashable {   // open
+        public static let refreshGrant: Derivation   // refresh_token grant with `resources` (narrowing, RFC 8707 §2.2)
+        public static let tokenExchange: Derivation  // RFC 8693: exchange the default access token for one bound to `resources`/`audiences`
     }
-    public var method: Method
+    public var derivation: Derivation
     public var resources: [URL]
     public var audiences: [String]
     public var scope: ScopeSet?
     public static let `default`: TokenTarget      // refresh grant, no resources, no scope
-    public init(method: Method = .refreshGrant, resources: [URL] = [], audiences: [String] = [], scope: ScopeSet? = nil)
+    public static func refreshGrant(resources: [URL] = [], scope: ScopeSet? = nil) -> TokenTarget
+    public static func exchange(resources: [URL] = [], audiences: [String] = [], scope: ScopeSet? = nil) -> TokenTarget
+    // The memberwise initializer is `package`: the factories cover every valid combination.
 }
 
 public struct AccessToken: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {   // descriptions never show values
@@ -784,7 +789,9 @@ public enum PassportEvent: Sendable {
     case response(endpoint: EndpointKind, statusCode: Int, errorCode: String?, duration: Duration)
     case transportFailure(endpoint: EndpointKind, grantType: GrantType?, duration: Duration)
 }
-public enum EndpointKind: String, Sendable { case token, deviceAuthorization, revocation, metadata, resource }
+public struct EndpointKind: RawRepresentable, Sendable, Hashable {   // open
+    public static let token, deviceAuthorization, revocation, metadata, resource: EndpointKind
+}
 ```
 
 Every `.request` is followed by exactly one `.response` or one

@@ -20,7 +20,7 @@ struct AcceptanceTests {
         let gate = Gate()
         let harness = try await Harness(policy: HangingPolicy(gate: gate))
         let manager = harness.manager
-        let target = TokenTarget(resources: [apiA])
+        let target = TokenTarget.refreshGrant(resources: [apiA])
         let hanging = Task { try await manager.accessToken(for: target) }
         #expect(await harness.clock.waitForSleeper(timeout: .seconds(2)), "the policy has no time limit")
         harness.clock.advance(by: .seconds(10))
@@ -44,7 +44,7 @@ struct AcceptanceTests {
         let harness = try await Harness(policy: RequireAnyScope(["read"]))
         let manager = harness.manager
         await harness.server.configure { $0.isResourceUnauthorized = { $0.path.hasPrefix("/denied") } }
-        let denied = TokenTarget(resources: [deniedResource])
+        let denied = TokenTarget.refreshGrant(resources: [deniedResource])
 
         let first = await thrownError { try await manager.accessToken(for: denied) }
         #expect(first?.code == .tokenRejected)
@@ -54,12 +54,12 @@ struct AcceptanceTests {
         }
         #expect(await harness.tokenRequests(.refreshToken).count == 1, "retrying caused a refresh storm")
         // Other targets are not affected, and no further rejection was reported.
-        _ = try await manager.accessToken(for: TokenTarget(resources: [apiA]))
+        _ = try await manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiA]))
         _ = await manager.signOut(revoke: false)
         #expect(
             await Harness.take(4, from: harness.events) == [
                 .signedIn, .tokenRejected(target: denied, grantedScope: ["none"]),
-                .refreshed(target: TokenTarget(resources: [apiA])), .signedOut(reason: .userInitiated),
+                .refreshed(target: TokenTarget.refreshGrant(resources: [apiA])), .signedOut(reason: .userInitiated),
             ])
 
         // After the window the server is asked again.
@@ -73,7 +73,7 @@ struct AcceptanceTests {
 
     @Test("invariant 4: signing in again, and invalidate, forget a rejection; a zero duration disables it")
     func rejectionIsForgotten() async throws {
-        let denied = TokenTarget(resources: [deniedResource])
+        let denied = TokenTarget.refreshGrant(resources: [deniedResource])
         let harness = try await Harness(policy: RequireAnyScope(["read"]))
         await harness.server.configure { $0.isResourceUnauthorized = { $0.path.hasPrefix("/denied") } }
         _ = await thrownError { try await harness.manager.accessToken(for: denied) }
@@ -108,8 +108,8 @@ struct AcceptanceTests {
         }
         let target =
             switch rejection {
-            case .invalidTarget: TokenTarget(resources: [deniedResource])
-            case .invalidScope: TokenTarget(scope: ["admin"])
+            case .invalidTarget: TokenTarget.refreshGrant(resources: [deniedResource])
+            case .invalidScope: TokenTarget.refreshGrant(scope: ["admin"])
             }
         let before = await harness.storedRefreshToken()
         let error = await thrownError { try await harness.manager.accessToken(for: target) }
@@ -129,7 +129,9 @@ struct AcceptanceTests {
                 $0.value("resource") != nil ? .init(status: 400, body: #"{"error":"invalid_grant"}"#) : nil
             }
         }
-        let error = await thrownError { try await harness.manager.accessToken(for: TokenTarget(resources: [apiA])) }
+        let error = await thrownError {
+            try await harness.manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiA]))
+        }
         #expect(error?.recovery == .reauthenticate)
         #expect(await harness.manager.credential == nil)
     }

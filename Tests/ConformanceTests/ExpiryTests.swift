@@ -40,7 +40,7 @@ struct ExpiryTests {
         let harness = try await Harness()
         let stale = try await harness.manager.accessToken()
         harness.wallClock.advance(by: .seconds(850))
-        let target = TokenTarget(method: .exchangeAccessToken, resources: [apiA])
+        let target = TokenTarget.exchange(resources: [apiA])
         let derived = try await harness.manager.accessToken(for: target)
 
         let grants = await harness.server.requests(to: "/token").compactMap { $0.value("grant_type") }
@@ -61,7 +61,7 @@ struct ExpiryTests {
         let subject = try await harness.manager.accessToken()
         harness.wallClock.advance(by: .seconds(800))
         let derived = try await harness.manager.accessToken(
-            for: TokenTarget(method: .exchangeAccessToken, resources: [apiA]))
+            for: TokenTarget.exchange(resources: [apiA]))
         #expect(await harness.tokenRequests(.refreshToken).isEmpty)
         #expect(derived.expiresAt == subject.expiresAt)
     }
@@ -80,12 +80,12 @@ struct ExpiryTests {
             }
         }
         let derived = try await harness.manager.accessToken(
-            for: TokenTarget(method: .exchangeAccessToken, audiences: ["billing"]))
+            for: TokenTarget.exchange(audiences: ["billing"]))
         #expect(derived.value.reveal() == "derived")
         #expect(await harness.currentRefreshToken() == before)
         #expect(await harness.storedRefreshToken() == before)
         // The real refresh token still works.
-        _ = try await harness.manager.accessToken(for: TokenTarget(resources: [apiB]))
+        _ = try await harness.manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiB]))
         #expect(await harness.presentedRefreshTokens() == [before].compactMap { $0 })
     }
 }

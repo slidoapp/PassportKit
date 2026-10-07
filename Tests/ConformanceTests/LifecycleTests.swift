@@ -83,7 +83,7 @@ struct LifecycleTests {
         harness.clock.advance(by: .seconds(10))
 
         // Another target queues behind the finished request, so it must see the rotated token.
-        let next = Task { try await harness.manager.accessToken(for: TokenTarget(resources: [apiA])) }
+        let next = Task { try await harness.manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiA])) }
         await harness.clock.waitForSleeper()
         harness.clock.advance(by: .seconds(10))
         _ = try await next.value

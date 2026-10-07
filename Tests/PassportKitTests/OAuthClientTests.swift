@@ -11,7 +11,7 @@ struct OAuthClientTests {
     @Test func initRejectsInsecureConfiguration() {
         let configuration = ClientConfiguration(
             endpoints: Endpoints(token: URL(string: "http://as.example.com/token")!),
-            authentication: .none(clientID: "app")
+            authentication: .publicClient(clientID: "app")
         )
         #expect(throws: PassportError.self) { try OAuthClient(configuration: configuration) }
     }
@@ -196,7 +196,7 @@ struct OAuthClientTests {
         let error = await #expect(throws: PassportError.self) {
             try await client.exchange(TokenExchangeRequest(subjectToken: Secret("at"), subjectTokenType: .accessToken))
         }
-        #expect(error?.recovery == PassportError.Recovery.none)
+        #expect(error?.recovery == PassportError.Recovery.noAction)
     }
 
     @Test func exchange401AccessDeniedIsResourceDenied() async throws {

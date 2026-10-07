@@ -174,7 +174,7 @@
                         authorization: FakeAuthorizationServer.authorizationEndpoint,
                         token: FakeAuthorizationServer.tokenEndpoint,
                         revocation: FakeAuthorizationServer.revocationEndpoint),
-                    authentication: .none(clientID: "app"), issuer: FakeAuthorizationServer.issuer),
+                    authentication: .publicClient(clientID: "app"), issuer: FakeAuthorizationServer.issuer),
                 transport: server, wallClock: wallClock, clock: ManualClock(), random: SequenceRandomSource())
             let store = KeychainCredentialStore()
 
