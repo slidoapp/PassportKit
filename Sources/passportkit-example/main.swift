@@ -59,12 +59,23 @@ struct ExampleError: Error, CustomStringConvertible {
     init(_ description: String) { self.description = description }
 }
 
+/// Text from a server can carry terminal escape sequences or invisible characters; this makes it safe to print.
+func display(_ text: String) -> String {
+    let safe = text.unicodeScalars.map { scalar -> Character in
+        switch scalar.properties.generalCategory {
+        case .control, .format, .lineSeparator, .paragraphSeparator: "?"
+        default: Character(scalar)
+        }
+    }
+    return String(safe.prefix(200))
+}
+
 func signIn(arguments: Arguments, client: OAuthClient) async throws -> TokenResponse {
     switch arguments.flow {
     case "device":
         let authorization = try await client.beginDeviceAuthorization(scope: arguments.scope)
         print("Open \(authorization.verificationURIComplete ?? authorization.verificationURI)")
-        print("and enter the code \(authorization.userCode) if asked.")
+        print("and enter the code \(display(authorization.userCode)) if asked.")
         print("Waiting for approval (polling every \(authorization.interval))...")
         return try await client.completeDeviceAuthorization(authorization)
     default:
@@ -88,7 +99,7 @@ func signIn(arguments: Arguments, client: OAuthClient) async throws -> TokenResp
 }
 
 func describe(_ response: TokenResponse) -> String {
-    let scope = response.scope?.rawValue ?? "(not reported)"
+    let scope = response.scope.map { display($0.rawValue) } ?? "(not reported)"
     let lifetime = response.expiresIn.map { "\($0)" } ?? "(not reported)"
     return "scope: \(scope)\nexpires in: \(lifetime)\nrefresh token: \(response.refreshToken == nil ? "no" : "yes")"
 }
@@ -100,7 +111,7 @@ func run() async throws {
     let metadata = try await Discovery.fetchMetadata(issuer: arguments.issuer)
     let configuration = try ClientConfiguration(
         metadata: metadata, authentication: .publicClient(clientID: arguments.clientID))
-    print("Discovered \(metadata.issuer)")
+    print("Discovered \(display(metadata.issuer.absoluteString))")
     let client = try OAuthClient(configuration: configuration)
 
     let response = try await signIn(arguments: arguments, client: client)
@@ -119,7 +130,9 @@ func run() async throws {
     let token = try await manager.accessToken(for: TokenTarget.refreshGrant(scope: arguments.scope))
     let after = await manager.credential?.refreshToken
     let remaining = token.expiresAt.map { "\(Int($0.timeIntervalSince(client.wallClock.now())))s" } ?? "(not reported)"
-    print("Refreshed once.\nscope: \(token.grantedScope?.rawValue ?? "(not reported)")\nexpires in: \(remaining)")
+    print(
+        "Refreshed once.\nscope: \(token.grantedScope.map { display($0.rawValue) } ?? "(not reported)")\nexpires in: \(remaining)"
+    )
     print("refresh token rotated: \(after != before ? "yes" : "no")")
 }
 
