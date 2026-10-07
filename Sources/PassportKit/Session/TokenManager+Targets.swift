@@ -97,10 +97,17 @@ extension TokenManager {
     private func issueByRefreshGrant(_ target: TokenTarget, turn: RefreshLane.Turn, session: Int) async throws
         -> AccessToken
     {
-        let response = try await spendRefreshToken(turn: turn, session: session, adoptsIDToken: true) {
+        // A refresh that names neither scope nor resource renews the whole grant, so the answer is recorded
+        // as the grant's scope (RFC 6749 §6).
+        let isRootRefresh = target.scope == nil && target.resources.isEmpty
+        let response = try await spendRefreshToken(
+            turn: turn, session: session, adoptsIDToken: true, adoptsScope: isRootRefresh
+        ) {
             try await self.client.refresh($0, scope: target.scope, resources: target.resources)
         }
-        let token = makeToken(from: response, target: target, requestedScope: target.scope)
+        // An omitted `scope` means the scope that was requested, and without a request, the scope originally
+        // granted (RFC 6749 §5.1, §6).
+        let token = makeToken(from: response, target: target, requestedScope: target.scope ?? current?.grantedScope)
         try await accept(token, response: response, session: session)
         return token
     }
