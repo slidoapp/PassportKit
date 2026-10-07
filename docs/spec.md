@@ -104,8 +104,9 @@ Rules:
 - Every token, code, verifier, device code and client secret in public
   API is a `Secret`, never a `String`.
 - `AdditionalParameters` are appended after standard parameters. A name
-  that collides with a parameter the library sets throws
-  `PassportError` with code `.invalidConfiguration`.
+  that collides with a parameter the library sets, or with `client_id` or
+  `client_secret` in any authentication mode (RFC 6749 §2.3: one method per
+  request), throws `PassportError` with code `.invalidConfiguration`.
 - Resource indicators are `URL`s; they must be absolute and have no
   fragment (RFC 8707 §2), otherwise `.invalidConfiguration`.
 
@@ -130,14 +131,28 @@ public protocol HTTPTransport: Sendable {
     func send(_ request: HTTPRequest) async throws -> HTTPResponse
 }
 public struct URLSessionTransport: HTTPTransport {
-    public init(configuration: URLSessionConfiguration = .ephemeral)
+    public init(configuration: URLSessionConfiguration = .ephemeral,
+                requestTimeout: Duration = .seconds(30), resourceTimeout: Duration = .seconds(60))
 }
 ```
 
 `URLSessionTransport`:
-- does not follow redirects for `POST` requests;
+- does not follow redirects for `POST` requests, nor from HTTPS to HTTP;
+- on a redirect that changes scheme, host or port, drops every request header
+  except `Accept`, `Accept-Language` and `User-Agent`;
 - uses an ephemeral configuration without cookies or cache by default;
+- times out after 30 s without progress (`timeoutIntervalForRequest`) and
+  60 s in total (`timeoutIntervalForResource`); both are initializer
+  parameters and override the passed configuration. Device polling does not
+  shorten a send to the remaining device lifetime: a poll started just before
+  the deadline can overrun it by at most the resource timeout, and its answer
+  is still used (shortening would cancel a request the server may already have
+  acted on);
+- returns a response that was complete when the caller cancelled, so a rotated
+  refresh token is never lost;
 - caps response bodies at 1 MiB (`.invalidResponse` beyond that).
+
+`HTTPHeaders` descriptions and reflection show header names only.
 
 Form bodies follow RFC 6749 Appendix B: UTF-8, every character except
 unreserved ones percent-encoded, space as `+`, `+` as `%2B`.
@@ -168,8 +183,18 @@ public struct ClientConfiguration: Sendable {
     public var minimumTokenLifetime: Duration = .seconds(60)   // refresh earlier than this before expiry
     public var defaultTokenLifetime: Duration? = nil           // used when `expires_in` is missing; nil = treat as expired
     public var requiresIssuerInAuthorizationResponse: Bool = false   // RFC 9207 §2.4: a missing `iss` fails; needs `issuer`
+    public init(metadata: AuthorizationServerMetadata, authentication: ClientAuthentication,
+                additionalHeaders: HTTPHeaders = [:], minimumTokenLifetime: Duration = .seconds(60),
+                defaultTokenLifetime: Duration? = nil) throws
 }
 ```
+
+`ClientConfiguration.init(metadata:authentication:…)` is the discovery path:
+it takes the endpoints and `issuer` from the metadata and sets
+`requiresIssuerInAuthorizationResponse` to
+`metadata.authorizationResponseIssParameterSupported == true` (RFC 9207 §3),
+then validates. Prefer it over assembling a configuration by hand so the
+mix-up defence follows what the server advertises.
 
 HTTP `http` endpoints are rejected unless the host is a loopback address
 (`localhost`, `127.0.0.1`, `::1`).
@@ -208,11 +233,14 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
 Classification rules (tested exhaustively):
 
 1. For any non-2xx response from the authorization server, parse the JSON
-   body first. The `error` member decides the code; the HTTP status is
+   body first. The `error` member decides the code, provided it is a
+   well-formed RFC 6749 §5.2 value of at most 64 characters (else the body
+   counts as malformed, rule 2). `error_uri` is kept only when `http(s)`; the HTTP status is
    only recorded. A 401 with `error=access_denied` is `.accessDenied`.
 2. A non-JSON or malformed error body maps by status: 429 and 5xx to
-   `.temporarilyUnavailable` with `.retryLater` (honour `Retry-After`
-   seconds), anything else to `.invalidResponse`.
+   `.temporarilyUnavailable` with `.retryLater` (honour `Retry-After`, as
+   delta-seconds or, relative to the injected wall clock, an HTTP-date; discovery has
+   no wall clock and honours seconds only), anything else to `.invalidResponse`.
 3. Recovery mapping:
 
 | Code | Context | Recovery |
@@ -247,7 +275,8 @@ Parsing tolerates `expires_in` as a number or numeric string, unknown
 members, and `token_type` in any case. It rejects a 2xx response without
 `access_token` or `token_type` (`.invalidResponse`). `token_type` is
 not checked for exchanges whose `issued_token_type` is not an access
-token (RFC 8693 §2.2.1 allows `N_A`).
+token (RFC 8693 §2.2.1 allows `N_A`). A token exchange response must carry
+`issued_token_type` (RFC 8693 §2.2.1), else `.invalidResponse`.
 
 The **granted scope** of a response is `scope` when present, otherwise
 the requested scope (RFC 6749 §5.1). Narrower-than-requested scope is
@@ -317,6 +346,15 @@ public struct DeviceAuthorization: Sendable {
 }
 ```
 
+The start response must have an `https` (or loopback `http`) verification URI,
+else `.invalidResponse`; an insecure `verification_uri_complete` is dropped.
+`verification_url` is accepted as an interoperability alias of
+`verification_uri` (some providers shipped it before RFC 8628 settled on
+`_uri`). An `interval` above one hour is `.invalidResponse`; `slow_down`
+stops increasing the interval at one hour; `expires_in` is clamped to about
+100 years. These bounds keep `Duration` conversions from trapping on hostile
+numbers.
+
 Polling rules: wait `interval` before each request; on `slow_down` add
 5 s permanently; on `authorization_pending` continue; on transport
 errors, 429 and 5xx back off exponentially (doubling, capped at 30 s)
@@ -335,11 +373,12 @@ public struct AuthorizationRequest: Sendable {
     public var loginHint: String?
     public var prompt: String?
     public var additionalParameters: AdditionalParameters = [:]
+    public var lifetime: Duration = .seconds(600)   // how long the user has; must be positive
 }
 public struct PendingAuthorization: Sendable, CustomStringConvertible {
     public let url: URL                   // open in an external user agent
     public let redirectURI: URL
-    // internal: state (Secret), codeVerifier (Secret), stopwatch; expires after 10 minutes; single use
+    // internal: state (Secret), codeVerifier (Secret), stopwatch; expires after `AuthorizationRequest.lifetime`; single use
 }
 public protocol UserAgent: Sendable {
     /// Presents `url` and returns the callback URL that matched `redirectURI`.
@@ -363,7 +402,9 @@ redirect URI carries the actual port; the callback is compared with it.
 1. the pending authorization was not completed before (`.invalidConfiguration`)
    and has not expired (`.timedOut`, recovery `.reauthenticate`);
 2. the callback matches `redirectURI` in scheme and host (case-insensitive),
-   port (default ports implied) and path (exact), else `.invalidResponse`; the
+   port (default ports implied) and path (exact), else `.invalidResponse`; a
+   callback with userinfo never matches, and a query on the registered redirect
+   URI must appear unchanged in the callback; the
    response is read from the query only, and a repeated response parameter or
    malformed encoding is `.invalidResponse`;
 3. `state` matches (constant-time comparison), else `.stateMismatch`;
@@ -377,7 +418,10 @@ redirect URI carries the actual port; the callback is compared with it.
 6. `code` present, else `.invalidResponse`;
 
 then it redeems the code with `grant_type`, `code`, `redirect_uri`,
-`code_verifier` and client authentication.
+`code_verifier`, the request's `resource` indicators (RFC 8707 §2.2) and
+client authentication. An authorization `error` that is not a well-formed
+RFC 6749 §4.1.2.1 value (at most 64 characters) is `.invalidResponse`;
+`error_uri` keeps only `http(s)`.
 
 A `PendingAuthorization` is single use. Copies share one flag, which is claimed
 once the callback passes the `state` check: from then on any further
@@ -620,13 +664,17 @@ public enum Discovery {
     /// RFC 8414 §3.1: inserts `/.well-known/oauth-authorization-server` between host and path.
     /// `.openIDConnect` appends `/.well-known/openid-configuration` instead.
     public static func fetchMetadata(issuer: URL, style: Style = .oauth, validation: IssuerValidation = .strict,
-                                     transport: any HTTPTransport = URLSessionTransport()) async throws -> AuthorizationServerMetadata
+                                     transport: any HTTPTransport = URLSessionTransport(),
+                                     observer: (any PassportObserver)? = nil,
+                                     clock: any Clock<Duration> = ContinuousClock()) async throws -> AuthorizationServerMetadata
     public enum Style: Sendable { case oauth, openIDConnect }
 }
 ```
 
 Metadata keys are the RFC's snake_case names; members the type does not model
-are kept in `additionalFields` and re-encoded. `fetchMetadata` sends `GET` with
+are kept in `additionalFields` and re-encoded. `fetchMetadata` reports
+`.request`, `.response` and `.transportFailure` events with
+`EndpointKind.metadata` to the observer, timed on `clock`. It sends `GET` with
 `Accept: application/json`; terminating slashes of the issuer path are removed
 before the well-known segment is added (`https://as.example.com/t/` gives
 `https://as.example.com/.well-known/oauth-authorization-server/t`). The issuer
@@ -706,7 +754,9 @@ endpoints well enough to run every flow, and is scriptable:
 - records every request with decoded form parameters.
 
 `ManualClock` implements `Clock<Duration>`; `sleep` suspends until the
-test advances time. `FixedWallClock` returns a settable `Date`.
+test advances time. `waitForSleeper()` and `advanceToNextSleeper()` wait for a
+sleeper in real time and stop the process with a clear message after 10 s
+instead of hanging; `waitForSleeper(timeout:)` returns `false` instead. `FixedWallClock` returns a settable `Date`.
 
 ## 15. Quality gates
 

@@ -12,6 +12,19 @@ codes, PKCE verifiers, device codes, client secrets.
 - Never placed in URLs (query or fragment) except where an RFC requires
   it (the authorization code in a redirect).
 
+`Secret` encodes as a plaintext string, because credential stores must
+persist the real value. Redaction covers `description`, `debugDescription`
+and reflection only. Encode a `Secret` solely into secure storage, never
+into logs, analytics, crash reports or unprotected files. `Secret ==` is
+not constant time; the library compares `state` in constant time itself.
+
+Text that arrives from the network and may reach a log or a UI is
+untrusted: error codes must match RFC 6749 §5.2 and fit 64 characters or
+the response is `invalidResponse`; `error_uri` keeps only `http` and
+`https`; `error_description` loses control, line-separator and invisible
+format characters (bidirectional overrides), long token-like runs and
+everything past 200 characters.
+
 ## Threats and mitigations
 
 | Threat | Mitigation |
@@ -30,3 +43,10 @@ codes, PKCE verifiers, device codes, client secrets.
 
 - HTTPS only for all endpoints, except loopback redirect URIs (RFC 8252).
 - Token requests do not follow redirects.
+- Other redirects never leave HTTPS for HTTP. When a redirect changes
+  scheme, host or port, every request header except `Accept`,
+  `Accept-Language` and `User-Agent` is dropped.
+- Requests time out after 30 s of silence and 60 s in total (configurable).
+- Additional parameters can never carry `client_id` or `client_secret`
+  (RFC 6749 §2.3: one authentication method per request).
+- A verification URI shown to a person must be `https` (or loopback `http`).
