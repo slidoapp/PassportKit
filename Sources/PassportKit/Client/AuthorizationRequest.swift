@@ -5,6 +5,27 @@ import Foundation
 /// PKCE (S256), `state` and the client identifier are added by
 /// ``OAuthClient/beginAuthorization(_:)``.
 public struct AuthorizationRequest: Sendable {
+    /// One value of the `prompt` parameter (OpenID Connect Core §3.1.2.1). An open set: servers define more.
+    public struct Prompt: RawRepresentable, Sendable, Hashable {
+        /// The `prompt` value as sent.
+        public let rawValue: String
+
+        /// Creates a prompt from its `prompt` value.
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        /// `none`: show no authentication or consent screen; fail if one would be needed. Named for what it asks,
+        /// so it never reads as "no value".
+        public static let noInteraction = Prompt(rawValue: "none")
+        /// `login`: ask the user to authenticate again.
+        public static let login = Prompt(rawValue: "login")
+        /// `consent`: ask the user for consent again.
+        public static let consent = Prompt(rawValue: "consent")
+        /// `select_account`: let the user choose an account.
+        public static let selectAccount = Prompt(rawValue: "select_account")
+    }
+
     /// Where the authorization server sends the user back (`redirect_uri`, RFC 6749 §3.1.2).
     ///
     /// Must be absolute, without fragment, and use `https`, a private-use scheme, or `http` on a loopback host
@@ -16,8 +37,9 @@ public struct AuthorizationRequest: Sendable {
     public var resources: [URL]
     /// `login_hint`, a hint for the authentication step (OpenID Connect Core §3.1.2.1).
     public var loginHint: String?
-    /// `prompt`, for example `login` or `consent`; sent verbatim.
-    public var prompt: String?
+    /// `prompt` values (OpenID Connect Core §3.1.2.1), sent as one space-delimited parameter in the given order;
+    /// omitted when empty. ``Prompt/noInteraction`` must not be combined with other values.
+    public var prompt: [Prompt]
     /// Extension parameters appended after the standard ones; a colliding name is an `invalidConfiguration` error.
     public var additionalParameters: AdditionalParameters
     /// How long the user has to complete the request, measured on the client's injected clock; 10 minutes by
@@ -30,7 +52,7 @@ public struct AuthorizationRequest: Sendable {
         scope: ScopeSet? = nil,
         resources: [URL] = [],
         loginHint: String? = nil,
-        prompt: String? = nil,
+        prompt: [Prompt] = [],
         additionalParameters: AdditionalParameters = [:],
         lifetime: Duration = .seconds(600)
     ) {

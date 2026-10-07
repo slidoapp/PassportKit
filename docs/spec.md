@@ -399,11 +399,14 @@ cancellation stops immediately. The library never opens a browser.
 
 ```swift
 public struct AuthorizationRequest: Sendable {
+    public struct Prompt: RawRepresentable, Sendable, Hashable {   // open; OIDC Core §3.1.2.1
+        public static let noInteraction, login, consent, selectAccount: Prompt   // "none", "login", "consent", "select_account"
+    }
     public var redirectURI: URL
     public var scope: ScopeSet?
     public var resources: [URL] = []
     public var loginHint: String?
-    public var prompt: String?
+    public var prompt: [Prompt] = []      // sent as one space-delimited `prompt` parameter, in order
     public var additionalParameters: AdditionalParameters = [:]
     public var lifetime: Duration = .seconds(600)   // how long the user has; must be positive
 }
