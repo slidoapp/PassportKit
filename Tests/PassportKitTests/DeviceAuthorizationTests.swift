@@ -94,6 +94,54 @@ struct DeviceAuthorizationTests {
         #expect(error?.code == .invalidResponse)
     }
 
+    @Test(arguments: ["http://as.example.com/device", "javascript:alert(1)", "myapp://device", "/relative"])
+    func startRejectsInsecureVerificationURI(uri: String) async throws {
+        let body = #"{"device_code":"d","user_code":"u","verification_uri":"\#(uri)","expires_in":60}"#
+        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
+        let error = await #expect(throws: PassportError.self) { try await client.startDeviceAuthorization() }
+        #expect(error?.code == .invalidResponse)
+    }
+
+    @Test func startAcceptsLoopbackHTTPAndDropsInsecureCompleteURI() async throws {
+        let body =
+            #"{"device_code":"d","user_code":"u","verification_uri":"http://localhost:8080/device","verification_uri_complete":"http://as.example.com/device?u=1","expires_in":60}"#
+        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
+        let authorization = try await client.startDeviceAuthorization()
+        #expect(authorization.verificationURI.absoluteString == "http://localhost:8080/device")
+        #expect(authorization.verificationURIComplete == nil)
+    }
+
+    @Test(arguments: ["1e25", "3601", "1e999"])
+    func startRejectsUnusableInterval(interval: String) async throws {
+        let body =
+            #"{"device_code":"d","user_code":"u","verification_uri":"https://as.example.com/v","expires_in":60,"interval":"#
+            + interval + "}"
+        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
+        let error = await #expect(throws: PassportError.self) { try await client.startDeviceAuthorization() }
+        #expect(error?.code == .invalidResponse)
+    }
+
+    @Test func startClampsHugeLifetimeInsteadOfTrapping() async throws {
+        let body =
+            #"{"device_code":"d","user_code":"u","verification_uri":"https://as.example.com/v","expires_in":1e25}"#
+        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
+        let authorization = try await client.startDeviceAuthorization()
+        #expect(authorization.expiresIn == .seconds(3_153_600_000))
+    }
+
+    @Test func slowDownStopsAtTheMaximumInterval() async throws {
+        let body =
+            #"{"device_code":"d","user_code":"u","verification_uri":"https://as.example.com/v","expires_in":100000,"interval":3598}"#
+        let clock = ManualClock()
+        let transport = RecordingTransport([
+            .json(200, body), .oauthError("slow_down"), .oauthError("slow_down"), .tokens(),
+        ])
+        let client = try ClientFixtures.client(transport, clock: clock)
+        let authorization = try await client.startDeviceAuthorization()
+        let outcome = await poll(client, authorization, clock: clock, sleeps: 3)
+        #expect(outcome.waits == [.seconds(3598), .seconds(3600), .seconds(3600)])
+    }
+
     @Test func startWithoutEndpointIsInvalidConfiguration() async throws {
         let configuration = ClientConfiguration(
             endpoints: Endpoints(token: ClientFixtures.tokenURL), authentication: .none(clientID: "app"))

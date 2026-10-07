@@ -6,12 +6,20 @@ enum AuthorizationCallback {
     private static let uniqueNames: Set<String> = ["code", "state", "error", "error_description", "error_uri", "iss"]
 
     /// Whether `callback` is the redirect URI: scheme and host case-insensitively, port (default ports
-    /// implied), and path exactly. The query is not compared; it carries the response.
+    /// implied), and path exactly. A callback with userinfo never matches. When the redirect URI has a query,
+    /// every one of its items must appear unchanged in the callback (RFC 6749 §3.1.2: the query is part of
+    /// the registered URI); further items are the response itself.
     static func matches(_ callback: URL, redirectURI: URL) -> Bool {
         guard let actual = URLComponents(url: callback, resolvingAgainstBaseURL: false),
             let expected = URLComponents(url: redirectURI, resolvingAgainstBaseURL: false)
         else { return false }
+        guard actual.user == nil, actual.password == nil else { return false }
+        let actualItems = actual.percentEncodedQueryItems ?? []
+        let expectedItems = expected.percentEncodedQueryItems ?? []
         return actual.scheme?.lowercased() == expected.scheme?.lowercased()
+            && expectedItems.allSatisfy { item in
+                actualItems.contains { $0.name == item.name && $0.value == item.value }
+            }
             && actual.host?.lowercased() == expected.host?.lowercased()
             && effectivePort(actual) == effectivePort(expected)
             && normalizedPath(actual) == normalizedPath(expected)

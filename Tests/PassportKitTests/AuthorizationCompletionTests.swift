@@ -94,6 +94,26 @@ struct AuthorizationCompletionTests {
         _ = try await client.completeAuthorization(pending, callbackURL: callback)
     }
 
+    @Test func callbackWithUserinfoIsRejected() async throws {
+        let (client, transport, pending) = try start()
+        let callback = URL(
+            string: "https://attacker:pw@app.example.com/callback?code=c&state=\(pending.state.reveal())")!
+        #expect(await failure(client, pending, callback)?.code == .invalidResponse)
+        #expect(await transport.requests.isEmpty)
+    }
+
+    @Test func registeredRedirectQueryMustBePresentInTheCallback() async throws {
+        let redirect = URL(string: "https://app.example.com/callback?tenant=acme")!
+        let (client, _, pending) = try start(redirectURI: redirect)
+        let missing = URL(string: "https://app.example.com/callback?code=c&state=\(pending.state.reveal())")!
+        #expect(await failure(client, pending, missing)?.code == .invalidResponse)
+        let altered = URL(
+            string: "https://app.example.com/callback?tenant=evil&code=c&state=\(pending.state.reveal())")!
+        #expect(await failure(client, pending, altered)?.code == .invalidResponse)
+        let exact = URL(string: "https://app.example.com/callback?tenant=acme&code=c&state=\(pending.state.reveal())")!
+        _ = try await client.completeAuthorization(pending, callbackURL: exact)
+    }
+
     @Test func loopbackRedirectMustCarryTheActualPort() async throws {
         let redirect = URL(string: "http://127.0.0.1:51234/cb")!
         let (client, _, pending) = try start(redirectURI: redirect)
@@ -153,6 +173,23 @@ struct AuthorizationCompletionTests {
         let error = await failure(client, pending, callback)
         #expect(error?.code == .invalidScope)
         #expect(error?.recovery == .fixConfiguration)
+    }
+
+    @Test func malformedAuthorizationErrorCodeIsInvalidResponse() async throws {
+        let (client, _, pending) = try start()
+        let callback = Fixtures.callback([("error", "bad\u{202E}code"), ("state", pending.state.reveal())])
+        let error = await failure(client, pending, callback)
+        #expect(error?.code == .invalidResponse)
+    }
+
+    @Test func nonWebErrorURIIsDropped() async throws {
+        let (client, _, pending) = try start()
+        let callback = Fixtures.callback([
+            ("error", "access_denied"), ("error_uri", "javascript:alert(1)"), ("state", pending.state.reveal()),
+        ])
+        let error = await failure(client, pending, callback)
+        #expect(error?.code == .accessDenied)
+        #expect(error?.errorURI == nil)
     }
 
     @Test func errorResponsesNeedAValidState() async throws {

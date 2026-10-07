@@ -11,6 +11,20 @@ extension PassportError {
             self.rawValue = rawValue
         }
 
+        /// The longest error code accepted from a server or a redirect.
+        static let maximumServerLength = 64
+
+        /// Accepts a code received from the network only when it is a well-formed `error` value of
+        /// RFC 6749 §5.2 (`%x20-21 / %x23-5B / %x5D-7E`) of at most 64 characters, so hostile text never
+        /// becomes a code that callers log or switch on. Returns `nil` otherwise.
+        static func fromServer(_ text: String) -> Code? {
+            let scalars = text.unicodeScalars
+            guard !scalars.isEmpty, scalars.count <= maximumServerLength,
+                scalars.allSatisfy({ ($0.value >= 0x20 && $0.value <= 0x7E) && $0 != "\"" && $0 != "\\" })
+            else { return nil }
+            return Code(rawValue: text)
+        }
+
         /// `invalid_request` (RFC 6749 §5.2).
         public static let invalidRequest = Code(rawValue: "invalid_request")
         /// `invalid_client` (RFC 6749 §5.2).
