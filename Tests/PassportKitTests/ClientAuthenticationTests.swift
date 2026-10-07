@@ -51,4 +51,32 @@ struct ClientAuthenticationTests {
             #expect(!text.contains(Canary.value))
         }
     }
+
+    @Test(
+        arguments: [
+            ClientAuthentication.none(clientID: "app"),
+            .clientSecretPost(clientID: "app", secret: Secret("s")),
+            .clientSecretBasic(clientID: "app", secret: Secret("s")),
+        ],
+        ["client_id", "client_secret"]
+    )
+    func additionalParametersCannotAddASecondAuthenticationMethod(
+        authentication: ClientAuthentication, name: String
+    ) {
+        let configuration = ClientFixtures.configuration(authentication: authentication)
+        var request = FormRequest(tokenEndpoint: ClientFixtures.tokenURL, grantType: .clientCredentials)
+        request.additionalParameters = [name: "other"]
+        #expect {
+            try request.build(configuration: configuration)
+        } throws: { ($0 as? PassportError)?.code == .invalidConfiguration }
+    }
+
+    @Test func authorizationURLRejectsClientAuthenticationParameters() throws {
+        let client = try ClientFixtures.client(RecordingTransport())
+        let request = AuthorizationRequest(
+            redirectURI: AuthorizationFixtures.redirectURI, additionalParameters: ["client_secret": "leak"])
+        #expect {
+            try client.beginAuthorization(request)
+        } throws: { ($0 as? PassportError)?.code == .invalidConfiguration }
+    }
 }

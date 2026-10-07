@@ -81,7 +81,8 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
     /// A mirror exposing the summary only, so reflection cannot reach the underlying error.
     public var customMirror: Mirror { Mirror(self, children: ["summary": description], displayStyle: .struct) }
 
-    /// Removes control characters, redacts runs of 24 or more token-like characters (a token echoed by a
+    /// Replaces control and line-separator characters, drops invisible format characters (bidirectional overrides,
+    /// zero-width characters), redacts runs of 24 or more token-like characters (a token echoed by a
     /// server would look like one) and truncates to ``maximumDescriptionLength`` characters.
     static func sanitize(_ text: String) -> String {
         var output = ""
@@ -96,7 +97,11 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
                 continue
             }
             flushRun()
-            output.unicodeScalars.append(scalar.properties.generalCategory == .control ? " " : scalar)
+            switch scalar.properties.generalCategory {
+            case .control, .lineSeparator, .paragraphSeparator: output += " "
+            case .format: break  // bidirectional overrides and other invisible characters can disguise text
+            default: output.unicodeScalars.append(scalar)
+            }
         }
         flushRun()
         return String(output.prefix(maximumDescriptionLength))

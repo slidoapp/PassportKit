@@ -29,7 +29,7 @@ extension OAuthClient {
         let state = try PKCE.makeRandomValue(random: random)
         let verifier = try PKCE.makeVerifier(random: random)
 
-        var builder = FormRequest(endpoint: .token, url: endpoint)
+        var builder = ParameterList()
         builder.add("response_type", "code")
         builder.add("client_id", configuration.authentication.clientID)
         builder.add("redirect_uri", request.redirectURI.absoluteString)
@@ -40,7 +40,8 @@ extension OAuthClient {
         try builder.add(resources: request.resources)
         if let loginHint = request.loginHint { builder.add("login_hint", loginHint) }
         if let prompt = request.prompt { builder.add("prompt", prompt) }
-        let parameters = try request.additionalParameters.appending(to: builder.parameters)
+        let parameters = try request.additionalParameters.appending(
+            to: builder.items, reserving: ClientAuthentication.parameterNames)
 
         let existing = components.percentEncodedQueryItems ?? []
         let names = Set(parameters.map(\.0))
@@ -143,10 +144,13 @@ extension OAuthClient {
         }
         try validateIssuer(values["iss"])
         if let error = values["error"], !error.isEmpty {
+            guard let code = PassportError.Code.fromServer(error) else {
+                throw PassportError(.invalidResponse, errorDescription: "The authorization error code is malformed.")
+            }
             throw PassportError.fromServerError(
-                code: PassportError.Code(rawValue: error),
+                code: code,
                 errorDescription: values["error_description"],
-                errorURI: values["error_uri"].flatMap { URL(string: $0) }.flatMap { $0.scheme == nil ? nil : $0 },
+                errorURI: values["error_uri"].flatMap(PassportError.errorURI(from:)),
                 context: .authorizationResponse
             )
         }
