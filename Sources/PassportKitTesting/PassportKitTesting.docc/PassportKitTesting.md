@@ -28,5 +28,5 @@ Add this library to test targets only.
 ### Clocks and randomness
 
 - ``ManualClock``
-- ``FixedWallClock``
+- ``ManualWallClock``
 - ``SequenceRandomSource``

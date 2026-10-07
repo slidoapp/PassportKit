@@ -37,7 +37,7 @@ struct RefreshAndDeviceTests {
 
     @Test("a retired token works once inside the leeway, then never again")
     func rotationLeeway() async throws {
-        let fixture = Fixture([.app(rotates: true, leeway: .init(seconds: 120, maximumReuse: 1))])
+        let fixture = Fixture([.app(rotates: true, leeway: .init(window: .seconds(120), maximumReuse: 1))])
         let signedIn = try await fixture.signIn()
         let rotated = try await fixture.refresh(signedIn.refreshToken)
         fixture.wallClock.advance(by: .seconds(60))
@@ -50,7 +50,7 @@ struct RefreshAndDeviceTests {
 
     @Test("a retired token is refused after the leeway window")
     func leewayExpires() async throws {
-        let fixture = Fixture([.app(rotates: true, leeway: .init(seconds: 120, maximumReuse: 1))])
+        let fixture = Fixture([.app(rotates: true, leeway: .init(window: .seconds(120), maximumReuse: 1))])
         let signedIn = try await fixture.signIn()
         _ = try await fixture.refresh(signedIn.refreshToken)
         fixture.wallClock.advance(by: .seconds(121))
@@ -69,7 +69,7 @@ struct RefreshAndDeviceTests {
 
     @Test("refresh token lifetime and revocation")
     func refreshLifetime() async throws {
-        let fixture = Fixture([.app(refreshLifetime: 100)])
+        let fixture = Fixture([.app(refreshLifetime: .seconds(100))])
         let first = try await fixture.signIn()
         fixture.wallClock.advance(by: .seconds(101))
         #expect(try await fixture.refresh(first.refreshToken).error == "invalid_grant")

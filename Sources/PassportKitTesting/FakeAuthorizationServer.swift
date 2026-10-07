@@ -40,10 +40,10 @@ public actor FakeAuthorizationServer: HTTPTransport {
         public var rotationLeeway: RotationLeeway?
         /// Whether presenting a retired refresh token outside the leeway revokes the whole grant.
         public var revokesGrantOnReuse: Bool
-        /// Access token lifetime in seconds.
-        public var accessTokenLifetime: TimeInterval
-        /// Refresh token lifetime in seconds; `nil` means no expiry.
-        public var refreshTokenLifetime: TimeInterval?
+        /// Access token lifetime.
+        public var accessTokenLifetime: Duration
+        /// Refresh token lifetime; `nil` means no expiry.
+        public var refreshTokenLifetime: Duration?
         /// The registered redirect URIs (loopback addresses match with any port, RFC 8252 §7.3).
         public var redirectURIs: [String]
 
@@ -56,8 +56,8 @@ public actor FakeAuthorizationServer: HTTPTransport {
             rotatesRefreshTokens: Bool = false,
             rotationLeeway: RotationLeeway? = nil,
             revokesGrantOnReuse: Bool = false,
-            accessTokenLifetime: TimeInterval = 3600,
-            refreshTokenLifetime: TimeInterval? = nil,
+            accessTokenLifetime: Duration = .seconds(3600),
+            refreshTokenLifetime: Duration? = nil,
             redirectURIs: [String] = ["https://app.example.com/callback"]
         ) {
             self.id = id
@@ -76,13 +76,13 @@ public actor FakeAuthorizationServer: HTTPTransport {
     /// A window in which a rotated refresh token can be presented again, like servers that tolerate a retry.
     public struct RotationLeeway: Sendable {
         /// How long after rotation the old token still works.
-        public var seconds: TimeInterval
+        public var window: Duration
         /// How many times it may be reused inside the window.
         public var maximumReuse: Int
 
         /// Creates a leeway, for example 120 seconds and one reuse.
-        public init(seconds: TimeInterval, maximumReuse: Int) {
-            self.seconds = seconds
+        public init(window: Duration, maximumReuse: Int) {
+            self.window = window
             self.maximumReuse = maximumReuse
         }
     }
@@ -154,10 +154,10 @@ public actor FakeAuthorizationServer: HTTPTransport {
         public var issuerParameter = IssuerParameter.issuer
         /// The `issuer` member of the metadata document.
         public var advertisedIssuer = FakeAuthorizationServer.issuer.absoluteString
-        /// Device code lifetime in seconds.
-        public var deviceCodeLifetime: TimeInterval = 600
-        /// The polling interval in seconds advertised to device clients.
-        public var deviceInterval = 5
+        /// Device code lifetime.
+        public var deviceCodeLifetime = Duration.seconds(600)
+        /// The polling interval advertised to device clients.
+        public var deviceInterval = Duration.seconds(5)
         /// How long to hold back the answer to a request after the server has handled it, on the server's clock.
         ///
         /// Unlike an override delay, the request takes effect (tokens rotate) immediately; only the response is
@@ -209,7 +209,7 @@ public actor FakeAuthorizationServer: HTTPTransport {
     /// `wallClock` decides token expiry; `clock` times override delays and may be a ``ManualClock``.
     public init(
         clients: [ClientRegistration],
-        wallClock: any WallClock = FixedWallClock(),
+        wallClock: any WallClock = ManualWallClock(),
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.clients = Dictionary(uniqueKeysWithValues: clients.map { ($0.id, $0) })
@@ -227,15 +227,24 @@ public actor FakeAuthorizationServer: HTTPTransport {
     public func requests(to path: String) -> [RecordedRequest] { requests.filter { $0.path == path } }
 
     /// Revokes a token and, for a refresh token, every token of its grant (RFC 7009 §2.1).
+    public func revoke(token: Secret) { revoke(token: token.reveal()) }
+
+    /// Revokes a token given as text, for example one read from a raw response body.
     public func revoke(token: String) {
         guard let record = tokens[token] else { return }
         if record.kind == .refresh { revokeGrant(record.grantID) } else { revoked.insert(token) }
     }
 
     /// Makes a token expire now, by the injected wall clock's current time.
+    public func expire(token: Secret) { expire(token: token.reveal()) }
+
+    /// Makes a token given as text expire now.
     public func expire(token: String) { tokens[token]?.expiresAt = wallClock.now() }
 
     /// What the server knows about `token`, or `nil` for an unknown one.
+    public func details(of token: Secret) -> TokenDetails? { details(of: token.reveal()) }
+
+    /// What the server knows about a token given as text, or `nil` for an unknown one.
     public func details(of token: String) -> TokenDetails? {
         tokens[token].map {
             TokenDetails(

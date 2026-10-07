@@ -19,7 +19,7 @@ struct RedactionCanaryTests {
         let renderings = RenderingLog()
         let events = EventLog()
         let clock = ManualClock()
-        let wallClock = FixedWallClock()
+        let wallClock = ManualWallClock()
         let client: OAuthClient
 
         init(authentication: (Secret) -> ClientAuthentication) async throws {
@@ -48,7 +48,7 @@ struct RedactionCanaryTests {
         func authorize() async throws -> TokenResponse {
             try await client.authorize(
                 AuthorizationRequest(redirectURI: redirectURI, scope: ["read", "write"]),
-                using: ServerUserAgent(server: server))
+                using: server.userAgent())
         }
 
         func echo(_ code: String, path: String = "/token", status: Int = 400, of parameters: [String]) {

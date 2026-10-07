@@ -2,7 +2,7 @@ import Foundation
 import PassportKit
 
 /// A `WallClock` that returns a settable date and never moves on its own.
-public final class FixedWallClock: WallClock, @unchecked Sendable {
+public final class ManualWallClock: WallClock, @unchecked Sendable {
     // @unchecked Sendable: the date is only read and written under `lock`.
     private let lock = NSLock()
     private var date: Date
@@ -17,8 +17,14 @@ public final class FixedWallClock: WallClock, @unchecked Sendable {
 
     /// Moves the clock by `duration` (negative values move it back).
     public func advance(by duration: Duration) {
-        let seconds = Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
-        lock.withLock { date = date.addingTimeInterval(seconds) }
+        lock.withLock { date = date.addingTimeInterval(duration.timeInterval) }
+    }
+}
+
+extension Duration {
+    /// The duration in seconds, for calendar arithmetic.
+    var timeInterval: TimeInterval {
+        Double(components.seconds) + Double(components.attoseconds) / 1e18
     }
 }
 

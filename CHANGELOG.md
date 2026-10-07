@@ -53,7 +53,7 @@ First development cycle; nothing is released yet.
 
 #### Testing (`PassportKitTesting`)
 
-- `FakeAuthorizationServer`, `ManualClock` (`waitForSleeper(timeout:)`), `FixedWallClock`, `SequenceRandomSource`
+- `FakeAuthorizationServer`, `ManualClock` (`waitForSleeper(timeout:)`), `ManualWallClock`, `SequenceRandomSource`
   and `RecordingTransport`. The server rotates refresh tokens on token exchange with a refresh-token subject, can
   issue a refresh token (`requested_token_type`), and delays responses with `Controls.responseDelay`.
 
@@ -128,6 +128,13 @@ First development cycle; nothing is released yet.
   `completeDeviceAuthorization` like `beginAuthorization` and `completeAuthorization`;
   `TokenManager.exchangeRefreshToken(audiences:)` takes an array like `TokenExchangeRequest.audiences`;
   `HTTPHeaders.add(name:value:)` is `append(_:_:)`, like `AdditionalParameters.append(_:_:)`.
+
+- `PassportKitTesting`: every lifetime and interval is a `Duration` (`ClientRegistration.accessTokenLifetime`,
+  `refreshTokenLifetime`, `RotationLeeway.window` (was `seconds`), `Controls.deviceCodeLifetime`,
+  `Controls.deviceInterval`); `FixedWallClock` is `ManualWallClock`, matching `ManualClock`;
+  `FakeAuthorizationServer.makeClient(clientID:wallClock:clock:)` and `userAgent(subject:decision:)` replace the
+  hand-written client and user agent of every test; `revoke(token:)`, `expire(token:)` and `details(of:)` take a
+  `Secret`, with `String` overloads.
 
 ### Security
 

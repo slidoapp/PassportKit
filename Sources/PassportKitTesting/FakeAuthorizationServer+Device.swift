@@ -44,14 +44,15 @@ extension FakeAuthorizationServer {
         let userCode = nextIdentifier("USER").uppercased()
         devices[deviceCode] = DeviceRecord(
             clientID: client.id, userCode: userCode, scope: scope, resources: try resources(of: request),
-            expiresAt: now().addingTimeInterval(controls.deviceCodeLifetime))
+            expiresAt: now().addingTimeInterval(controls.deviceCodeLifetime.timeInterval))
         return jsonResponse(
             200,
             [
                 "device_code": deviceCode, "user_code": userCode,
                 "verification_uri": "https://as.example.com/device",
                 "verification_uri_complete": "https://as.example.com/device?user_code=\(userCode)",
-                "expires_in": Int(controls.deviceCodeLifetime), "interval": controls.deviceInterval,
+                "expires_in": Int(controls.deviceCodeLifetime.timeInterval),
+                "interval": Int(controls.deviceInterval.timeInterval),
             ], headers: ["Cache-Control": "no-store"])
     }
 

@@ -58,9 +58,33 @@ struct SeamsAndHooksTests {
         try await sleeper.value
     }
 
-    @Test("FixedWallClock moves only when told to; SequenceRandomSource is deterministic")
+    @Test("makeClient and userAgent run a whole sign-in, and the token helpers take Secrets")
+    func clientAndUserAgentConveniences() async throws {
+        let server = FakeAuthorizationServer(clients: [.init(id: "app", accessTokenLifetime: .seconds(60))])
+        let client = try await server.makeClient(clientID: "app")
+        let request = AuthorizationRequest(
+            redirectURI: URL(string: "https://app.example.com/callback")!, scope: ["read"])
+        let tokens = try await client.authorize(request, using: server.userAgent(subject: "ann"))
+        #expect(tokens.expiresIn == .seconds(60))
+        #expect(await server.details(of: tokens.accessToken)?.subject == "ann")
+        await server.expire(token: tokens.accessToken)
+        let probe = HTTPRequest(
+            method: .get, url: URL(string: "https://api.example.com/v1/things")!,
+            headers: ["Authorization": "Bearer \(tokens.accessToken.reveal())"])
+        #expect(try await server.send(probe).statusCode == 401)
+
+        let denied = await #expect(throws: PassportError.self) {
+            try await client.authorize(request, using: server.userAgent(decision: .deny))
+        }
+        #expect(denied?.code == .accessDenied)
+        await #expect(throws: FakeAuthorizationServer.ControlError.self) {
+            try await server.makeClient(clientID: "other")
+        }
+    }
+
+    @Test("ManualWallClock moves only when told to; SequenceRandomSource is deterministic")
     func seams() {
-        let wall = FixedWallClock(Date(timeIntervalSince1970: 100))
+        let wall = ManualWallClock(Date(timeIntervalSince1970: 100))
         #expect(wall.now() == wall.now())
         wall.advance(by: .milliseconds(1500))
         #expect(wall.now() == Date(timeIntervalSince1970: 101.5))
