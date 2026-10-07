@@ -57,6 +57,34 @@ struct DeviceAuthorizationTests {
             ])
     }
 
+    @Test("RFC 8628 §3.1: a confidential client authenticates the device authorization request and every poll")
+    func confidentialClientAuthenticatesStartAndPolls() async throws {
+        let transport = RecordingTransport([
+            .json(200, Self.deviceJSON), .oauthError("authorization_pending"), .tokens("done"),
+        ])
+        let clock = ManualClock()
+        let client = try ClientFixtures.client(
+            transport, authentication: .clientSecretBasic(clientID: "app", secret: Secret("s3cret")), clock: clock)
+        let authorization = try await client.beginDeviceAuthorization(scope: ["a"])
+        let outcome = await poll(client, authorization, clock: clock, sleeps: 2)
+        #expect(try outcome.result.get().accessToken.reveal() == "done")
+        let requests = await transport.requests
+        #expect(requests.count == 3)
+        for sent in requests {
+            #expect(sent.request.headers["Authorization"] == "Basic YXBwOnMzY3JldA==")
+            #expect(sent.value("client_secret") == nil)
+        }
+        #expect(requests[1].value("grant_type") == GrantType.deviceCode.rawValue)
+
+        let post = RecordingTransport([.json(200, Self.deviceJSON)])
+        _ = try await ClientFixtures.client(
+            post, authentication: .clientSecretPost(clientID: "app", secret: Secret("s3cret"))
+        )
+        .beginDeviceAuthorization()
+        let sent = try #require(await post.requests.first)
+        #expect(sent.value("client_id") == "app" && sent.value("client_secret") == "s3cret")
+    }
+
     @Test func startParsesAllMembers() async throws {
         let (_, _, _, authorization) = try await start([])
         #expect(authorization.userCode == "WDJB-MJHT")

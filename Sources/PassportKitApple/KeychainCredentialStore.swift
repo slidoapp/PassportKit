@@ -166,7 +166,7 @@
         }
 
         /// The status is public information; no item data is involved.
-        private static func failure(_ status: OSStatus) -> PassportError {
+        static func failure(_ status: OSStatus) -> PassportError {
             let underlying = NSError(domain: NSOSStatusErrorDomain, code: Int(status))
             if status == errSecInteractionNotAllowed {
                 return PassportError(

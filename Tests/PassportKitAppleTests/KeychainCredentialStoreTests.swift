@@ -5,7 +5,7 @@
     import Security
     import Testing
 
-    import PassportKitApple
+    @testable import PassportKitApple
 
     /// Uses the real Keychain of the test host with a unique service per test, removed on exit. The default
     /// store uses the login keychain on macOS, which `swift test` can reach without entitlements; the data
@@ -131,6 +131,46 @@
                 try await group.waitForAll()
             }
             #expect(itemCount() == 1)
+        }
+
+        @Test func storedItemIsNotSynchronizable() async throws {
+            let store = KeychainCredentialStore()
+            defer { cleanUp() }
+            try await store.save(credential(), for: account)
+            let attributes = try storedAttributes()
+            // The attribute reads back as false (0) or is absent; it is never true.
+            let synchronizable = attributes[kSecAttrSynchronizable as String] as? Bool
+            #expect(synchronizable != true)
+            #if !os(macOS)
+                // The file-based keychain of macOS has no accessibility classes; the setting is applied there only
+                // with the data protection keychain, which an unsigned test host cannot use.
+                let accessible = attributes[kSecAttrAccessible as String] as? String
+                #expect(accessible == kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String)
+            #endif
+        }
+
+        @Test func lockedDeviceIsRetryableAndOtherStatusesAreNot() {
+            let locked = KeychainCredentialStore.failure(errSecInteractionNotAllowed)
+            #expect(locked.code == .storageFailure)
+            #expect(locked.recovery == .retryLater(after: nil))
+            let other = KeychainCredentialStore.failure(errSecAuthFailed)
+            #expect(other.code == .storageFailure)
+            #expect(other.recovery != .retryLater(after: nil))
+            #expect(other.description.contains("\(errSecAuthFailed)"))
+        }
+
+        private func storedAttributes() throws -> [String: Any] {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: account.service,
+                kSecAttrAccount as String: account.account,
+                kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+                kSecReturnAttributes as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+            ]
+            var result: CFTypeRef?
+            try #require(SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess)
+            return try #require(result as? [String: Any])
         }
 
         #if os(macOS)
