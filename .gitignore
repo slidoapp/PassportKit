@@ -1,0 +1,16 @@
+# SwiftPM
+.build/
+.swiftpm/
+/Package.resolved
+
+# Xcode
+DerivedData/
+*.xcresult
+xcuserdata/
+
+# macOS
+.DS_Store
+
+# Local agent settings
+.claude/settings.local.json
+CLAUDE.local.md
