@@ -286,6 +286,6 @@ provider.use(async (ctx, next) => {
   }
 });
 
-http.createServer(provider.callback()).listen(port, () => {
+http.createServer(provider.callback()).listen(port, '127.0.0.1', () => {
   console.log(`integration server listening on ${issuer}`);
 });
