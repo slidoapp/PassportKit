@@ -31,3 +31,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Authorization server metadata discovery (RFC 8414): `Discovery.fetchMetadata`,
   `AuthorizationServerMetadata` with preserved unknown members,
   `IssuerValidation`, and `Endpoints.init(metadata:)`.
+- `AuthenticationChallenge.parse` for `WWW-Authenticate` values (RFC 9110
+  §11.6.1, RFC 6750 §3).

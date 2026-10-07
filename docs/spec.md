@@ -544,9 +544,19 @@ public struct AuthenticationChallenge: Sendable, Hashable {
     public var scheme: String
     public var parameters: [String: String]   // lower-cased names
     public var token68: String?
+    public init(scheme: String, parameters: [String: String] = [:], token68: String? = nil)
     public static func parse(_ headerValues: [String]) -> [AuthenticationChallenge]
 }
 ```
+
+`parse` takes every `WWW-Authenticate` line (RFC 9110 §11.6.1): each line is a
+comma-separated list of challenges, so one line may hold several. Scheme and
+parameter names are case-insensitive and stored lower-cased (the scheme too, so
+`DPoP` is `"dpop"`). Parameter values are tokens or quoted strings; commas
+inside quotes do not split and `\` escapes the next character. `Negotiate abc==`
+is the `token68` form. A repeated parameter name keeps its first value. Parsing
+is lenient and total: malformed parts are skipped and input that is not a
+challenge yields an empty array.
 
 `evaluate` rules:
 
