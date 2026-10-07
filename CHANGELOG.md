@@ -17,3 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OAuthClient` with refresh, client credentials, token exchange, extension
   grants and revocation, plus `TokenExchangeRequest`, `PassportObserver`,
   `PassportEvent` and `EndpointKind`.
+- Device authorization grant: `OAuthClient.startDeviceAuthorization` and
+  `completeDeviceAuthorization` with interval, `slow_down`, backoff, expiry
+  and cancellation handling, and the `DeviceAuthorization` value.
