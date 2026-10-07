@@ -46,6 +46,9 @@ extension TokenManager {
         if let token = cache.usableToken(for: target, now: client.wallClock.now(), minimumLifetime: minimumLifetime) {
             return token
         }
+        // A token that was just rejected is not asked for again: every attempt would rotate the refresh token.
+        let now = client.wallClock.now()
+        if let rejection = cache.rejection(for: target, now: now) { throw rejection }
         let flight = flights[target] ?? startFlight(for: target)
         return try await flight.completion.wait()
     }
@@ -153,13 +156,25 @@ extension TokenManager {
         )
     }
 
-    /// Runs the acceptance policy. A rejection is reported and thrown unless the session changed meanwhile.
+    /// Runs the acceptance policy, limited to `acceptancePolicyTimeLimit`: a policy that does not answer in time
+    /// rejects the token, so it cannot hold the refresh token lane forever. A rejection is remembered for
+    /// `rejectedTokenCacheDuration`, reported and thrown, unless the session changed meanwhile.
     func accept(_ token: AccessToken, response: TokenResponse, session: Int) async throws {
-        guard case .reject(let reason) = await acceptancePolicy.evaluate(token, response: response),
-            session == generation
-        else { return }
+        let policy = acceptancePolicy
+        // The default policy cannot hang, so it needs no timer.
+        let verdict =
+            policy is AcceptAnyToken
+            ? .accept
+            : (try? await withTimeLimit(acceptancePolicyTimeLimit, clock: client.clock) {
+                await policy.evaluate(token, response: response)
+            }) ?? .reject(reason: "The acceptance policy did not answer in time.")
+        guard case .reject(let reason) = verdict, session == generation else { return }
+        let error = PassportError(.tokenRejected, recovery: .resourceDenied, errorDescription: reason)
+        cache.reject(
+            target: token.target, error: error,
+            until: client.wallClock.now().addingTimeInterval(rejectedTokenCacheDuration.seconds))
         eventHub.emit(.tokenRejected(target: token.target, grantedScope: token.grantedScope))
-        throw PassportError(.tokenRejected, recovery: .resourceDenied, errorDescription: reason)
+        throw error
     }
 
     /// Caches `token` when its expiry is known. A token without one is used once and then issued again.

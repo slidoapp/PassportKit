@@ -1,8 +1,10 @@
 import Foundation
 
-/// Cached access tokens per target, and the counter that gives each cached token its generation.
+/// Cached access tokens per target, the recent rejections per target, and the counter that gives each cached
+/// token its generation.
 struct TokenCache {
     private var tokens: [TokenTarget: AccessToken] = [:]
+    private var rejections: [TokenTarget: (error: PassportError, until: Date)] = [:]
     private var lastGeneration = 0
 
     /// A new generation, unique for the life of the manager, so a token from a cleared session never matches.
@@ -30,6 +32,22 @@ struct TokenCache {
 
     mutating func removeAll() {
         tokens = [:]
+        rejections = [:]
+    }
+
+    /// Remembers that the token of `target` was rejected, until `until`.
+    mutating func reject(target: TokenTarget, error: PassportError, until: Date) {
+        rejections[target] = (error, until)
+    }
+
+    /// The rejection of `target` that is still remembered at `now`.
+    func rejection(for target: TokenTarget, now: Date) -> PassportError? {
+        guard let rejection = rejections[target], now < rejection.until else { return nil }
+        return rejection.error
+    }
+
+    mutating func forgetRejection(of target: TokenTarget) {
+        rejections[target] = nil
     }
 }
 

@@ -98,3 +98,30 @@ final class OrderLog: @unchecked Sendable {
     var entries: [String] { lock.withLock { recorded } }
     func append(_ entry: String) { lock.withLock { recorded.append(entry) } }
 }
+
+/// Something to wait for that ignores cancellation until the test opens it, like a hung callback.
+final class Gate: @unchecked Sendable {
+    // @unchecked Sendable: the state is only touched under `lock`.
+    private let lock = NSLock()
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var isOpen = false
+
+    func wait() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let proceed = lock.withLock { () -> Bool in
+                if !isOpen { waiters.append(continuation) }
+                return isOpen
+            }
+            if proceed { continuation.resume() }
+        }
+    }
+
+    func open() {
+        let parked = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            isOpen = true
+            defer { waiters = [] }
+            return waiters
+        }
+        for waiter in parked { waiter.resume() }
+    }
+}
