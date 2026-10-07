@@ -33,3 +33,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `IssuerValidation`, and `Endpoints.init(metadata:)`.
 - `AuthenticationChallenge.parse` for `WWW-Authenticate` values (RFC 9110
   §11.6.1, RFC 6750 §3).
+- `TokenManager`, the session actor: `load`, `signIn`, `accessToken(for:)`,
+  `invalidate`, `exchangeRefreshToken` and `signOut(revoke:)`, with a FIFO
+  lane for every operation that sends the refresh token, coalescing per
+  `TokenTarget`, persist-before-publish of rotated refresh tokens,
+  generation checks, expiry rules and a multicast `events` stream. Adds
+  `TokenTarget`, `AccessToken`, `TokenAcceptancePolicy` (`AcceptAnyToken`,
+  `RequireAnyScope`), `SessionEvent`, `SignOutReason` and `SignOutResult`.
+- Credential storage: `Credential`, `CredentialAccount`, `CredentialStore`,
+  `InMemoryCredentialStore` and the versioned JSON `CredentialCoding`.
+- `OAuthClient.configuration` and `OAuthClient.wallClock` are public.
+- `PassportKitTesting`: `FakeAuthorizationServer` rotates refresh tokens on
+  token exchange with a refresh-token subject, can issue a refresh token
+  (`requested_token_type`), and delays responses with `Controls.responseDelay`.
+
+### Fixed
+
+- `FakeAuthorizationServer.authorizeInteractively` decodes the authorization
+  request query as form data, so a `+` in `scope` is a space.
+
