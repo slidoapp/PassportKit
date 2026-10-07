@@ -6,7 +6,7 @@ import Foundation
 /// encoded bytes are secrets and belong in protected storage only.
 public enum CredentialCoding {
     /// The record version written by ``encode(_:)``.
-    public static let currentVersion = 1
+    static let currentVersion = 1
 
     private struct Header: Decodable {
         var version: Int

@@ -7,7 +7,7 @@ import Foundation
 public struct TokenResponse: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// The access token (`access_token`).
     public var accessToken: Secret
-    /// The token type (`token_type`), for example `Bearer`. Compare case-insensitively, see ``isBearer``.
+    /// The token type (`token_type`), for example `Bearer`. Compare case-insensitively.
     public var tokenType: String
     /// The lifetime from `expires_in`, or `nil` when the server omitted it.
     public var expiresIn: Duration?
@@ -44,7 +44,7 @@ public struct TokenResponse: Sendable, CustomStringConvertible, CustomDebugStrin
     }
 
     /// Whether ``tokenType`` is `Bearer`, compared case-insensitively (RFC 6749 §7.1, RFC 9110 §11.1).
-    public var isBearer: Bool {
+    var isBearer: Bool {
         tokenType.lowercased() == "bearer"
     }
 

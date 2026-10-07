@@ -303,7 +303,7 @@ not an error by itself.
 
 ```swift
 public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
-    /// Throws `.invalidConfiguration` when `configuration.validate()` fails.
+    /// Throws `.invalidConfiguration` when an endpoint or the issuer is not `https` (or loopback `http`).
     public init(configuration: ClientConfiguration,
                 transport: any HTTPTransport = URLSessionTransport(),
                 wallClock: any WallClock = SystemWallClock(),
@@ -363,14 +363,18 @@ public struct TokenTypeHint: RawRepresentable, Sendable, Hashable {   // open: R
 
 ```swift
 public struct DeviceAuthorization: Sendable {
-    public var userCode: String
-    public var verificationURI: URL
-    public var verificationURIComplete: URL?     // used verbatim; may already contain a query
-    public var expiresIn: Duration                 // as granted; see ADR 0006
-    public var expiresAt: Date                     // for display only
+    public internal(set) var userCode: String
+    public internal(set) var verificationURI: URL
+    public internal(set) var verificationURIComplete: URL?     // used verbatim; may already contain a query
+    public internal(set) var expiresIn: Duration                 // as granted; see ADR 0006
+    public internal(set) var expiresAt: Date                     // for display only
     public var remainingLifetime: Duration { get } // measured on the injected clock
-    public var interval: Duration                  // 5 s when omitted
+    public internal(set) var interval: Duration                  // 5 s when omitted
     // internal: deviceCode (Secret)
+    // Public memberwise init for previews and UI tests (deviceCode: Secret, clock: defaults to ContinuousClock).
+    public init(deviceCode: Secret, userCode: String, verificationURI: URL, verificationURIComplete: URL? = nil,
+                expiresIn: Duration, expiresAt: Date, interval: Duration = .seconds(5),
+                clock: any Clock<Duration> = ContinuousClock())
 }
 ```
 
@@ -504,8 +508,9 @@ public struct AccessToken: Sendable, Hashable, CustomStringConvertible, CustomDe
     public var expiresAt: Date?
     public var grantedScope: ScopeSet?
     public var target: TokenTarget
-    public var generation: Int          // changes whenever the cached token for this target changes
+    public internal(set) var generation: Int   // changes whenever the cached token for this target changes
     public var additionalFields: [String: JSONValue]
+    // The initializer is `package`: tokens come from the manager.
 }
 
 public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {   // descriptions never show values

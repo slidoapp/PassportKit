@@ -20,7 +20,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     /// Creates a client.
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when the
-    /// configuration fails ``ClientConfiguration/validate()``, so a misconfigured client never exists.
+    /// configuration is invalid (an endpoint or the issuer is neither `https` nor loopback `http`), so a misconfigured client never exists.
     public init(
         configuration: ClientConfiguration,
         transport: any HTTPTransport = URLSessionTransport(),

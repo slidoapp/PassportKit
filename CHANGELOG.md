@@ -98,6 +98,10 @@ First development cycle; nothing is released yet.
   `derivation`, with `.refreshGrant` and `.tokenExchange`. `PassportError.Recovery.none` is `.noAction`.
   `Recovery`, `RetryDecision`, `SessionEvent`, `SignOutReason` and `SignOutResult.Revocation` are documented as
   not frozen.
+- Less accidental surface: `ClientConfiguration.validate()`, `Endpoints.validate()`,
+  `PassportError.maximumDescriptionLength`, `URLSessionTransport.maximumBodySize`, `CredentialCoding.currentVersion`
+  and `TokenResponse.isBearer` are internal, `AccessToken.init` is package-only and `AccessToken.generation` is
+  read-only. `DeviceAuthorization` has read-only properties and a public initializer for previews and UI tests.
 
 ### Security
 
