@@ -35,7 +35,7 @@ struct FormRequest {
     /// Library-owned headers win over `additionalHeaders` with the same name.
     func build(configuration: ClientConfiguration) throws -> HTTPRequest {
         var headers = HTTPHeaders()
-        for (name, value) in configuration.additionalHeaders { headers.add(name: name, value: value) }
+        for (name, value) in configuration.additionalHeaders { headers.append(name, value) }
         var standard = parameters.items
         configuration.authentication.apply(to: &standard, headers: &headers)
         let all = try additionalParameters.appending(to: standard, reserving: ClientAuthentication.parameterNames)

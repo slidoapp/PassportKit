@@ -104,7 +104,7 @@ extension OAuthClient {
     /// Runs the whole flow: begins, lets `userAgent` present the URL, and completes with its callback.
     ///
     /// Errors from `userAgent`, such as ``PassportError/Code-swift.struct/userCancelled``, propagate unchanged.
-    public func authorize(_ request: AuthorizationRequest, using userAgent: any UserAgent) async throws
+    public func authorize(_ request: AuthorizationRequest, using userAgent: any AuthorizationUserAgent) async throws
         -> TokenResponse
     {
         let pending = try beginAuthorization(request)

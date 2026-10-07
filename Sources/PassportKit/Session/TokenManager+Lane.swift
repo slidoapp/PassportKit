@@ -6,7 +6,7 @@ extension TokenManager {
     /// Exchanges the refresh token for tokens of another audience or resource (RFC 8693 §2.1).
     ///
     /// The subject is the current refresh token. The response is returned as it came: the issued token (for
-    /// the default `requestedTokenType`, a refresh token bound to `audience`) is in `accessToken`, whatever its
+    /// the default `requestedTokenType`, a refresh token bound to `audiences`) is in `accessToken`, whatever its
     /// type. The manager does not cache or judge it. A `refresh_token` in the response is the rotated subject
     /// and is saved before this returns (persist before publish).
     ///
@@ -14,7 +14,7 @@ extension TokenManager {
     /// a request that was sent finishes and its rotated refresh token is saved. `invalid_grant` ends the
     /// session (RFC 6749 §5.2).
     public func exchangeRefreshToken(
-        audience: String?,
+        audiences: [String] = [],
         resources: [URL] = [],
         scope: ScopeSet? = nil,
         requestedTokenType: TokenTypeIdentifier = .refreshToken
@@ -30,7 +30,7 @@ extension TokenManager {
                     try await self.client.exchange(
                         TokenExchangeRequest(
                             subjectToken: $0, subjectTokenType: .refreshToken, requestedTokenType: requestedTokenType,
-                            audiences: audience.map { [$0] } ?? [], resources: resources, scope: scope))
+                            audiences: audiences, resources: resources, scope: scope))
                 }
                 completion.complete(.success(response))
             } catch {

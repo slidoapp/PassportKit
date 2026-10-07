@@ -70,7 +70,7 @@ let client = try OAuthClient(
     configuration: ClientConfiguration(metadata: metadata, authentication: .publicClient(clientID: "my-app")))
 
 // 1. Sign in. Show the code, then wait for the person to approve.
-let authorization = try await client.startDeviceAuthorization(scope: ["openid", "offline_access"])
+let authorization = try await client.beginDeviceAuthorization(scope: ["openid", "offline_access"])
 print("Open \(authorization.verificationURI) and enter \(authorization.userCode)")
 let tokens = try await client.completeDeviceAuthorization(authorization)
 

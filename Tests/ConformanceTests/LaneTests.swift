@@ -20,7 +20,7 @@ struct LaneTests {
                 group.addTask { (try? await manager.accessToken(for: targets[index % 3])) != nil }
             }
             for audience in ["billing", "reports"] {
-                group.addTask { (try? await manager.exchangeRefreshToken(audience: audience)) != nil }
+                group.addTask { (try? await manager.exchangeRefreshToken(audiences: [audience])) != nil }
             }
             await harness.deliverResponses(5)
             return await group.reduce(into: []) { $0.append($1) }

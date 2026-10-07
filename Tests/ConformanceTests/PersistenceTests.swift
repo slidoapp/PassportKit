@@ -43,7 +43,7 @@ struct PersistenceTests {
     func exchangeRefreshTokenPersists() async throws {
         let harness = try await Harness()
         let before = await harness.storedRefreshToken()
-        let response = try await harness.manager.exchangeRefreshToken(audience: "billing")
+        let response = try await harness.manager.exchangeRefreshToken(audiences: ["billing"])
         #expect(response.issuedTokenType == .refreshToken)
         let issued = response.accessToken.reveal()
         #expect(await harness.server.details(of: issued)?.audience == ["billing"])

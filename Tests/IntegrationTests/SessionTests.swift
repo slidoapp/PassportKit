@@ -20,7 +20,7 @@ struct SessionTests {
         #expect(rotated != original)
         #expect(try await session.store.load(session.account)?.refreshToken == rotated)
 
-        let reuse = await passportError { _ = try await session.client.refresh(refreshToken: original) }
+        let reuse = await passportError { _ = try await session.client.refresh(original) }
         #expect(reuse?.code == .invalidGrant)
         #expect(reuse?.recovery == .reauthenticate)
     }
@@ -71,7 +71,7 @@ struct SessionTests {
         let session = try await IntegrationServer.signIn()
         let original = try #require(await session.refreshToken)
 
-        let response = try await session.manager.exchangeRefreshToken(audience: IntegrationServer.audienceClientID)
+        let response = try await session.manager.exchangeRefreshToken(audiences: [IntegrationServer.audienceClientID])
         #expect(response.issuedTokenType == .refreshToken)
         #expect(response.accessToken != original)
 
@@ -82,7 +82,7 @@ struct SessionTests {
         // The audience's refresh token is usable by the audience client.
         let audienceClient = try await IntegrationServer.client(
             authentication: .publicClient(clientID: IntegrationServer.audienceClientID))
-        let audienceTokens = try await audienceClient.refresh(refreshToken: response.accessToken)
+        let audienceTokens = try await audienceClient.refresh(response.accessToken)
         #expect(audienceTokens.refreshToken != nil)
 
         // The rotated subject keeps working: a refresh with a resource sends it.
@@ -99,7 +99,7 @@ struct SessionTests {
         #expect(result.isStoredCredentialDeleted)
         #expect(await session.manager.credential == nil)
 
-        let error = await passportError { _ = try await session.client.refresh(refreshToken: refreshToken) }
+        let error = await passportError { _ = try await session.client.refresh(refreshToken) }
         #expect(error?.code == .invalidGrant)
     }
 }

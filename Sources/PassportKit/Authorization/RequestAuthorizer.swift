@@ -145,7 +145,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
             }
             var headers = HTTPHeaders()
             for (name, value) in http.allHeaderFields {
-                if let name = name as? String, let value = value as? String { headers.add(name: name, value: value) }
+                if let name = name as? String, let value = value as? String { headers.append(name, value) }
             }
             switch await evaluate(statusCode: http.statusCode, headers: headers, token: token, attempt: attempt) {
             case .deliver: return (data, http)

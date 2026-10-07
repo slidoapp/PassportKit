@@ -18,7 +18,7 @@ enum DocumentationSnippets {
             metadata: metadata, authentication: .publicClient(clientID: "my-app"))
         let client = try OAuthClient(configuration: configuration)
 
-        let authorization = try await client.startDeviceAuthorization(scope: ["openid", "offline_access"])
+        let authorization = try await client.beginDeviceAuthorization(scope: ["openid", "offline_access"])
         print("Open \(authorization.verificationURI) and enter \(authorization.userCode)")
         let tokens = try await client.completeDeviceAuthorization(authorization)
 
@@ -36,7 +36,7 @@ enum DocumentationSnippets {
         _ = (data, response)
     }
 
-    static func signIn(client: OAuthClient, using userAgent: any UserAgent) async throws -> TokenResponse {
+    static func signIn(client: OAuthClient, using userAgent: any AuthorizationUserAgent) async throws -> TokenResponse {
         let request = AuthorizationRequest(
             redirectURI: URL(string: "com.example.app:/callback")!,
             scope: ["openid", "offline_access"])
@@ -130,7 +130,7 @@ enum DocumentationSnippets {
         return (client, server)
     }
 
-    struct ApprovingUserAgent: UserAgent {
+    struct ApprovingUserAgent: AuthorizationUserAgent {
         let server: FakeAuthorizationServer
 
         func present(_ url: URL, redirectURI: URL) async throws -> URL {

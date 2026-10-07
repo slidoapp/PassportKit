@@ -45,7 +45,7 @@ struct ObserverTests {
         let observer = RecordingObserver()
         let transport = RecordingTransport([.oauthError("invalid_grant"), .json(200, "")])
         let client = try ClientFixtures.client(transport, observer: observer)
-        _ = try? await client.refresh(refreshToken: Secret("rt"))
+        _ = try? await client.refresh(Secret("rt"))
         try await client.revoke(Secret("rt"))
         let events = observer.events
         #expect(events.count == 4)
@@ -100,7 +100,7 @@ struct ObserverTests {
         let client = try ClientFixtures.client(
             transport, authentication: .clientSecretPost(clientID: "app", secret: Secret(Canary.value)),
             observer: observer)
-        _ = try? await client.refresh(refreshToken: Secret(Canary.value), additionalParameters: ["k": Canary.value])
+        _ = try? await client.refresh(Secret(Canary.value), additionalParameters: ["k": Canary.value])
         _ = try? await client.clientCredentials()
         _ = try await client.requestToken(grantType: .tokenExchange, parameters: ["subject_token": Canary.value])
         let text = observer.events.map { "\($0)" }.joined()

@@ -21,11 +21,11 @@ First development cycle; nothing is released yet.
   `TokenExchangeRequest`, `PassportObserver`, `PassportEvent` and `EndpointKind`. `configuration` and `wallClock`
   are public, and a description shows the client ID and token endpoint only.
 - `PassportEvent.transportFailure(endpoint:grantType:duration:)`, so every `.request` event has a terminating event.
-- Device authorization grant (RFC 8628): `startDeviceAuthorization` and `completeDeviceAuthorization` with interval,
+- Device authorization grant (RFC 8628): `beginDeviceAuthorization` and `completeDeviceAuthorization` with interval,
   `slow_down`, back-off, expiry and cancellation handling, and the `DeviceAuthorization` value.
 - Authorization code grant with PKCE `S256` (RFC 7636): `beginAuthorization`, `completeAuthorization` and
   `authorize(_:using:)`, with `AuthorizationRequest` (`lifetime`, default 10 minutes), `PendingAuthorization` and
-  `UserAgent`, `state` and redirect checks, and `iss` validation (RFC 9207) with
+  `AuthorizationUserAgent`, `state` and redirect checks, and `iss` validation (RFC 9207) with
   `ClientConfiguration.requiresIssuerInAuthorizationResponse`.
 - Authorization server metadata (RFC 8414): `Discovery.fetchMetadata(issuer:style:validation:transport:observer:clock:)`,
   `AuthorizationServerMetadata` with preserved unknown members, `IssuerValidation`, `Endpoints.init(metadata:)` and
@@ -122,6 +122,12 @@ First development cycle; nothing is released yet.
   `LocalizedError` whose `errorDescription` is its redacted `description`. The sanitized server text that was
   `PassportError.errorDescription` is now `PassportError.detail` (and the `detail:` initializer parameter),
   because the name belongs to `LocalizedError`.
+
+- Naming: `UserAgent` is `AuthorizationUserAgent`; `OAuthClient.refresh(_:scope:resources:additionalParameters:)`
+  takes the refresh token without a label; `startDeviceAuthorization` is `beginDeviceAuthorization`, pairing with
+  `completeDeviceAuthorization` like `beginAuthorization` and `completeAuthorization`;
+  `TokenManager.exchangeRefreshToken(audiences:)` takes an array like `TokenExchangeRequest.audiences`;
+  `HTTPHeaders.add(name:value:)` is `append(_:_:)`, like `AdditionalParameters.append(_:_:)`.
 
 ### Security
 

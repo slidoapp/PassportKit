@@ -5,7 +5,7 @@ extension OAuthClient {
     ///
     /// `invalid_grant` is reported with recovery ``PassportError/Recovery-swift.enum/reauthenticate``.
     public func refresh(
-        refreshToken: Secret,
+        _ refreshToken: Secret,
         scope: ScopeSet? = nil,
         resources: [URL] = [],
         additionalParameters: AdditionalParameters = [:]

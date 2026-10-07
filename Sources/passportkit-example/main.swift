@@ -62,7 +62,7 @@ struct ExampleError: Error, CustomStringConvertible {
 func signIn(arguments: Arguments, client: OAuthClient) async throws -> TokenResponse {
     switch arguments.flow {
     case "device":
-        let authorization = try await client.startDeviceAuthorization(scope: arguments.scope)
+        let authorization = try await client.beginDeviceAuthorization(scope: arguments.scope)
         print("Open \(authorization.verificationURIComplete ?? authorization.verificationURI)")
         print("and enter the code \(authorization.userCode) if asked.")
         print("Waiting for approval (polling every \(authorization.interval))...")

@@ -208,7 +208,7 @@
         }
     }
 
-    private struct ServerAgent: UserAgent {
+    private struct ServerAgent: AuthorizationUserAgent {
         let server: FakeAuthorizationServer
 
         func present(_ url: URL, redirectURI: URL) async throws -> URL {

@@ -35,7 +35,7 @@ The device authorization grant (RFC 8628) suits devices and tools without a
 browser. Show the person where to go, then wait for approval:
 
 ```swift
-let authorization = try await client.startDeviceAuthorization(scope: ["openid", "offline_access"])
+let authorization = try await client.beginDeviceAuthorization(scope: ["openid", "offline_access"])
 print("Open \(authorization.verificationURI) and enter \(authorization.userCode)")
 let tokens = try await client.completeDeviceAuthorization(authorization)
 ```
@@ -47,12 +47,12 @@ at the deadline and stops immediately when its task is cancelled.
 ## Sign in with the authorization code flow
 
 Interactive apps use the authorization code grant with PKCE. A
-``UserAgent`` shows the authorization page and returns the redirect. On
+``AuthorizationUserAgent`` shows the authorization page and returns the redirect. On
 Apple platforms `PassportKitApple` provides agents; see
 <doc:NativeAppRedirects>.
 
 ```swift
-func signIn(using userAgent: any UserAgent) async throws -> TokenResponse {
+func signIn(using userAgent: any AuthorizationUserAgent) async throws -> TokenResponse {
     let request = AuthorizationRequest(
         redirectURI: URL(string: "com.example.app:/callback")!,
         scope: ["openid", "offline_access"])

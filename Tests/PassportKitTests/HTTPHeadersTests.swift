@@ -13,8 +13,8 @@ struct HTTPHeadersTests {
 
     @Test func keepsMultipleValuesInOrder() {
         var headers = HTTPHeaders()
-        headers.add(name: "WWW-Authenticate", value: "Bearer realm=\"a\"")
-        headers.add(name: "www-authenticate", value: "Basic")
+        headers.append("WWW-Authenticate", "Bearer realm=\"a\"")
+        headers.append("www-authenticate", "Basic")
         #expect(headers.values(for: "WWW-AUTHENTICATE") == ["Bearer realm=\"a\"", "Basic"])
         #expect(headers["www-authenticate"] == "Bearer realm=\"a\"")
         #expect(headers.names == ["WWW-Authenticate"])

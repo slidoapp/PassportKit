@@ -20,7 +20,7 @@ struct LifecycleTests {
         #expect(await Harness.take(2, from: harness.events) == [.signedIn, .signedOut(reason: .refreshTokenRejected)])
         #expect(await thrownError { try await harness.manager.accessToken() }?.code == .notAuthenticated)
         #expect(
-            await thrownError { try await harness.manager.exchangeRefreshToken(audience: "a") }?.code
+            await thrownError { try await harness.manager.exchangeRefreshToken(audiences: ["a"]) }?.code
                 == .notAuthenticated)
     }
 

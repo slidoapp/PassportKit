@@ -191,8 +191,8 @@ struct AuthenticationChallengeTests {
 
     @Test func parsesHeaderLinesStraightFromHTTPHeaders() {
         var headers = HTTPHeaders()
-        headers.add(name: "WWW-Authenticate", value: #"Basic realm="simple""#)
-        headers.add(name: "www-authenticate", value: #"Bearer error="invalid_token""#)
+        headers.append("WWW-Authenticate", #"Basic realm="simple""#)
+        headers.append("www-authenticate", #"Bearer error="invalid_token""#)
         let parsed = AuthenticationChallenge.parse(headers.values(for: "WWW-Authenticate"))
         #expect(parsed.map(\.scheme) == ["basic", "bearer"])
     }

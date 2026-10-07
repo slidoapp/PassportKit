@@ -55,7 +55,7 @@ A target with audiences must use the exchange derivation. Use the refresh grant
 when the server issues resource-bound tokens from the refresh token, and the
 exchange when your server requires it.
 
-``TokenManager/exchangeRefreshToken(audience:resources:scope:requestedTokenType:)``
+``TokenManager/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``
 exchanges the refresh token itself, for example to hand a refresh token to
 another component. It is not cached and does not run the acceptance policy;
 the result belongs to your app.

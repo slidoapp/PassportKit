@@ -19,7 +19,7 @@ struct StoreOrderingTests {
         let inFlight = Task {
             switch operation {
             case .refresh: _ = try await manager.accessToken()
-            case .exchange: _ = try await manager.exchangeRefreshToken(audience: "billing")
+            case .exchange: _ = try await manager.exchangeRefreshToken(audiences: ["billing"])
             }
         }
         await harness.clock.waitForSleeper()

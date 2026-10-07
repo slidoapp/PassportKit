@@ -98,7 +98,7 @@ extension TokenManager {
         -> AccessToken
     {
         let response = try await spendRefreshToken(turn: turn, session: session, adoptsIDToken: true) {
-            try await self.client.refresh(refreshToken: $0, scope: target.scope, resources: target.resources)
+            try await self.client.refresh($0, scope: target.scope, resources: target.resources)
         }
         let token = makeToken(from: response, target: target, requestedScope: target.scope)
         try await accept(token, response: response, session: session)

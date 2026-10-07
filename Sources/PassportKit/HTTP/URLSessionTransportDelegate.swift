@@ -139,7 +139,7 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
             return (name, text)
         }
         for (name, value) in fields.sorted(by: { $0.0 < $1.0 }) {
-            headers.add(name: name, value: value)
+            headers.append(name, value)
         }
         return headers
     }

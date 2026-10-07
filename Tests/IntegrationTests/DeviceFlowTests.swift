@@ -11,7 +11,7 @@ import Testing
 struct DeviceFlowTests {
     @Test func approvedDeviceFlowSignsIn() async throws {
         let client = try await IntegrationServer.client()
-        let authorization = try await client.startDeviceAuthorization(scope: IntegrationServer.fullScope)
+        let authorization = try await client.beginDeviceAuthorization(scope: IntegrationServer.fullScope)
         #expect(authorization.interval == .seconds(5))
 
         async let approval: Void = IntegrationServer.decideDevice(userCode: authorization.userCode, approve: true)
@@ -28,7 +28,7 @@ struct DeviceFlowTests {
 
     @Test func deniedDeviceFlowEndsWithAccessDenied() async throws {
         let client = try await IntegrationServer.client()
-        let authorization = try await client.startDeviceAuthorization(scope: IntegrationServer.fullScope)
+        let authorization = try await client.beginDeviceAuthorization(scope: IntegrationServer.fullScope)
 
         async let decision: Void = IntegrationServer.decideDevice(userCode: authorization.userCode, approve: false)
         let error = await passportError { _ = try await client.completeDeviceAuthorization(authorization) }
