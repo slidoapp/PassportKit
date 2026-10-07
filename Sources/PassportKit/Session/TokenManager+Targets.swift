@@ -166,7 +166,7 @@ extension TokenManager {
             policy is AcceptAnyToken
             ? .accept
             : (try? await withTimeLimit(acceptancePolicyTimeLimit, clock: client.clock) {
-                await policy.evaluate(token, response: response)
+                await policy.evaluate(TokenAcceptanceContext(token: token, response: response))
             }) ?? .reject(reason: "The acceptance policy did not answer in time.")
         guard case .reject(let reason) = verdict, session == generation else { return }
         let error = PassportError(.tokenRejected, recovery: .resourceDenied, errorDescription: reason)

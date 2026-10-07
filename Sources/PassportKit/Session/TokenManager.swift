@@ -55,7 +55,13 @@ public actor TokenManager {
     /// Creates a manager with no session. Call ``load()`` to restore one from `store`.
     ///
     /// `account` names where the credential is stored. `acceptancePolicy` judges every issued access token
-    /// (ADR 0004); a policy that has not answered after `acceptancePolicyTimeLimit` rejects the token.
+    /// (ADR 0004).
+    ///
+    /// The default, ``AcceptAnyToken``, accepts whatever the server answers with, including a token whose scope
+    /// the server narrowed below what the app needs (RFC 6749 §3.3). An app that depends on a scope or a
+    /// resource should pass a policy such as ``RequireAnyScope``.
+    ///
+    /// A policy that has not answered after `acceptancePolicyTimeLimit` rejects the token.
     /// A rejected token is remembered for `rejectedTokenCacheDuration`: asking for the same target again within
     /// that time throws the same rejection without a request, so a caller that retries in a loop cannot make the
     /// manager rotate the refresh token over and over. Pass `.zero` to ask the server every time.
@@ -125,7 +131,7 @@ public actor TokenManager {
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/tokenRejected`` when the
     /// acceptance policy rejects the access token. The session is still established.
-    public func signIn(with response: TokenResponse, requestedScope: ScopeSet?) async throws {
+    public func signIn(with response: TokenResponse, requestedScope: ScopeSet? = nil) async throws {
         startNewSession()
         let session = generation
         let credential = Credential(
