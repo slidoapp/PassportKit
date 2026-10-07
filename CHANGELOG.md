@@ -113,6 +113,10 @@ First development cycle; nothing is released yet.
   arguments. `RequireAnyScope(_:forTargets:)` takes a `TargetSelector` (`.withResources`, `.all`,
   `.matching { }`) instead of a `when:` closure. New: `ClosureTokenAcceptancePolicy` and `.custom { }`.
 
+- `AuthorizationRequest.prompt` is `[AuthorizationRequest.Prompt]` instead of a string: an open struct with
+  `.noInteraction` (the value `none`), `.login`, `.consent` and `.selectAccount`, sent as one space-delimited
+  parameter, so several values can be combined.
+
 ### Security
 
 - `RequestAuthorizer` sends only `Bearer` tokens (compared case-insensitively). Another token type fails with

@@ -39,7 +39,7 @@ extension OAuthClient {
         builder.add(scope: request.scope)
         try builder.add(resources: request.resources)
         if let loginHint = request.loginHint { builder.add("login_hint", loginHint) }
-        if let prompt = request.prompt { builder.add("prompt", prompt) }
+        if !request.prompt.isEmpty { builder.add("prompt", request.prompt.map(\.rawValue).joined(separator: " ")) }
         let parameters = try request.additionalParameters.appending(
             to: builder.items, reserving: ClientAuthentication.parameterNames)
 

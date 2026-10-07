@@ -69,7 +69,7 @@ enum IntegrationServer {
     ) async throws -> Session {
         let client = try await client(minimumTokenLifetime: minimumTokenLifetime)
         let request = AuthorizationRequest(
-            redirectURI: redirectURI, scope: scope, resources: resources, prompt: "consent")
+            redirectURI: redirectURI, scope: scope, resources: resources, prompt: [.consent])
         let response = try await client.authorize(request, using: RedirectFollowingUserAgent())
         let account = CredentialAccount(service: "IntegrationTests.\(UUID())", account: "user")
         let manager = TokenManager(client: client, store: store, account: account, acceptancePolicy: policy)

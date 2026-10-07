@@ -33,7 +33,7 @@ struct AuthorizationTests {
     @Test func callbackCarriesTheIssuerAndTheClientChecksIt() async throws {
         let client = try await IntegrationServer.client()
         let request = AuthorizationRequest(
-            redirectURI: IntegrationServer.redirectURI, scope: IntegrationServer.fullScope, prompt: "consent")
+            redirectURI: IntegrationServer.redirectURI, scope: IntegrationServer.fullScope, prompt: [.consent])
         let pending = try client.beginAuthorization(request)
         let callback = try await RedirectFollowingUserAgent().present(
             pending.url, redirectURI: IntegrationServer.redirectURI)
@@ -63,7 +63,7 @@ struct AuthorizationTests {
     private func rejectedCallback(_ tamper: (inout URLComponents) -> Void) async throws -> PassportError? {
         let client = try await IntegrationServer.client()
         let request = AuthorizationRequest(
-            redirectURI: IntegrationServer.redirectURI, scope: IntegrationServer.fullScope, prompt: "consent")
+            redirectURI: IntegrationServer.redirectURI, scope: IntegrationServer.fullScope, prompt: [.consent])
         let pending = try client.beginAuthorization(request)
         let callback = try await RedirectFollowingUserAgent().present(
             pending.url, redirectURI: IntegrationServer.redirectURI)

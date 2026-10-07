@@ -19,7 +19,7 @@ struct AuthorizationRequestTests {
                 scope: ["b", "a"],
                 resources: [URL(string: "https://api.example.com/v1")!, URL(string: "https://other.example.com")!],
                 loginHint: "ann@example.com",
-                prompt: "consent",
+                prompt: [.consent],
                 additionalParameters: ["audience_hint": "x y"]
             ))
         let verifier = Secret(CountingRandomSource.text(call: 2))
@@ -33,6 +33,17 @@ struct AuthorizationRequestTests {
                 "login_hint=ann@example.com", "prompt=consent", "audience_hint=x y",
             ])
         #expect(pending.redirectURI == AuthorizationFixtures.redirectURI)
+    }
+
+    @Test func promptValuesAreOneSpaceDelimitedParameterInGivenOrder() throws {
+        let both = try client().beginAuthorization(
+            AuthorizationRequest(
+                redirectURI: AuthorizationFixtures.redirectURI, prompt: [.login, .selectAccount]))
+        #expect(pairs(both.url).contains("prompt=login select_account"))
+        let none = try client().beginAuthorization(
+            AuthorizationRequest(redirectURI: AuthorizationFixtures.redirectURI))
+        #expect(!pairs(none.url).contains { $0.hasPrefix("prompt=") })
+        #expect(AuthorizationRequest.Prompt.noInteraction.rawValue == "none")
     }
 
     @Test func stateAndVerifierAre32RandomBytesEach() throws {

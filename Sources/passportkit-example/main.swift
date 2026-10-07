@@ -4,7 +4,7 @@
 //   passportkit-example --issuer https://as.example.com --client-id app --scope "openid offline_access" \
 //       --flow device
 //
-// Options: --flow device|code (default device), --prompt <value> for the code flow (some servers need
+// Options: --flow device|code (default device), --prompt <values> (space-delimited) for the code flow (some servers need
 // `consent` to issue a refresh token), --no-browser to print the authorization URL instead of opening it.
 
 import Foundation
@@ -19,7 +19,7 @@ struct Arguments {
     var clientID: String
     var scope: ScopeSet
     var flow: String
-    var prompt: String?
+    var prompt: [AuthorizationRequest.Prompt]
     var opensBrowser: Bool
 
     static let usage = """
@@ -49,7 +49,7 @@ struct Arguments {
         self.clientID = clientID
         self.scope = ScopeSet(parsing: scope)
         self.flow = flow
-        self.prompt = values["--prompt"]
+        self.prompt = (values["--prompt"] ?? "").split(separator: " ").map { .init(rawValue: String($0)) }
         self.opensBrowser = !flags.contains("--no-browser")
     }
 }
