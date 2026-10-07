@@ -35,7 +35,7 @@ func makeClient() throws -> (OAuthClient, FakeAuthorizationServer) {
         endpoints: Endpoints(
             authorization: FakeAuthorizationServer.authorizationEndpoint,
             token: FakeAuthorizationServer.tokenEndpoint),
-        authentication: .none(clientID: "app"),
+        authentication: .publicClient(clientID: "app"),
         issuer: FakeAuthorizationServer.issuer)
     let client = try OAuthClient(configuration: configuration, transport: server)
     return (client, server)

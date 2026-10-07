@@ -38,16 +38,16 @@ struct EventAndTargetTests {
 
     @Test("a target is the same whatever the order or repetition of its resources and audiences")
     func targetIdentity() {
-        let reordered = TokenTarget(resources: [apiB, apiA, apiB], scope: ["read", "write"])
-        let target = TokenTarget(resources: [apiA, apiB], scope: ["write", "read"])
+        let reordered = TokenTarget.refreshGrant(resources: [apiB, apiA, apiB], scope: ["read", "write"])
+        let target = TokenTarget.refreshGrant(resources: [apiA, apiB], scope: ["write", "read"])
         #expect(reordered == target)
         #expect(Set([reordered, target]).count == 1)
-        let exchange = TokenTarget(method: .exchangeAccessToken, audiences: ["a", "b"])
-        #expect(exchange == TokenTarget(method: .exchangeAccessToken, audiences: ["b", "a", "a"]))
-        #expect(exchange != TokenTarget(method: .refreshGrant, audiences: ["a", "b"]))
-        #expect(TokenTarget(resources: [apiA]) != TokenTarget(resources: [apiA, apiB]))
+        let exchange = TokenTarget.exchange(audiences: ["a", "b"])
+        #expect(exchange == TokenTarget.exchange(audiences: ["b", "a", "a"]))
+        #expect(exchange != TokenTarget(derivation: .refreshGrant, audiences: ["a", "b"]))
+        #expect(TokenTarget.refreshGrant(resources: [apiA]) != TokenTarget.refreshGrant(resources: [apiA, apiB]))
         // No scope asked for and an empty scope asked for are different requests.
-        #expect(TokenTarget(scope: nil) != TokenTarget(scope: ScopeSet([])))
+        #expect(TokenTarget.refreshGrant(scope: nil) != TokenTarget.refreshGrant(scope: ScopeSet([])))
     }
 
     @Test("invariant 2: callers that list the same resources in another order share one request and one token")
@@ -59,14 +59,16 @@ struct EventAndTargetTests {
         let orders = [[apiA, apiB], [apiB, apiA], [apiA, apiB, apiA]]
         let tokens = try await withThrowingTaskGroup(of: AccessToken.self) { group in
             for resources in orders {
-                group.addTask { try await manager.accessToken(for: TokenTarget(resources: resources)) }
+                group.addTask { try await manager.accessToken(for: TokenTarget.refreshGrant(resources: resources)) }
             }
             await harness.deliverResponses(1)
             return try await group.reduce(into: []) { $0.append($1) }
         }
         #expect(Set(tokens.map(\.value)).count == 1)
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
-        #expect(try await manager.accessToken(for: TokenTarget(resources: [apiB, apiA])).value == tokens[0].value)
+        #expect(
+            try await manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiB, apiA])).value
+                == tokens[0].value)
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
     }
 }

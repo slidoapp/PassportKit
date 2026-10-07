@@ -61,7 +61,7 @@ struct PersistenceTests {
         let harness = try await Harness(policy: RequireAnyScope(["read"]))
         await harness.server.configure { $0.isResourceUnauthorized = { $0.path.hasPrefix("/denied") } }
         let before = await harness.storedRefreshToken()
-        let target = TokenTarget(resources: [deniedResource])
+        let target = TokenTarget.refreshGrant(resources: [deniedResource])
 
         let error = await thrownError { try await harness.manager.accessToken(for: target) }
         #expect(error?.code == .tokenRejected)
@@ -80,7 +80,7 @@ struct PersistenceTests {
         _ = await thrownError { try await harness.manager.accessToken(for: target) }
         #expect(await harness.tokenRequests(.refreshToken).count == 2)
         // An accessible resource still works on the persisted token.
-        let allowed = try await harness.manager.accessToken(for: TokenTarget(resources: [apiA]))
+        let allowed = try await harness.manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiA]))
         #expect(allowed.grantedScope == ["read", "write"])
     }
 
@@ -93,7 +93,7 @@ struct PersistenceTests {
             $0.isResourceUnauthorized = { $0.path.hasPrefix("/denied") }
             $0.exchangeForUnauthorizedResource = behavior
         }
-        let target = TokenTarget(method: .exchangeAccessToken, resources: [deniedResource])
+        let target = TokenTarget.exchange(resources: [deniedResource])
         let error = await thrownError { try await harness.manager.accessToken(for: target) }
         #expect(error?.code == (behavior == .accessDenied401 ? .accessDenied : .tokenRejected))
         #expect(error?.recovery == .resourceDenied)
@@ -104,7 +104,7 @@ struct PersistenceTests {
         #expect(await harness.tokenRequests(.refreshToken).isEmpty)
         // And an accessible resource can be exchanged.
         let allowed = try await harness.manager.accessToken(
-            for: TokenTarget(method: .exchangeAccessToken, resources: [apiA]))
+            for: TokenTarget.exchange(resources: [apiA]))
         #expect(allowed.grantedScope == ["read", "write"])
     }
 }

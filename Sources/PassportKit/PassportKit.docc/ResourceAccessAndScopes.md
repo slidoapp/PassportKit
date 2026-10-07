@@ -57,7 +57,7 @@ second. The session is intact. Handle both with one branch:
 func items(using manager: TokenManager) async throws -> Data? {
     do {
         let token = try await manager.accessToken(
-            for: TokenTarget(resources: [URL(string: "https://api.example.com/items")!]))
+            for: .refreshGrant(resources: [URL(string: "https://api.example.com/items")!]))
         // Use the token.
         _ = token
         return nil

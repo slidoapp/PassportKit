@@ -89,6 +89,16 @@ First development cycle; nothing is released yet.
   requested again, event streams buffer 64 events, a grant without a refresh token ends its session when its access
   token expires, and `TokenTarget` ignores the order and repetition of resources and audiences.
 
+### Changed: public API review before the first release
+
+- Evolvable types: `ClientAuthentication`, `TokenTarget.Derivation` (was the enum `TokenTarget.Method`),
+  `EndpointKind` and `TokenTypeHint` are open structs with static members, so new cases are not source breaking.
+  `ClientAuthentication.none(clientID:)` is now `.publicClient(clientID:)`. `TokenTarget` is created with
+  `.refreshGrant(resources:scope:)` or `.exchange(resources:audiences:scope:)`; its `method` property is
+  `derivation`, with `.refreshGrant` and `.tokenExchange`. `PassportError.Recovery.none` is `.noAction`.
+  `Recovery`, `RetryDecision`, `SessionEvent`, `SignOutReason` and `SignOutResult.Revocation` are documented as
+  not frozen.
+
 ### Security
 
 - `RequestAuthorizer` sends only `Bearer` tokens (compared case-insensitively). Another token type fails with

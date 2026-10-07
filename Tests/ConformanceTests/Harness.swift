@@ -94,7 +94,7 @@ struct Harness {
                 authorization: FakeAuthorizationServer.authorizationEndpoint,
                 token: FakeAuthorizationServer.tokenEndpoint,
                 revocation: FakeAuthorizationServer.revocationEndpoint),
-            authentication: .none(clientID: "app"), issuer: FakeAuthorizationServer.issuer,
+            authentication: .publicClient(clientID: "app"), issuer: FakeAuthorizationServer.issuer,
             minimumTokenLifetime: minimumTokenLifetime, defaultTokenLifetime: defaultTokenLifetime)
         client = try OAuthClient(
             configuration: configuration, transport: GaugedTransport(server: server, gauge: gauge),

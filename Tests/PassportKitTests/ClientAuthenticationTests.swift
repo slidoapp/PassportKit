@@ -13,7 +13,7 @@ struct ClientAuthenticationTests {
     }
 
     @Test func publicClientSendsClientIDInBody() {
-        let result = apply(.none(clientID: "app"))
+        let result = apply(.publicClient(clientID: "app"))
         #expect(result.parameters == ["client_id=app"])
         #expect(result.headers["Authorization"] == nil)
     }
@@ -40,7 +40,7 @@ struct ClientAuthenticationTests {
     }
 
     @Test func clientIDAccessor() {
-        #expect(ClientAuthentication.none(clientID: "a").clientID == "a")
+        #expect(ClientAuthentication.publicClient(clientID: "a").clientID == "a")
         #expect(ClientAuthentication.clientSecretPost(clientID: "b", secret: Secret("x")).clientID == "b")
         #expect(ClientAuthentication.clientSecretBasic(clientID: "c", secret: Secret("x")).clientID == "c")
     }
@@ -54,7 +54,7 @@ struct ClientAuthenticationTests {
 
     @Test(
         arguments: [
-            ClientAuthentication.none(clientID: "app"),
+            ClientAuthentication.publicClient(clientID: "app"),
             .clientSecretPost(clientID: "app", secret: Secret("s")),
             .clientSecretBasic(clientID: "app", secret: Secret("s")),
         ],

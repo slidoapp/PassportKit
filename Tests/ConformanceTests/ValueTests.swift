@@ -59,7 +59,7 @@ struct ValueTests {
                 AccessToken(value: Secret("a"), tokenType: "Bearer", grantedScope: scope, target: target),
                 response: response)
         }
-        let resourceTarget = TokenTarget(resources: [apiA])
+        let resourceTarget = TokenTarget.refreshGrant(resources: [apiA])
         #expect(await verdict(resourceTarget, ["write", "other"]).isAccepted)
         #expect(await !verdict(resourceTarget, ["none"]).isAccepted)
         #expect(await !verdict(resourceTarget, nil).isAccepted, "an unknown scope proves nothing")

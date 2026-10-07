@@ -208,10 +208,10 @@ struct RedactionCanaryTests {
         rig.renderings.look(try #require(await store.load(account)))
         let root = try #require(await rig.renderings.observe { try await manager.accessToken() })
         await rig.renderings.observe {
-            try await manager.accessToken(for: TokenTarget(resources: [apiA], scope: ["read"]))
+            try await manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiA], scope: ["read"]))
         }
         await rig.renderings.observe {
-            try await manager.accessToken(for: TokenTarget(method: .exchangeAccessToken, audiences: ["service"]))
+            try await manager.accessToken(for: TokenTarget.exchange(audiences: ["service"]))
         }
         await rig.renderings.observe { try await manager.exchangeRefreshToken(audience: "service") }
         // The signed `URLRequest` of the other overload is Foundation's own type and prints its headers; the

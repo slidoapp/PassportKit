@@ -92,9 +92,9 @@ extension PassportError {
     ) -> Recovery {
         switch code {
         case .invalidGrant:
-            context == .refreshGrant || context == .exchangeWithRefreshToken ? .reauthenticate : .none
+            context == .refreshGrant || context == .exchangeWithRefreshToken ? .reauthenticate : .noAction
         case .accessDenied:
-            context == .deviceAuthorizationPoll || context == .authorizationResponse ? .none : .resourceDenied
+            context == .deviceAuthorizationPoll || context == .authorizationResponse ? .noAction : .resourceDenied
         case .invalidTarget, .insufficientScope, .tokenRejected:
             .resourceDenied
         case .invalidClient, .unauthorizedClient, .unsupportedGrantType, .invalidRequest, .invalidScope,
@@ -103,9 +103,10 @@ extension PassportError {
         case .temporarilyUnavailable, .serverError, .transportFailure:
             .retryLater(after: retryAfter)
         case .expiredToken:
-            context == .deviceAuthorizationPoll ? .reauthenticate : .none
+            context == .deviceAuthorizationPoll ? .reauthenticate : .noAction
         default:
-            statusCode.map { $0 == 429 || (500...599).contains($0) } == true ? .retryLater(after: retryAfter) : .none
+            statusCode.map { $0 == 429 || (500...599).contains($0) } == true
+                ? .retryLater(after: retryAfter) : .noAction
         }
     }
 

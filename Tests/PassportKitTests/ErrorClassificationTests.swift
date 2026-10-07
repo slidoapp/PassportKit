@@ -24,16 +24,16 @@ struct ErrorClassificationTests {
         let declines = context == .deviceAuthorizationPoll || context == .authorizationResponse
         let consumesRefreshToken = context == .refreshGrant || context == .exchangeWithRefreshToken
         switch code.rawValue {
-        case "invalid_grant": return consumesRefreshToken ? .reauthenticate : .none
-        case "access_denied": return declines ? .none : .resourceDenied
+        case "invalid_grant": return consumesRefreshToken ? .reauthenticate : .noAction
+        case "access_denied": return declines ? .noAction : .resourceDenied
         case "invalid_target", "insufficient_scope", "client.token_rejected": return .resourceDenied
         case "invalid_client", "unauthorized_client", "unsupported_grant_type", "invalid_request", "invalid_scope",
             "client.invalid_configuration":
             return .fixConfiguration
         case "temporarily_unavailable", "server_error", "client.transport_failure":
             return .retryLater(after: retryAfter)
-        case "expired_token": return context == .deviceAuthorizationPoll ? .reauthenticate : .none
-        default: return .none
+        case "expired_token": return context == .deviceAuthorizationPoll ? .reauthenticate : .noAction
+        default: return .noAction
         }
     }
 
@@ -70,7 +70,7 @@ struct ErrorClassificationTests {
         }
         #expect(classify(.refreshGrant) == .reauthenticate)
         #expect(classify(.exchangeWithRefreshToken) == .reauthenticate)
-        #expect(classify(.other) == PassportError.Recovery.none)
+        #expect(classify(.other) == PassportError.Recovery.noAction)
     }
 
     @Test func parsesErrorURIOnlyWhenAbsolute() {
@@ -105,7 +105,7 @@ struct ErrorClassificationTests {
             #expect(error.code == code)
             #expect(error.statusCode == status)
             let isTransient = code == .temporarilyUnavailable
-            #expect(error.recovery == (isTransient ? .retryLater(after: .seconds(12)) : .none))
+            #expect(error.recovery == (isTransient ? .retryLater(after: .seconds(12)) : .noAction))
         }
     }
 
@@ -115,7 +115,7 @@ struct ErrorClassificationTests {
         let permanent = PassportError.fromErrorResponse(statusCode: 400, headers: [:], body: body, context: .other)
         #expect(transient.code.rawValue == "vendor_specific")
         #expect(transient.recovery == .retryLater(after: nil))
-        #expect(permanent.recovery == PassportError.Recovery.none)
+        #expect(permanent.recovery == PassportError.Recovery.noAction)
     }
 
     @Test(arguments: [

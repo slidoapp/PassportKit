@@ -29,14 +29,14 @@ let general = try await manager.accessToken()
 
 // A token bound to one resource (RFC 8707), refreshed from the root grant.
 let bound = try await manager.accessToken(
-    for: TokenTarget(resources: [items], scope: ["items.read"]))
+    for: .refreshGrant(resources: [items], scope: ["items.read"]))
 
 // A token for another service, exchanged from the default token (RFC 8693).
 let exchanged = try await manager.accessToken(
-    for: TokenTarget(method: .exchangeAccessToken, audiences: ["reports"]))
+    for: .exchange(audiences: ["reports"]))
 ```
 
-Two targets are equal when their method, scope and the sets of resources and
+Two targets are equal when their derivation, scope and the sets of resources and
 audiences are equal. Order and repetition do not matter. A token is never
 handed to a caller that asked for a different target, so a token for one API
 is not reused for another. Concurrent callers for the same target share one
@@ -44,14 +44,14 @@ request.
 
 ## Refresh or exchange
 
-- ``TokenTarget/Method/refreshGrant`` sends a refresh grant that names the
+- ``TokenTarget/refreshGrant(resources:scope:)`` sends a refresh grant that names the
   resources and scope. It narrows what the root grant allows.
-- ``TokenTarget/Method/exchangeAccessToken`` exchanges the default access
+- ``TokenTarget/exchange(resources:audiences:scope:)`` exchanges the default access
   token for one bound to resources or audiences. The server decides whether
   the exchange is allowed. A derived token never outlives the token it came
   from.
 
-A target with audiences must use the exchange method. Use the refresh grant
+A target with audiences must use the exchange derivation. Use the refresh grant
 when the server issues resource-bound tokens from the refresh token, and the
 exchange when your server requires it.
 

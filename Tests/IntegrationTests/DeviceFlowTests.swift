@@ -35,6 +35,6 @@ struct DeviceFlowTests {
         try await decision
 
         #expect(error?.code == .accessDenied)
-        #expect(error?.recovery == PassportError.Recovery.none)
+        #expect(error?.recovery == PassportError.Recovery.noAction)
     }
 }

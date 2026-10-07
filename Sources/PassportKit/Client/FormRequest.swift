@@ -55,10 +55,7 @@ struct FormRequest {
     func secretValues(configuration: ClientConfiguration) -> [String] {
         var values = (parameters.items + additionalParameters.items.map { ($0.name, $0.value) })
             .filter { Self.secretParameterNames.contains($0.0) }.map(\.1)
-        switch configuration.authentication {
-        case .none: break
-        case .clientSecretPost(_, let secret), .clientSecretBasic(_, let secret): values.append(secret.reveal())
-        }
+        if let secret = configuration.authentication.secret { values.append(secret.reveal()) }
         return values
     }
 }

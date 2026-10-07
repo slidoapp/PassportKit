@@ -27,7 +27,7 @@ struct SessionTests {
 
     @Test func exchangedAccessTokenForAnAllowedResourceSucceeds() async throws {
         let session = try await IntegrationServer.signIn()
-        let target = TokenTarget(method: .exchangeAccessToken, resources: [IntegrationServer.allowedResource])
+        let target = TokenTarget.exchange(resources: [IntegrationServer.allowedResource])
         let token = try await session.manager.accessToken(for: target)
         #expect(token.grantedScope?.contains("api:read") == true)
         #expect(token.target == target)
@@ -35,7 +35,7 @@ struct SessionTests {
 
     @Test func exchangeForADeniedResourceFailsAndKeepsTheSession() async throws {
         let session = try await IntegrationServer.signIn()
-        let target = TokenTarget(method: .exchangeAccessToken, resources: [IntegrationServer.deniedResource])
+        let target = TokenTarget.exchange(resources: [IntegrationServer.deniedResource])
 
         let error = await passportError { _ = try await session.manager.accessToken(for: target) }
         #expect(error?.code == .accessDenied)
@@ -43,7 +43,7 @@ struct SessionTests {
 
         #expect(await session.manager.credential != nil)
         _ = try await session.manager.accessToken()
-        let allowed = TokenTarget(method: .exchangeAccessToken, resources: [IntegrationServer.allowedResource])
+        let allowed = TokenTarget.exchange(resources: [IntegrationServer.allowedResource])
         _ = try await session.manager.accessToken(for: allowed)
     }
 
@@ -52,10 +52,10 @@ struct SessionTests {
         let original = try #require(await session.refreshToken)
 
         // Control: the same kind of target for an allowed resource is accepted.
-        let allowed = TokenTarget(resources: [IntegrationServer.allowedResource])
+        let allowed = TokenTarget.refreshGrant(resources: [IntegrationServer.allowedResource])
         _ = try await session.manager.accessToken(for: allowed)
 
-        let denied = TokenTarget(resources: [IntegrationServer.deniedResource])
+        let denied = TokenTarget.refreshGrant(resources: [IntegrationServer.deniedResource])
         let error = await passportError { _ = try await session.manager.accessToken(for: denied) }
         #expect(error?.code == .tokenRejected)
         #expect(error?.recovery == .resourceDenied)
@@ -81,12 +81,12 @@ struct SessionTests {
 
         // The audience's refresh token is usable by the audience client.
         let audienceClient = try await IntegrationServer.client(
-            authentication: .none(clientID: IntegrationServer.audienceClientID))
+            authentication: .publicClient(clientID: IntegrationServer.audienceClientID))
         let audienceTokens = try await audienceClient.refresh(refreshToken: response.accessToken)
         #expect(audienceTokens.refreshToken != nil)
 
         // The rotated subject keeps working: a refresh with a resource sends it.
-        let target = TokenTarget(resources: [IntegrationServer.allowedResource])
+        let target = TokenTarget.refreshGrant(resources: [IntegrationServer.allowedResource])
         _ = try await session.manager.accessToken(for: target)
     }
 

@@ -20,16 +20,25 @@ public enum PassportEvent: Sendable, Equatable {
     case transportFailure(endpoint: EndpointKind, grantType: GrantType?, duration: Duration)
 }
 
-/// Which kind of server endpoint a request targets.
-public enum EndpointKind: String, Sendable {
+/// Which kind of server endpoint a request targets. An open set: new endpoints can be added without breaking
+/// source compatibility.
+public struct EndpointKind: RawRepresentable, Sendable, Hashable {
+    /// A short, stable name of the endpoint kind.
+    public let rawValue: String
+
+    /// Creates an endpoint kind from its name.
+    public init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
     /// The token endpoint (RFC 6749 §3.2).
-    case token
+    public static let token = EndpointKind(rawValue: "token")
     /// The device authorization endpoint (RFC 8628 §3.1).
-    case deviceAuthorization
+    public static let deviceAuthorization = EndpointKind(rawValue: "deviceAuthorization")
     /// The revocation endpoint (RFC 7009 §2).
-    case revocation
+    public static let revocation = EndpointKind(rawValue: "revocation")
     /// The authorization server metadata endpoint (RFC 8414 §3).
-    case metadata
+    public static let metadata = EndpointKind(rawValue: "metadata")
     /// A protected resource.
-    case resource
+    public static let resource = EndpointKind(rawValue: "resource")
 }

@@ -1,4 +1,6 @@
 /// Why a session ended.
+///
+/// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
 public enum SignOutReason: Sendable, Hashable {
     /// ``TokenManager/signOut(revoke:)`` was called.
     case userInitiated
@@ -9,6 +11,8 @@ public enum SignOutReason: Sendable, Hashable {
 }
 
 /// Something that happened to the session, delivered through ``TokenManager/events``.
+///
+/// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
 public enum SessionEvent: Sendable, Equatable {
     /// A credential was adopted by ``TokenManager/signIn(with:requestedScope:)`` or restored by ``TokenManager/load()``.
     case signedIn
@@ -25,6 +29,8 @@ public enum SessionEvent: Sendable, Equatable {
 /// What ``TokenManager/signOut(revoke:)`` did.
 public struct SignOutResult: Sendable, Equatable {
     /// The outcome of revoking the refresh token (RFC 7009).
+    ///
+    /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
     public enum Revocation: Sendable, Equatable {
         /// Not attempted: not requested, no refresh token, or no revocation endpoint configured.
         case skipped

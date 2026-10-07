@@ -9,7 +9,7 @@ struct PassportErrorTests {
         let rhs = PassportError(.invalidGrant, recovery: .reauthenticate, statusCode: 400, errorDescription: "two")
         #expect(lhs == rhs)
         #expect(lhs != PassportError(.invalidGrant, recovery: .reauthenticate, statusCode: 401))
-        #expect(lhs != PassportError(.invalidGrant, recovery: .none, statusCode: 400))
+        #expect(lhs != PassportError(.invalidGrant, recovery: .noAction, statusCode: 400))
         #expect(lhs != PassportError(.invalidClient, recovery: .reauthenticate, statusCode: 400))
     }
 
