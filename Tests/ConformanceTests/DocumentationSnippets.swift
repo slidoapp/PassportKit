@@ -15,7 +15,7 @@ enum DocumentationSnippets {
         let issuer = URL(string: "https://as.example.com")!
         let metadata = try await Discovery.fetchMetadata(issuer: issuer)
         let configuration = try ClientConfiguration(
-            metadata: metadata, authentication: .none(clientID: "my-app"))
+            metadata: metadata, authentication: .publicClient(clientID: "my-app"))
         let client = try OAuthClient(configuration: configuration)
 
         let authorization = try await client.startDeviceAuthorization(scope: ["openid", "offline_access"])
@@ -49,9 +49,9 @@ enum DocumentationSnippets {
 
         let general = try await manager.accessToken()
         let bound = try await manager.accessToken(
-            for: TokenTarget(resources: [items], scope: ["items.read"]))
+            for: .refreshGrant(resources: [items], scope: ["items.read"]))
         let exchanged = try await manager.accessToken(
-            for: TokenTarget(method: .exchangeAccessToken, audiences: ["reports"]))
+            for: .exchange(audiences: ["reports"]))
         _ = (general, bound, exchanged)
     }
 
@@ -66,7 +66,7 @@ enum DocumentationSnippets {
     static func items(using manager: TokenManager) async throws -> Data? {
         do {
             let token = try await manager.accessToken(
-                for: TokenTarget(resources: [URL(string: "https://api.example.com/items")!]))
+                for: .refreshGrant(resources: [URL(string: "https://api.example.com/items")!]))
             // Use the token.
             _ = token
             return nil
@@ -91,7 +91,7 @@ enum DocumentationSnippets {
         case .fixConfiguration:
             // A bug in the client setup or the request. Retrying cannot help; log it.
             break
-        case .none:
+        case .noAction:
             // Nothing to recover from, for example the person declined.
             break
         }
@@ -114,7 +114,7 @@ enum DocumentationSnippets {
             endpoints: Endpoints(
                 authorization: FakeAuthorizationServer.authorizationEndpoint,
                 token: FakeAuthorizationServer.tokenEndpoint),
-            authentication: .none(clientID: "app"),
+            authentication: .publicClient(clientID: "app"),
             issuer: FakeAuthorizationServer.issuer)
         let client = try OAuthClient(configuration: configuration, transport: server)
         return (client, server)

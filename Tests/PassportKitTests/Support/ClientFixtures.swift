@@ -22,7 +22,7 @@ enum ClientFixtures {
     static let revocationURL = URL(string: "https://as.example.com/oauth/revoke")!
 
     static func configuration(
-        authentication: ClientAuthentication = .none(clientID: "app"),
+        authentication: ClientAuthentication = .publicClient(clientID: "app"),
         additionalHeaders: HTTPHeaders = [:],
         revocation: Bool = true,
         authorization: URL? = authorizationURL,
@@ -45,7 +45,7 @@ enum ClientFixtures {
 
     static func client(
         _ transport: any HTTPTransport,
-        authentication: ClientAuthentication = .none(clientID: "app"),
+        authentication: ClientAuthentication = .publicClient(clientID: "app"),
         additionalHeaders: HTTPHeaders = [:],
         revocation: Bool = true,
         authorization: URL? = authorizationURL,

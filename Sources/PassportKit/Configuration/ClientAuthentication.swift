@@ -2,19 +2,49 @@ import Foundation
 
 /// How the client authenticates at the token, device authorization and revocation endpoints.
 ///
-/// Descriptions show the secret as `<redacted>` because ``Secret`` redacts itself.
-public enum ClientAuthentication: Sendable, Hashable {
+/// An open set: new methods can be added without breaking source compatibility. Create a value with one of the
+/// static factories. Descriptions show the secret as `<redacted>` because ``Secret`` redacts itself.
+public struct ClientAuthentication: Sendable, Hashable {
+    enum Storage: Sendable, Hashable {
+        case publicClient(clientID: String)
+        case clientSecretPost(clientID: String, secret: Secret)
+        case clientSecretBasic(clientID: String, secret: Secret)
+    }
+
+    let storage: Storage
+
+    private init(_ storage: Storage) {
+        self.storage = storage
+    }
+
     /// A public client: sends `client_id` in the body (RFC 6749 §3.2.1).
-    case none(clientID: String)
+    public static func publicClient(clientID: String) -> ClientAuthentication {
+        ClientAuthentication(.publicClient(clientID: clientID))
+    }
+
     /// Sends `client_id` and `client_secret` in the body (RFC 6749 §2.3.1).
-    case clientSecretPost(clientID: String, secret: Secret)
+    public static func clientSecretPost(clientID: String, secret: Secret) -> ClientAuthentication {
+        ClientAuthentication(.clientSecretPost(clientID: clientID, secret: secret))
+    }
+
     /// Sends HTTP Basic credentials; id and secret are form-encoded before base64 (RFC 6749 §2.3.1).
-    case clientSecretBasic(clientID: String, secret: Secret)
+    public static func clientSecretBasic(clientID: String, secret: Secret) -> ClientAuthentication {
+        ClientAuthentication(.clientSecretBasic(clientID: clientID, secret: secret))
+    }
 
     /// The `client_id`.
     public var clientID: String {
-        switch self {
-        case .none(let clientID), .clientSecretPost(let clientID, _), .clientSecretBasic(let clientID, _): clientID
+        switch storage {
+        case .publicClient(let clientID), .clientSecretPost(let clientID, _), .clientSecretBasic(let clientID, _):
+            clientID
+        }
+    }
+
+    /// The client secret, when the method has one.
+    var secret: Secret? {
+        switch storage {
+        case .publicClient: nil
+        case .clientSecretPost(_, let secret), .clientSecretBasic(_, let secret): secret
         }
     }
 
@@ -24,8 +54,8 @@ public enum ClientAuthentication: Sendable, Hashable {
 
     /// Adds the client credentials to a request being built: body parameters or the `Authorization` header.
     func apply(to parameters: inout [(String, String)], headers: inout HTTPHeaders) {
-        switch self {
-        case .none(let clientID):
+        switch storage {
+        case .publicClient(let clientID):
             parameters.append(("client_id", clientID))
         case .clientSecretPost(let clientID, let secret):
             parameters.append(("client_id", clientID))

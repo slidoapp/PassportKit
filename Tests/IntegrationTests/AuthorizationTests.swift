@@ -15,7 +15,7 @@ struct AuthorizationTests {
         #expect(metadata.authorizationResponseIssParameterSupported == true)
 
         let configuration = try ClientConfiguration(
-            metadata: metadata, authentication: .none(clientID: IntegrationServer.publicClientID))
+            metadata: metadata, authentication: .publicClient(clientID: IntegrationServer.publicClientID))
         #expect(configuration.issuer == issuer)
         #expect(configuration.requiresIssuerInAuthorizationResponse)
         #expect(configuration.endpoints.deviceAuthorization != nil)

@@ -10,7 +10,7 @@ struct AuthorizationCompletionTests {
 
     private func start(
         _ steps: [RecordingTransport.Step] = [.tokens("at")],
-        authentication: ClientAuthentication = .none(clientID: "app"),
+        authentication: ClientAuthentication = .publicClient(clientID: "app"),
         issuer: URL? = nil,
         requiresIssuer: Bool = false,
         clock: any Clock<Duration> = ContinuousClock(),
@@ -66,7 +66,7 @@ struct AuthorizationCompletionTests {
         let (client, _, pending) = try start([.oauthError("invalid_grant")])
         let error = await failure(client, pending, code(for: pending))
         #expect(error?.code == .invalidGrant)
-        #expect(error?.recovery == PassportError.Recovery.none)
+        #expect(error?.recovery == PassportError.Recovery.noAction)
     }
 
     // MARK: Redirect match
@@ -161,7 +161,7 @@ struct AuthorizationCompletionTests {
         ])
         let error = try #require(await failure(client, pending, callback))
         #expect(error.code == .accessDenied)
-        #expect(error.recovery == PassportError.Recovery.none)
+        #expect(error.recovery == PassportError.Recovery.noAction)
         #expect(error.errorDescription == "The user said no")
         #expect(error.errorURI == URL(string: "https://as.example.com/help"))
         #expect(await transport.requests.isEmpty)

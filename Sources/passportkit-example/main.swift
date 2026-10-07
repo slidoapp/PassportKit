@@ -99,7 +99,7 @@ func run() async throws {
     // RFC 8414 discovery; the configuration follows what the server advertises (endpoints, RFC 9207).
     let metadata = try await Discovery.fetchMetadata(issuer: arguments.issuer)
     let configuration = try ClientConfiguration(
-        metadata: metadata, authentication: .none(clientID: arguments.clientID))
+        metadata: metadata, authentication: .publicClient(clientID: arguments.clientID))
     print("Discovered \(metadata.issuer)")
     let client = try OAuthClient(configuration: configuration)
 
@@ -116,7 +116,7 @@ func run() async throws {
         return
     }
     // A target with an explicit scope is a different token than the one from sign-in, so it is refreshed.
-    let token = try await manager.accessToken(for: TokenTarget(scope: arguments.scope))
+    let token = try await manager.accessToken(for: TokenTarget.refreshGrant(scope: arguments.scope))
     let after = await manager.credential?.refreshToken
     let remaining = token.expiresAt.map { "\(Int($0.timeIntervalSince(client.wallClock.now())))s" } ?? "(not reported)"
     print("Refreshed once.\nscope: \(token.grantedScope?.rawValue ?? "(not reported)")\nexpires in: \(remaining)")

@@ -33,7 +33,7 @@ enum IntegrationServer {
     }
 
     static func client(
-        authentication: ClientAuthentication = .none(clientID: publicClientID),
+        authentication: ClientAuthentication = .publicClient(clientID: publicClientID),
         minimumTokenLifetime: Duration = .seconds(5)
     ) async throws -> OAuthClient {
         let configuration = try ClientConfiguration(

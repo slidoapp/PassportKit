@@ -67,7 +67,7 @@ import PassportKit
 let issuer = URL(string: "https://as.example.com")!
 let metadata = try await Discovery.fetchMetadata(issuer: issuer)
 let client = try OAuthClient(
-    configuration: ClientConfiguration(metadata: metadata, authentication: .none(clientID: "my-app")))
+    configuration: ClientConfiguration(metadata: metadata, authentication: .publicClient(clientID: "my-app")))
 
 // 1. Sign in. Show the code, then wait for the person to approve.
 let authorization = try await client.startDeviceAuthorization(scope: ["openid", "offline_access"])
