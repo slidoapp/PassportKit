@@ -1,0 +1,50 @@
+import Foundation
+
+/// What to ask for in an authorization code request (RFC 6749 §4.1.1).
+///
+/// PKCE (S256), `state` and the client identifier are added by
+/// ``OAuthClient/beginAuthorization(_:)``.
+public struct AuthorizationRequest: Sendable {
+    /// Where the authorization server sends the user back (`redirect_uri`, RFC 6749 §3.1.2).
+    ///
+    /// Must be absolute, without fragment, and use `https`, a private-use scheme, or `http` on a loopback host
+    /// (RFC 8252 §7). For a loopback redirect put the actual port in the URI: the callback is compared with it.
+    public var redirectURI: URL
+    /// The requested scope (RFC 6749 §3.3); omitted when `nil` or empty.
+    public var scope: ScopeSet?
+    /// Resource indicators, sent as repeated `resource` parameters (RFC 8707 §2).
+    public var resources: [URL]
+    /// `login_hint`, a hint for the authentication step (OpenID Connect Core §3.1.2.1).
+    public var loginHint: String?
+    /// `prompt`, for example `login` or `consent`; sent verbatim.
+    public var prompt: String?
+    /// Extension parameters appended after the standard ones; a colliding name is an `invalidConfiguration` error.
+    public var additionalParameters: AdditionalParameters
+
+    /// Creates a request.
+    public init(
+        redirectURI: URL,
+        scope: ScopeSet? = nil,
+        resources: [URL] = [],
+        loginHint: String? = nil,
+        prompt: String? = nil,
+        additionalParameters: AdditionalParameters = [:]
+    ) {
+        self.redirectURI = redirectURI
+        self.scope = scope
+        self.resources = resources
+        self.loginHint = loginHint
+        self.prompt = prompt
+        self.additionalParameters = additionalParameters
+    }
+}
+
+/// Presents an authorization URL to the user and returns the redirect, for example in a system browser sheet
+/// (RFC 8252 §4). The library never opens a browser itself.
+public protocol UserAgent: Sendable {
+    /// Presents `url` and returns the callback URL that matched `redirectURI`.
+    ///
+    /// Throw ``PassportError`` with code ``PassportError/Code-swift.struct/userCancelled`` when the user
+    /// dismisses the agent, and honour task cancellation.
+    func present(_ url: URL, redirectURI: URL) async throws -> URL
+}

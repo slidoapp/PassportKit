@@ -167,6 +167,7 @@ public struct ClientConfiguration: Sendable {
     public var additionalHeaders: HTTPHeaders = [:] // sent on every request to the authorization server
     public var minimumTokenLifetime: Duration = .seconds(60)   // refresh earlier than this before expiry
     public var defaultTokenLifetime: Duration? = nil           // used when `expires_in` is missing; nil = treat as expired
+    public var requiresIssuerInAuthorizationResponse: Bool = false   // RFC 9207 §2.4: a missing `iss` fails; needs `issuer`
 }
 ```
 
@@ -335,10 +336,10 @@ public struct AuthorizationRequest: Sendable {
     public var prompt: String?
     public var additionalParameters: AdditionalParameters = [:]
 }
-public struct PendingAuthorization: Sendable {
-    public var url: URL                   // open in an external user agent
-    public var redirectURI: URL
-    // internal: state (Secret), codeVerifier (Secret), createdAt; expires after 10 minutes; single use
+public struct PendingAuthorization: Sendable, CustomStringConvertible {
+    public let url: URL                   // open in an external user agent
+    public let redirectURI: URL
+    // internal: state (Secret), codeVerifier (Secret), stopwatch; expires after 10 minutes; single use
 }
 public protocol UserAgent: Sendable {
     /// Presents `url` and returns the callback URL that matched `redirectURI`.
@@ -346,18 +347,45 @@ public protocol UserAgent: Sendable {
 }
 ```
 
-`beginAuthorization`: 32 random bytes for `state` and the verifier
-(base64url, no padding), `code_challenge_method=S256`. The request URL
-is the authorization endpoint plus query parameters; existing query
-items on the endpoint are preserved.
+`beginAuthorization`: 32 random bytes each for `state` and the verifier
+(base64url, no padding; `state` is drawn first), `code_challenge_method=S256`.
+The request URL is the authorization endpoint plus, in order, `response_type`,
+`client_id`, `redirect_uri`, `state`, `code_challenge`,
+`code_challenge_method`, `scope`, repeated `resource`, `login_hint`,
+`prompt` and the additional parameters. Existing query items on the endpoint
+are preserved; one that the request also sets is `.invalidConfiguration`, as
+are a missing authorization endpoint and a redirect URI that is relative, has a
+fragment, or is `http` on a non-loopback host (RFC 8252 §7.3, §8.3). A loopback
+redirect URI carries the actual port; the callback is compared with it.
 
-`completeAuthorization` checks, in order: callback matches `redirectURI`
-(scheme, host, port, path); `state` matches (constant-time comparison);
-`error` parameter (→ `PassportError` from the response, recovery `.none`
-for `access_denied`); `iss` equals the configured issuer when either the
-response carries `iss` or metadata requires it (RFC 9207); `code`
-present; then redeems the code with the verifier and `redirect_uri`.
-A `PendingAuthorization` can be completed once.
+`completeAuthorization` checks, in order:
+
+1. the pending authorization was not completed before (`.invalidConfiguration`)
+   and has not expired (`.timedOut`, recovery `.reauthenticate`);
+2. the callback matches `redirectURI` in scheme and host (case-insensitive),
+   port (default ports implied) and path (exact), else `.invalidResponse`; the
+   response is read from the query only, and a repeated response parameter or
+   malformed encoding is `.invalidResponse`;
+3. `state` matches (constant-time comparison), else `.stateMismatch`;
+4. `iss` equals the configured issuer by exact string comparison, else
+   `.issuerMismatch` (RFC 9207 §2.4). A missing `iss` fails only when
+   `requiresIssuerInAuthorizationResponse` is set; with no issuer configured a
+   response `iss` is accepted unchecked. This runs before step 5 because RFC
+   9207 §2.4 requires the check for error responses too;
+5. an `error` parameter becomes a `PassportError` through the authorization
+   response context (recovery `.none` for `access_denied`);
+6. `code` present, else `.invalidResponse`;
+
+then it redeems the code with `grant_type`, `code`, `redirect_uri`,
+`code_verifier` and client authentication.
+
+A `PendingAuthorization` is single use. Copies share one flag, which is claimed
+once the callback passes the `state` check: from then on any further
+completion, including after a failed redemption or a server error response,
+throws `.invalidConfiguration`. A callback rejected earlier (wrong redirect or
+`state`) does not consume it, so a stray request to a loopback listener cannot
+cancel the flow. Expiry is measured on the client's injected clock (ADR 0006).
+`description` shows only the redirect target and age.
 
 ## 9. `TokenManager` — the session
 
