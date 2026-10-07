@@ -29,6 +29,11 @@ let package = Package(
         .testTarget(
             name: "PassportKitTests", dependencies: ["PassportKit", "PassportKitTesting"], swiftSettings: swiftSettings),
         .testTarget(
+            name: "PassportKitTestingTests",
+            dependencies: ["PassportKit", "PassportKitTesting"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
             name: "ConformanceTests", dependencies: ["PassportKit", "PassportKitTesting"], swiftSettings: swiftSettings),
         .testTarget(
             name: "PassportKitAppleTests",
