@@ -568,11 +568,15 @@ public protocol PassportObserver: Sendable { func record(_ event: PassportEvent)
 public enum PassportEvent: Sendable {
     case request(endpoint: EndpointKind, grantType: GrantType?)
     case response(endpoint: EndpointKind, statusCode: Int, errorCode: String?, duration: Duration)
+    case transportFailure(endpoint: EndpointKind, grantType: GrantType?, duration: Duration)
 }
 public enum EndpointKind: String, Sendable { case token, deviceAuthorization, revocation, metadata, resource }
 ```
 
-Events carry no URLs with query strings, no bodies and no secrets.
+Every `.request` is followed by exactly one `.response` or one
+`.transportFailure` (no HTTP response: connection, TLS, timeout or task
+cancellation). Events carry no URLs with query strings, no bodies and no
+secrets.
 
 ## 13. Apple module
 

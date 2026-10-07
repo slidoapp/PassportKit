@@ -38,6 +38,39 @@ struct ObserverTests {
         }
     }
 
+    @Test func transportFailureTerminatesTheRequest() async throws {
+        let observer = RecordingObserver()
+        let clock = ManualClock()
+        let transport = SlowTransport(clock: clock, delay: .seconds(3), response: .fail(URLError(.timedOut)))
+        let client = try ClientFixtures.client(transport, clock: clock, observer: observer)
+        async let result: TokenResponse = client.clientCredentials()
+        await clock.advanceToNextSleeper()
+        do {
+            _ = try await result
+            Issue.record("expected a failure")
+        } catch let error as PassportError {
+            #expect(error.code == .transportFailure)
+        }
+        #expect(
+            observer.events == [
+                .request(endpoint: .token, grantType: .clientCredentials),
+                .transportFailure(endpoint: .token, grantType: .clientCredentials, duration: .seconds(3)),
+            ])
+    }
+
+    @Test func cancellationAlsoTerminatesTheRequest() async throws {
+        let observer = RecordingObserver()
+        let transport = RecordingTransport([.fail(CancellationError())])
+        let client = try ClientFixtures.client(transport, observer: observer)
+        await #expect(throws: CancellationError.self) { try await client.clientCredentials() }
+        let events = observer.events
+        #expect(events.count == 2)
+        guard case .transportFailure(.token, .clientCredentials, _) = events[1] else {
+            Issue.record("unexpected event \(events[1])")
+            return
+        }
+    }
+
     @Test func eventsContainNoSecrets() async throws {
         let observer = RecordingObserver()
         let transport = RecordingTransport([
@@ -63,7 +96,9 @@ private struct SlowTransport: HTTPTransport {
 
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {
         try await clock.sleep(for: delay)
-        guard case .respond(let response) = response else { throw URLError(.badServerResponse) }
-        return response
+        switch response {
+        case .respond(let response): return response
+        case .fail(let error): throw error
+        }
     }
 }
