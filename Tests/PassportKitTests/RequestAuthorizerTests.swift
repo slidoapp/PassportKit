@@ -83,9 +83,9 @@ struct RequestAuthorizerTests {
         let url = try #require(URL(string: text))
         // Signed out: an allowed URL gets as far as the missing token, a rejected one never does.
         let expected: PassportError.Code = allowed ? .notAuthenticated : .invalidConfiguration
-        #expect(await thrownCode { _ = try await authorizer.authorize(URLRequest(url: url)) } == expected)
+        #expect(await thrownCode { _ = try await authorizer.sign(URLRequest(url: url)) } == expected)
         #expect(
-            await thrownCode { _ = try await authorizer.authorize(HTTPRequest(method: .get, url: url)) } == expected)
+            await thrownCode { _ = try await authorizer.sign(HTTPRequest(method: .get, url: url)) } == expected)
     }
 
     private func thrownCode(_ operation: () async throws -> Void) async -> PassportError.Code? {

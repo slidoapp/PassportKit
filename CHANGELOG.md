@@ -40,7 +40,7 @@ First development cycle; nothing is released yet.
 - Credential storage: `Credential`, `CredentialAccount`, `CredentialStore`, `InMemoryCredentialStore` and the
   versioned JSON `CredentialCoding`.
 - `RequestAuthorizer` and `RetryDecision`: sign `URLRequest` and `HTTPRequest` with a bearer token (https or
-  loopback only), decide what a 401 or 403 means (RFC 6750 §3.1), `send(_:for:using:)` and
+  loopback only), decide what a 401 or 403 means (RFC 6750 §3.1), `send(_:for:)` and
   `data(for:target:session:)` with at most one retry.
 - `Retry-After` is also read as an HTTP-date.
 
@@ -102,6 +102,10 @@ First development cycle; nothing is released yet.
   `PassportError.maximumDescriptionLength`, `URLSessionTransport.maximumBodySize`, `CredentialCoding.currentVersion`
   and `TokenResponse.isBearer` are internal, `AccessToken.init` is package-only and `AccessToken.generation` is
   read-only. `DeviceAuthorization` has read-only properties and a public initializer for previews and UI tests.
+
+- `RequestAuthorizer` takes its transport at creation (`init(manager:transport:)`, `URLSessionTransport()` by
+  default), so `send(_:for:using:)` is `send(_:for:)`; `authorize(_:for:)` is `sign(_:for:)`, which no longer
+  clashes with `OAuthClient.authorize(_:using:)`.
 
 ### Security
 
