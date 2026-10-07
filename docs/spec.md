@@ -40,15 +40,21 @@ DPoP and PAR (see §11).
 | Product / target | Contents | Imports |
 |---|---|---|
 | `PassportKit` | Everything protocol-level: types, client, token manager, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store | Foundation (FoundationNetworking on Linux); CryptoKit when available |
-| `PassportKitApple` | `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackUserAgent` (Network framework listener + system browser) | `PassportKit`, Security, AuthenticationServices, Network, AppKit/UIKit |
+| `PassportKitApple` | `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | `PassportKit`, Security, AuthenticationServices, Network, AppKit/UIKit |
 | `PassportKitTesting` | `FakeAuthorizationServer`, `ManualClock`, `FixedWallClock`, `SequenceRandomSource`, `RecordingTransport` | `PassportKit` |
 
-Test targets: `PassportKitTests` (unit), `ConformanceTests` (scenarios
-against the fake server), `PassportKitAppleTests` (Apple only).
+Test targets: `PassportKitTests` (unit), `PassportKitTestingTests` (the
+fake server itself), `ConformanceTests` (scenarios against the fake
+server, including the redaction canary), `IntegrationTests` (a local
+open-source server, macOS, run by `make integration`) and
+`PassportKitAppleTests` (Apple only).
 
 An executable target `passportkit-example` (not a product) demonstrates
-the device flow and discovery against a real server; it takes all values
-from command-line arguments.
+discovery, the device and loopback code flows and one refresh against a
+real server; it takes all values from command-line arguments.
+
+Each library has a DocC catalog (`Sources/<Target>/<Target>.docc`); the
+`PassportKit` catalog holds the articles.
 
 ## 3. Core value types
 
@@ -256,6 +262,16 @@ Classification rules (tested exhaustively):
 Cancellation is not wrapped: `CancellationError` propagates unchanged.
 User cancellation of a browser sheet is `.userCancelled`.
 
+`errorDescription` is untrusted text. It loses control, line-separator and
+invisible format characters, token-like runs of 24 or more characters
+become `<redacted>`, and it is cut to 200 characters. In addition, every
+credential the library sent in the request (refresh, subject, actor and
+device codes, authorization code, PKCE verifier, client secret, the token of
+a revocation, the bearer token of a resource request) is replaced by
+`<redacted>` wherever it appears, however short it is, so a server that
+repeats a request value cannot make the library print it. Values of fewer
+than four characters are left alone.
+
 ## 7. Token responses
 
 ```swift
@@ -285,13 +301,16 @@ not an error by itself.
 ## 8. `OAuthClient` — stateless protocol operations
 
 ```swift
-public struct OAuthClient: Sendable {
+public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    /// Throws `.invalidConfiguration` when `configuration.validate()` fails.
     public init(configuration: ClientConfiguration,
                 transport: any HTTPTransport = URLSessionTransport(),
                 wallClock: any WallClock = SystemWallClock(),
                 clock: any Clock<Duration> = ContinuousClock(),
                 random: any RandomSource = SystemRandomSource(),
-                observer: (any PassportObserver)? = nil)
+                observer: (any PassportObserver)? = nil) throws
+    public let configuration: ClientConfiguration
+    public let wallClock: any WallClock
 
     // RFC 6749 §6 (+ RFC 8707 resources)
     public func refresh(refreshToken: Secret, scope: ScopeSet? = nil, resources: [URL] = [],
@@ -316,7 +335,13 @@ public struct OAuthClient: Sendable {
     // Extension grants (e.g. vendor-specific): full error parsing and redaction
     public func requestToken(grantType: GrantType, parameters: AdditionalParameters) async throws -> TokenResponse
 }
+```
 
+`description`, `debugDescription` and reflection of an `OAuthClient` show the
+client ID and the token endpoint only, so a dump never reaches the injected
+transport or observer.
+
+```swift
 public struct TokenExchangeRequest: Sendable {
     public var subjectToken: Secret
     public var subjectTokenType: TokenTypeIdentifier
@@ -689,7 +714,17 @@ challenge yields an empty array.
 | 401 at `attempt == 0` with any other Bearer error (`invalid_request`) | `.deliver` |
 
 `authorize` throws `.invalidConfiguration` for a URL that is neither `https`
-nor `http` on a loopback host, before asking for a token.
+nor `http` on a loopback host, before asking for a token. It also throws
+`.invalidConfiguration`, after obtaining the token and before anything is
+sent, when `AccessToken.tokenType` is not `Bearer` (compared
+case-insensitively): a sender-constrained type such as `DPoP` needs a proof
+this authorizer cannot make, and a token must never be sent as a bearer
+credential it was not issued as. The session is not affected. `send` and
+`data(for:target:session:)` inherit both rules.
+
+The `error_description` of an `insufficient_scope` challenge goes through the
+same description rules as server errors (see §6) and has the bearer token
+removed.
 
 ## 11. Discovery and extension room
 
@@ -730,8 +765,7 @@ error; a body that is not a JSON object with an `issuer` and well-formed known
 members is `.invalidResponse`. `.strict` requires the metadata `issuer` to be
 identical to the requested issuer (RFC 8414 §3.3): a string comparison, so a
 trailing slash difference is a mismatch (`.issuerMismatch`); `.expected(url)`
-compares with `url` instead; `.disabled` skips the check. Discovery sends no
-observer events.
+compares with `url` instead; `.disabled` skips the check.
 
 Metadata is a hint: PassportKit always sends PKCE S256, never refuses
 public clients because `none` is not advertised, and never enforces
@@ -827,12 +861,21 @@ instead of hanging; `waitForSleeper(timeout:)` returns `false` instead. `FixedWa
 
 ## 15. Quality gates
 
-- `make check` (format lint, build with warnings as errors, all tests)
-  passes on macOS; the core and testing modules build and test on Linux.
-- No `Date()`, `Task.sleep`, `URLSession.shared`, `UUID()` or random APIs
-  in core outside the default `SystemWallClock`, `SystemRandomSource` and
-  `URLSessionTransport` implementations (CI grep).
-- Redaction canary test: a run of every flow with canary secrets finds no
-  canary in any error description, event, `String(describing:)` or
-  `String(reflecting:)` of public values.
-- DocC comments on every public symbol.
+- `make check` (format lint, determinism grep, build with warnings as
+  errors, all tests) passes on macOS; the core and testing modules build
+  and test on Linux.
+- `make docs` (DocC archives of all three libraries) has no warning, so
+  every symbol link resolves. `make integration` passes against the local
+  server.
+- No `Date()`, `Date.now`, `Task.sleep`, `URLSession.shared`, `UUID()` or
+  random APIs (`.random(`, `arc4random`, `SystemRandomNumberGenerator`) in
+  core outside the default `SystemWallClock`, `SystemRandomSource` and
+  `URLSessionTransport` implementations: `scripts/check-determinism.sh`,
+  run by `make lint` and therefore by CI.
+- Redaction canary test (`Tests/ConformanceTests/RedactionCanaryTests.swift`):
+  a run of every flow with canary secrets, including error paths where the
+  server repeats the secrets it was sent, finds no canary in any error
+  description, event, `String(describing:)`, `String(reflecting:)` or `dump`
+  of public values.
+- DocC comments on every public symbol; the article samples are compiled in
+  `Tests/ConformanceTests/DocumentationSnippets.swift`.
