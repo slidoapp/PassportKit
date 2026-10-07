@@ -150,7 +150,7 @@ public struct Endpoints: Sendable, Hashable {
     public var token: URL
     public var deviceAuthorization: URL?
     public var revocation: URL?
-    public init(metadata: AuthorizationServerMetadata) throws   // throws if token endpoint missing
+    public init(metadata: AuthorizationServerMetadata) throws   // throws if the token endpoint is missing or an endpoint is not https
 }
 
 public enum ClientAuthentication: Sendable, Hashable {
@@ -580,6 +580,20 @@ public enum Discovery {
     public enum Style: Sendable { case oauth, openIDConnect }
 }
 ```
+
+Metadata keys are the RFC's snake_case names; members the type does not model
+are kept in `additionalFields` and re-encoded. `fetchMetadata` sends `GET` with
+`Accept: application/json`; terminating slashes of the issuer path are removed
+before the well-known segment is added (`https://as.example.com/t/` gives
+`https://as.example.com/.well-known/oauth-authorization-server/t`). The issuer
+must be `https` (or loopback `http`) without query, fragment or userinfo
+(`.invalidConfiguration`). Non-2xx responses are classified as for any server
+error; a body that is not a JSON object with an `issuer` and well-formed known
+members is `.invalidResponse`. `.strict` requires the metadata `issuer` to be
+identical to the requested issuer (RFC 8414 §3.3): a string comparison, so a
+trailing slash difference is a mismatch (`.issuerMismatch`); `.expected(url)`
+compares with `url` instead; `.disabled` skips the check. Discovery sends no
+observer events.
 
 Metadata is a hint: PassportKit always sends PKCE S256, never refuses
 public clients because `none` is not advertised, and never enforces

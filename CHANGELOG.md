@@ -28,3 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PendingAuthorization` and `UserAgent` types, `state` and redirect checks,
   and `iss` validation (RFC 9207) with the new
   `ClientConfiguration.requiresIssuerInAuthorizationResponse` option.
+- Authorization server metadata discovery (RFC 8414): `Discovery.fetchMetadata`,
+  `AuthorizationServerMetadata` with preserved unknown members,
+  `IssuerValidation`, and `Endpoints.init(metadata:)`.
