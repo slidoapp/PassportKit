@@ -15,7 +15,7 @@ extension PassportError {
     ) -> PassportError {
         let retryAfter = retryAfter(in: headers, now: now)
         guard case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: body),
-            case .string(let code)? = members["error"], !code.isEmpty
+            case .string(let text)? = members["error"], let code = Code.fromServer(text)
         else {
             let isTransient = statusCode == 429 || (500...599).contains(statusCode)
             let code: Code = isTransient ? .temporarilyUnavailable : .invalidResponse
@@ -23,23 +23,30 @@ extension PassportError {
                 code,
                 recovery: recovery(for: code, context: context, statusCode: statusCode, retryAfter: retryAfter),
                 statusCode: statusCode,
-                errorDescription: "The server response was not an OAuth error."
+                errorDescription: "The server response was not a well-formed OAuth error."
             )
         }
         var description: String?
         if case .string(let text)? = members["error_description"] { description = text }
         var uri: URL?
-        if case .string(let text)? = members["error_uri"], let parsed = URL(string: text), parsed.scheme != nil {
-            uri = parsed
-        }
+        if case .string(let text)? = members["error_uri"] { uri = Self.errorURI(from: text) }
         return fromServerError(
-            code: Code(rawValue: code),
+            code: code,
             errorDescription: description,
             errorURI: uri,
             statusCode: statusCode,
             retryAfter: retryAfter,
             context: context
         )
+    }
+
+    /// Parses an `error_uri` (RFC 6749 §5.2). Only `http` and `https` are kept: the value is server-controlled
+    /// and an application may open it.
+    static func errorURI(from text: String) -> URL? {
+        guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+            url.host?.isEmpty == false
+        else { return nil }
+        return url
     }
 
     /// Builds the error for an OAuth error code that was already extracted, for example from a redirect.

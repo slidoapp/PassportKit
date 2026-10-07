@@ -165,3 +165,43 @@ extension PassportError.Recovery {
         return self
     }
 }
+
+struct ServerErrorSanitizingTests {
+    private static func body(error: String, uri: String? = nil) -> Data {
+        var members = ["error": error]
+        members["error_uri"] = uri
+        return try! JSONEncoder().encode(members)
+    }
+
+    @Test(arguments: [
+        String(repeating: "a", count: 65), "has\"quote", "back\\slash", "line\nbreak", "caf\u{E9}", "\u{202E}evil", "",
+    ])
+    func malformedServerCodeBecomesInvalidResponse(code: String) {
+        let error = PassportError.fromErrorResponse(
+            statusCode: 400, headers: [:], body: Self.body(error: code), context: .other)
+        #expect(error.code == .invalidResponse)
+        #expect(!String(describing: error).contains(code) || code.isEmpty)
+    }
+
+    @Test func wellFormedUnknownServerCodeIsPreserved() {
+        let error = PassportError.fromErrorResponse(
+            statusCode: 400, headers: [:], body: Self.body(error: "vendor_specific.code-1"), context: .other)
+        #expect(error.code.rawValue == "vendor_specific.code-1")
+        #expect(PassportError.Code.fromServer(String(repeating: "a", count: 64)) != nil)
+    }
+
+    @Test(arguments: ["javascript:alert(1)", "file:///etc/passwd", "myapp://x", "https:///nohost", "relative/path"])
+    func errorURIKeepsOnlyWebURLs(uri: String) {
+        let error = PassportError.fromErrorResponse(
+            statusCode: 400, headers: [:], body: Self.body(error: "invalid_scope", uri: uri), context: .other)
+        #expect(error.code == .invalidScope)
+        #expect(error.errorURI == nil)
+    }
+
+    @Test func httpsErrorURIIsKept() {
+        let error = PassportError.fromErrorResponse(
+            statusCode: 400, headers: [:],
+            body: Self.body(error: "invalid_scope", uri: "https://as.example.com/help"), context: .other)
+        #expect(error.errorURI == URL(string: "https://as.example.com/help"))
+    }
+}

@@ -39,7 +39,7 @@ extension OAuthClient {
     /// Polls the token endpoint until the user approves, declines or the authorization expires (RFC 8628 §3.4, §3.5).
     ///
     /// The client waits the interval before every request. `authorization_pending` continues; `slow_down` adds
-    /// 5 seconds permanently; transport errors, 429 and 5xx back off exponentially from the interval up to 30
+    /// 5 seconds permanently (up to one hour); transport errors, 429 and 5xx back off exponentially from the interval up to 30
     /// seconds (a larger `Retry-After` wins) and the delay resets after the next server answer. No request is
     /// sent after the deadline: the call throws `expiredToken` with recovery `reauthenticate` instead.
     /// `access_denied` throws with recovery `none`; `expired_token` is terminal. Cancellation stops
@@ -93,7 +93,7 @@ extension OAuthClient {
                 backoff = nil
                 wait = interval
             case .slowDown:
-                interval += Self.slowDownIncrement
+                interval = min(interval + Self.slowDownIncrement, DeviceAuthorization.maximumInterval)
                 backoff = nil
                 wait = interval
             case .accessDenied, .expiredToken:
@@ -107,7 +107,8 @@ extension OAuthClient {
                 }
                 guard isTransient else { throw error }
                 backoff = nextBackoff(after: backoff, interval: interval)
-                wait = max(backoff ?? interval, PassportError.retryAfter(in: response.headers, now: wallClock.now()) ?? .zero)
+                wait = max(
+                    backoff ?? interval, PassportError.retryAfter(in: response.headers, now: wallClock.now()) ?? .zero)
             }
         }
     }

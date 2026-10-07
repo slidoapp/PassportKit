@@ -18,6 +18,10 @@ public enum ClientAuthentication: Sendable, Hashable {
         }
     }
 
+    /// The parameter names that carry client authentication. They are reserved in every mode, so an additional
+    /// parameter can never add a second authentication method (RFC 6749 §2.3).
+    static let parameterNames: Set<String> = ["client_id", "client_secret"]
+
     /// Adds the client credentials to a request being built: body parameters or the `Authorization` header.
     func apply(to parameters: inout [(String, String)], headers: inout HTTPHeaders) {
         switch self {

@@ -36,6 +36,12 @@ struct PassportErrorTests {
         }
     }
 
+    @Test func errorDescriptionDropsInvisibleFormatCharacters() {
+        // U+202E right-to-left override, U+200B zero-width space, U+2028 line separator.
+        let error = PassportError(.invalidGrant, errorDescription: "ok\u{202E}gnp.exe\u{200B}x\u{2028}end")
+        #expect(error.errorDescription == "okgnp.exex end")
+    }
+
     @Test func errorDescriptionIsTruncated() {
         let text = String(repeating: "word ", count: 200)
         let error = PassportError(.serverError, errorDescription: text)

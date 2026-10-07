@@ -38,6 +38,17 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
         task?.cancel()
     }
 
+    /// Request headers that carry no credential and stay on a cross-origin redirect.
+    private static let retainedAcrossOrigins: Set<String> = ["accept", "accept-language", "user-agent"]
+
+    private static func isSameOrigin(_ left: URL, _ right: URL) -> Bool {
+        func origin(_ url: URL) -> [String?] {
+            let scheme = url.scheme?.lowercased()
+            return [scheme, url.host?.lowercased(), String(url.port ?? (scheme == "https" ? 443 : 80))]
+        }
+        return origin(left) == origin(right)
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -56,8 +67,11 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
                 completionHandler(nil)
                 return
             }
-            if from.host?.lowercased() != target.host?.lowercased() {
-                redirected.setValue(nil, forHTTPHeaderField: "Authorization")
+            if !Self.isSameOrigin(from, target) {
+                for name in (redirected.allHTTPHeaderFields ?? [:]).keys
+                where !Self.retainedAcrossOrigins.contains(name.lowercased()) {
+                    redirected.setValue(nil, forHTTPHeaderField: name)
+                }
             }
         }
         completionHandler(redirected)
@@ -95,19 +109,20 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
             entry.continuation.resume(
                 throwing: PassportError(.invalidResponse, errorDescription: "Response body exceeds the size limit.")
             )
-        } else if entry.cancelledByCaller {
-            entry.continuation.resume(throwing: CancellationError())
-        } else if let error {
-            entry.continuation.resume(
-                throwing: PassportError(.transportFailure, errorDescription: "The request failed.", underlying: error)
-            )
-        } else if let response = entry.response {
+        } else if error == nil, let response = entry.response {
+            // A complete response wins over a late cancellation: a rotated refresh token must not be lost.
             entry.continuation.resume(
                 returning: HTTPResponse(
                     statusCode: response.statusCode,
                     headers: Self.headers(from: response),
                     body: entry.body
                 )
+            )
+        } else if entry.cancelledByCaller {
+            entry.continuation.resume(throwing: CancellationError())
+        } else if let error {
+            entry.continuation.resume(
+                throwing: PassportError(.transportFailure, errorDescription: "The request failed.", underlying: error)
             )
         } else {
             entry.continuation.resume(

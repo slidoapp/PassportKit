@@ -1,7 +1,12 @@
 import Foundation
 
 /// HTTP header fields: case-insensitive names, several values per name, insertion order preserved.
-public struct HTTPHeaders: Sendable, Hashable, Sequence, ExpressibleByDictionaryLiteral {
+///
+/// Header values can carry credentials (`Authorization`, `Cookie`), so descriptions and reflection show the
+/// header names only.
+public struct HTTPHeaders: Sendable, Hashable, Sequence, ExpressibleByDictionaryLiteral, CustomStringConvertible,
+    CustomDebugStringConvertible, CustomReflectable
+{
     /// One header line.
     public typealias Element = (name: String, value: String)
 
@@ -72,4 +77,13 @@ public struct HTTPHeaders: Sendable, Hashable, Sequence, ExpressibleByDictionary
             hasher.combine(entry.value)
         }
     }
+
+    /// The header names without values.
+    public var description: String { "HTTPHeaders(\(names))" }
+
+    /// The header names without values.
+    public var debugDescription: String { description }
+
+    /// A mirror exposing the names only, so `dump` never shows values.
+    public var customMirror: Mirror { Mirror(self, children: ["names": names], displayStyle: .struct) }
 }

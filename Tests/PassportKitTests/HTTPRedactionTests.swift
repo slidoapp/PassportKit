@@ -33,4 +33,23 @@ struct HTTPRedactionTests {
         }
         #expect(response.description.contains("status: 200"))
     }
+
+    @Test func headersShowNamesOnly() {
+        let headers: HTTPHeaders = ["Authorization": "Bearer \(Canary.value)", "Cookie": Canary.value]
+        for text in Canary.renderings(of: headers) {
+            #expect(!text.contains(Canary.value))
+        }
+        #expect(headers.description == "HTTPHeaders([\"Authorization\", \"Cookie\"])")
+    }
+
+    @Test func configurationNeverShowsHeaderValuesOrSecrets() {
+        let configuration = ClientConfiguration(
+            endpoints: Endpoints(token: URL(string: "https://as.example.com/token")!),
+            authentication: .clientSecretBasic(clientID: "app", secret: Secret(Canary.value)),
+            additionalHeaders: ["X-Api-Key": Canary.value]
+        )
+        for text in Canary.renderings(of: configuration) {
+            #expect(!text.contains(Canary.value))
+        }
+    }
 }
