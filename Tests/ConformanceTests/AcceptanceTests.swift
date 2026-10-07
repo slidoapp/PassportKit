@@ -7,8 +7,8 @@ import Testing
 struct HangingPolicy: TokenAcceptancePolicy {
     let gate: Gate
 
-    func evaluate(_ token: AccessToken, response: TokenResponse) async -> TokenAcceptance {
-        if !token.target.resources.isEmpty { await gate.wait() }
+    func evaluate(_ context: TokenAcceptanceContext) async -> TokenAcceptance {
+        if !context.target.resources.isEmpty { await gate.wait() }
         return .accept
     }
 }

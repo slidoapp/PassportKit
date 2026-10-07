@@ -32,9 +32,25 @@ let manager = TokenManager(
 
 By default the policy applies to targets that name resources, which is
 where servers narrow scope when the person cannot use the resource. Pass
-`when:` to choose other targets. A token whose granted scope is unknown is
-rejected. Implement the protocol for anything else; the policy has a time
-limit, and no answer in time counts as a rejection.
+`forTargets:` with ``TargetSelector/all`` or ``TargetSelector/matching(_:)``
+to choose other targets. A token whose granted scope is unknown is rejected.
+
+``TokenManager`` accepts every token when you pass no policy, scope
+narrowing included. Pass one whenever your app depends on a scope or a
+resource.
+
+For anything else, write a closure with ``TokenAcceptancePolicy/custom(_:)``
+or implement the protocol. The policy has a time limit, and no answer in
+time counts as a rejection.
+
+```swift
+let manager = TokenManager(
+    client: client, store: InMemoryCredentialStore(), account: account,
+    acceptancePolicy: .custom { context in
+        context.token.grantedScope?.scopes.contains("items.read") == true
+            ? .accept : .reject(reason: "The items scope is missing.")
+    })
+```
 
 ## Two ways a server says no
 

@@ -107,6 +107,12 @@ First development cycle; nothing is released yet.
   default), so `send(_:for:using:)` is `send(_:for:)`; `authorize(_:for:)` is `sign(_:for:)`, which no longer
   clashes with `OAuthClient.authorize(_:using:)`.
 
+- `TokenManager.signIn(with:requestedScope:)` defaults `requestedScope` to `nil`, and the documentation of
+  `TokenManager.init` warns that the default `AcceptAnyToken` accepts narrowed tokens.
+  `TokenAcceptancePolicy.evaluate(_:)` takes a `TokenAcceptanceContext` (token, response, target) instead of two
+  arguments. `RequireAnyScope(_:forTargets:)` takes a `TargetSelector` (`.withResources`, `.all`,
+  `.matching { }`) instead of a `when:` closure. New: `ClosureTokenAcceptancePolicy` and `.custom { }`.
+
 ### Security
 
 - `RequestAuthorizer` sends only `Bearer` tokens (compared case-insensitively). Another token type fails with

@@ -63,6 +63,16 @@ enum DocumentationSnippets {
         _ = manager
     }
 
+    static func customPolicy(client: OAuthClient, account: CredentialAccount) {
+        let manager = TokenManager(
+            client: client, store: InMemoryCredentialStore(), account: account,
+            acceptancePolicy: .custom { context in
+                context.token.grantedScope?.scopes.contains("items.read") == true
+                    ? .accept : .reject(reason: "The items scope is missing.")
+            })
+        _ = manager
+    }
+
     static func items(using manager: TokenManager) async throws -> Data? {
         do {
             let token = try await manager.accessToken(
