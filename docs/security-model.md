@@ -18,6 +18,14 @@ and reflection only. Encode a `Secret` solely into secure storage, never
 into logs, analytics, crash reports or unprotected files. `Secret ==` is
 not constant time; the library compares `state` in constant time itself.
 
+A server can make a library repeat what it was sent, for example by echoing
+a token in `error_description`. Every credential of a request (refresh,
+subject and actor tokens, authorization code, PKCE verifier, device code,
+client secret, the token of a revocation, the bearer token of a resource
+request) is therefore replaced by `<redacted>` in the error built from the
+response, whatever its length. `dump` of an `OAuthClient` shows a summary, so
+it cannot reach the injected transport or observer.
+
 Text that arrives from the network and may reach a log or a UI is
 untrusted: error codes must match RFC 6749 §5.2 and fit 64 characters or
 the response is `invalidResponse`; `error_uri` keeps only `http` and
@@ -33,7 +41,8 @@ everything past 200 characters.
 | CSRF on redirect | `state` generated per request and validated exactly |
 | Mix-up attacks | Validate `iss` in the authorization response when present (RFC 9207) |
 | Open redirect / redirect injection | Exact redirect URI matching; loopback listener binds to loopback interfaces only |
-| Token theft from logs | Redaction rules above, enforced by tests |
+| Token theft from logs | Redaction rules above, enforced by tests and by the redaction canary, which searches every error, event and description of every flow for the secrets it used |
+| Token sent with the wrong scheme | Only `Bearer` tokens are sent by `RequestAuthorizer`; sender-constrained types fail before any request |
 | Token theft from storage | Platform secure storage (Keychain) with the strictest workable accessibility class |
 | Refresh token replay after rotation | Persist rotated refresh token before use; serialize refresh-token-consuming operations |
 | Token used for the wrong resource | Tokens bound to their resource indicator; never reused across resources |
