@@ -16,6 +16,7 @@ final class RecordingObserver: PassportObserver, @unchecked Sendable {
 }
 
 enum ClientFixtures {
+    static let authorizationURL = URL(string: "https://as.example.com/oauth/authorize")!
     static let tokenURL = URL(string: "https://as.example.com/oauth/token")!
     static let deviceURL = URL(string: "https://as.example.com/oauth/device")!
     static let revocationURL = URL(string: "https://as.example.com/oauth/revoke")!
@@ -23,16 +24,22 @@ enum ClientFixtures {
     static func configuration(
         authentication: ClientAuthentication = .none(clientID: "app"),
         additionalHeaders: HTTPHeaders = [:],
-        revocation: Bool = true
+        revocation: Bool = true,
+        authorization: URL? = authorizationURL,
+        issuer: URL? = nil,
+        requiresIssuer: Bool = false
     ) -> ClientConfiguration {
         ClientConfiguration(
             endpoints: Endpoints(
+                authorization: authorization,
                 token: tokenURL,
                 deviceAuthorization: deviceURL,
                 revocation: revocation ? revocationURL : nil
             ),
             authentication: authentication,
-            additionalHeaders: additionalHeaders
+            issuer: issuer,
+            additionalHeaders: additionalHeaders,
+            requiresIssuerInAuthorizationResponse: requiresIssuer
         )
     }
 
@@ -41,17 +48,25 @@ enum ClientFixtures {
         authentication: ClientAuthentication = .none(clientID: "app"),
         additionalHeaders: HTTPHeaders = [:],
         revocation: Bool = true,
+        authorization: URL? = authorizationURL,
+        issuer: URL? = nil,
+        requiresIssuer: Bool = false,
         clock: any Clock<Duration> = ContinuousClock(),
+        random: any RandomSource = SystemRandomSource(),
         observer: (any PassportObserver)? = nil
     ) throws -> OAuthClient {
         try OAuthClient(
             configuration: configuration(
                 authentication: authentication,
                 additionalHeaders: additionalHeaders,
-                revocation: revocation
+                revocation: revocation,
+                authorization: authorization,
+                issuer: issuer,
+                requiresIssuer: requiresIssuer
             ),
             transport: transport,
             clock: clock,
+            random: random,
             observer: observer
         )
     }

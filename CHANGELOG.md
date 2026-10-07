@@ -23,3 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PassportEvent.transportFailure(endpoint:grantType:duration:)`, emitted when
   a request ends without an HTTP response, so every `.request` event has a
   terminating event.
+- Authorization code grant with PKCE (S256): `OAuthClient.beginAuthorization`,
+  `completeAuthorization` and `authorize(_:using:)`, the `AuthorizationRequest`,
+  `PendingAuthorization` and `UserAgent` types, `state` and redirect checks,
+  and `iss` validation (RFC 9207) with the new
+  `ClientConfiguration.requiresIssuerInAuthorizationResponse` option.
