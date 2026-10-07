@@ -658,7 +658,10 @@ endpoints well enough to run every flow, and is scriptable:
 - clients with flags: public/confidential, rotation on/off, rotation
   leeway (seconds and reuse count, like real servers that allow one reuse
   within 120 s);
-- per-request hooks to override responses (status, body, headers, delay);
+- per-request hooks to override responses (status, body, headers, delay) and to
+  delay the answer of a request the server has already handled (`responseDelay`);
+- token exchange with a refresh token subject spends and rotates it like a
+  refresh grant, and `requested_token_type` = refresh token issues a refresh token;
 - scope policy closure `(subject, requestedResources) -> ScopeSet` to
   simulate narrowed grants;
 - toggles for the two behaviours seen in the wild: refresh with
