@@ -58,6 +58,8 @@ swift test --filter <Suite>/<test>   # a single test
 
 ## Where things are
 
+- `docs/spec.md` — the implementation contract: public API and behaviour.
+- `docs/plan.md` — milestones and their done criteria.
 - `docs/architecture.md` — module boundaries, concurrency model,
   invariants. Read before cross-module changes.
 - `docs/rfc-matrix.md` — RFC requirement → code → test traceability.
