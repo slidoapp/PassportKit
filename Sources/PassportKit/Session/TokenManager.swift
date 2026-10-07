@@ -13,6 +13,8 @@ import Foundation
 ///   ``Completion``; cancelling a caller stops that caller waiting, nothing else.
 /// - Every suspension is followed by a generation check before results are written or published, so work
 ///   started under a session that has since ended or been replaced is discarded.
+/// - Changes to the store are queued in the order they are decided (``changeStore(_:)``), and each session has
+///   a lane of its own, so what one session's slow operations do never reorders or blocks another's.
 public actor TokenManager {
     /// The longest `signOut(revoke:)` waits for the revocation request, and the request itself runs.
     static let revocationTimeLimit = Duration.seconds(5)
