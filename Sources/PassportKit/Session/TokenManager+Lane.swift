@@ -68,7 +68,10 @@ extension TokenManager {
             response = try await send(refreshToken)
         } catch {
             guard session == generation else { throw SessionSuperseded() }
-            // Only a rejected refresh token ends the session; resource-level failures never do.
+            // Only a rejected refresh token ends the session; resource-level failures never do. A refresh
+            // narrowed to resources or a scope that fails with `invalid_grant` counts: RFC 6749 §5.2 defines it
+            // as a problem with the grant, while scope and resource problems are `invalid_scope` and
+            // `invalid_target`, which have other recoveries.
             if (error as? PassportError)?.recovery == .reauthenticate {
                 await endSession(reason: .refreshTokenRejected)
             }
