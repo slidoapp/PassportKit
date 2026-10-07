@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RequireAnyScope`), `SessionEvent`, `SignOutReason` and `SignOutResult`.
 - Credential storage: `Credential`, `CredentialAccount`, `CredentialStore`,
   `InMemoryCredentialStore` and the versioned JSON `CredentialCoding`.
+- `PassportKitApple`: `KeychainCredentialStore`, a `CredentialStore` on
+  non-synchronizable Keychain generic password items with in-place updates,
+  an accessibility class option, optional data protection keychain on macOS
+  and a `decodeLegacy` migration hook.
 - `OAuthClient.configuration` and `OAuthClient.wallClock` are public.
 - `PassportKitTesting`: `FakeAuthorizationServer` rotates refresh tokens on
   token exchange with a refresh-token subject, can issue a refresh token
