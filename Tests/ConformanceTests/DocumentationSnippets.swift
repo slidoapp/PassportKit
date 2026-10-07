@@ -116,25 +116,14 @@ enum DocumentationSnippets {
     }
 
     // Testing.md
-    static func makeClient() throws -> (OAuthClient, FakeAuthorizationServer) {
+    static func signIn() async throws -> (OAuthClient, FakeAuthorizationServer, TokenResponse) {
         let server = FakeAuthorizationServer(clients: [
             .init(id: "app", rotatesRefreshTokens: true)
         ])
-        let configuration = ClientConfiguration(
-            endpoints: Endpoints(
-                authorization: FakeAuthorizationServer.authorizationEndpoint,
-                token: FakeAuthorizationServer.tokenEndpoint),
-            authentication: .publicClient(clientID: "app"),
-            issuer: FakeAuthorizationServer.issuer)
-        let client = try OAuthClient(configuration: configuration, transport: server)
-        return (client, server)
-    }
-
-    struct ApprovingUserAgent: AuthorizationUserAgent {
-        let server: FakeAuthorizationServer
-
-        func present(_ url: URL, redirectURI: URL) async throws -> URL {
-            try await server.authorizeInteractively(url)
-        }
+        let client = try await server.makeClient(clientID: "app")
+        let request = AuthorizationRequest(
+            redirectURI: URL(string: "https://app.example.com/callback")!, scope: ["read"])
+        let tokens = try await client.authorize(request, using: server.userAgent())
+        return (client, server, tokens)
     }
 }

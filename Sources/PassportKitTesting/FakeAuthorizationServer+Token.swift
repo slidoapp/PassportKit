@@ -56,7 +56,7 @@ extension FakeAuthorizationServer {
         tokens[token] = TokenRecord(
             kind: kind, grantID: issuance.grantID, clientID: issuance.client.id, subject: issuance.subject,
             scope: scope, resources: issuance.resources, audience: issuance.audience,
-            expiresAt: lifetime.map { now().addingTimeInterval($0) })
+            expiresAt: lifetime.map { now().addingTimeInterval($0.timeInterval) })
         return token
     }
 
@@ -65,7 +65,8 @@ extension FakeAuthorizationServer {
         issuedTokenType: TokenTypeIdentifier? = nil, tokenType: String = "Bearer"
     ) -> HTTPResponse {
         var body: [String: Any] = [
-            "access_token": accessToken, "token_type": tokenType, "expires_in": Int(client.accessTokenLifetime),
+            "access_token": accessToken, "token_type": tokenType,
+            "expires_in": Int(client.accessTokenLifetime.timeInterval),
             "scope": scope.rawValue,
         ]
         body["refresh_token"] = refreshToken
@@ -164,7 +165,7 @@ extension FakeAuthorizationServer {
         var current = name
         guard client.rotatesRefreshTokens, record.successor != nil else { return (current, false) }
         guard let leeway = client.rotationLeeway, let rotatedAt = record.rotatedAt,
-            now().timeIntervalSince(rotatedAt) <= leeway.seconds, record.reuseCount < leeway.maximumReuse
+            now().timeIntervalSince(rotatedAt) <= leeway.window.timeInterval, record.reuseCount < leeway.maximumReuse
         else {
             if client.revokesGrantOnReuse { revokeGrant(record.grantID) }
             throw Failure.oauth("invalid_grant", "The refresh token was already used.")
