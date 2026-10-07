@@ -15,13 +15,7 @@ extension OAuthClient {
         if let typeHint { request.add("token_type_hint", typeHint.rawValue) }
         let response = try await send(request)
         guard (200..<300).contains(response.statusCode) else {
-            throw PassportError.fromErrorResponse(
-                statusCode: response.statusCode,
-                headers: response.headers,
-                body: response.body,
-                context: .other,
-                now: wallClock.now()
-            )
+            throw failure(response, to: request, context: .other)
         }
     }
 }

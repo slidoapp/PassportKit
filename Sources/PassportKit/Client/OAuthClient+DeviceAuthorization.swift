@@ -25,13 +25,7 @@ extension OAuthClient {
         request.additionalParameters = additionalParameters
         let response = try await send(request)
         guard (200..<300).contains(response.statusCode) else {
-            throw PassportError.fromErrorResponse(
-                statusCode: response.statusCode,
-                headers: response.headers,
-                body: response.body,
-                context: .other,
-                now: wallClock.now()
-            )
+            throw failure(response, to: request, context: .other)
         }
         return try DeviceAuthorization(parsing: response.body, wallClock: wallClock, clock: clock)
     }
@@ -81,13 +75,7 @@ extension OAuthClient {
             if (200..<300).contains(response.statusCode) {
                 return try TokenResponse(parsing: response.body)
             }
-            let error = PassportError.fromErrorResponse(
-                statusCode: response.statusCode,
-                headers: response.headers,
-                body: response.body,
-                context: .deviceAuthorizationPoll,
-                now: wallClock.now()
-            )
+            let error = failure(response, to: request, context: .deviceAuthorizationPoll)
             switch error.code {
             case .authorizationPending:
                 backoff = nil
