@@ -397,7 +397,7 @@ public actor TokenManager {
                 acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken())
 
     public func load() async throws -> Credential?                 // restores from the store
-    public func signIn(with response: TokenResponse, requestedScope: ScopeSet?) async throws  // adopt a grant result
+    public func signIn(with response: TokenResponse, requestedScope: ScopeSet?) async throws  // adopt a grant result; throws .tokenRejected if the policy rejects its access token (the session still exists)
     public var credential: Credential? { get }
 
     public func accessToken(for target: TokenTarget = .default) async throws -> AccessToken
@@ -419,9 +419,10 @@ public struct TokenTarget: Sendable, Hashable {
     public var audiences: [String]
     public var scope: ScopeSet?
     public static let `default`: TokenTarget      // refresh grant, no resources, no scope
+    public init(method: Method = .refreshGrant, resources: [URL] = [], audiences: [String] = [], scope: ScopeSet? = nil)
 }
 
-public struct AccessToken: Sendable, Hashable, CustomStringConvertible {
+public struct AccessToken: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {   // descriptions never show values
     public var value: Secret
     public var tokenType: String
     public var expiresAt: Date?
@@ -431,7 +432,7 @@ public struct AccessToken: Sendable, Hashable, CustomStringConvertible {
     public var additionalFields: [String: JSONValue]
 }
 
-public struct Credential: Sendable, Codable, Hashable {
+public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {   // descriptions never show values
     public var clientID: String
     public var issuer: URL?
     public var refreshToken: Secret?
@@ -461,17 +462,19 @@ Invariants (each has a conformance test):
    rejection the token is discarded, the rotated refresh token from the
    same response is still persisted, the call throws `.tokenRejected`
    with `.resourceDenied`, and the session stays signed in.
-5. **Session end.** Only `invalid_grant` (or `invalid_client` returned
-   for the refresh token, via `.reauthenticate`) on a lane operation ends
-   the session: the credential is deleted, `SessionEvent.signedOut` with
+5. **Session end.** Only an error with recovery `.reauthenticate` on a
+   lane operation ends the session, which in practice means `invalid_grant`
+   for the refresh token (`invalid_client` is `.fixConfiguration` and does
+   not end it). The credential is deleted, `SessionEvent.signedOut` with
    reason `.refreshTokenRejected` is emitted, and subsequent calls throw
-   `.notAuthenticated`.
+   `.notAuthenticated` (recovery `.reauthenticate`). An `invalid_grant` that
+   arrives after the session was replaced is ignored (invariant 6).
 6. **Generations.** `signOut`, `signIn` and session end increment the
    session generation. An operation that completes under an older
    generation discards its result and writes nothing.
 7. **Cancellation.** Cancelling a caller only stops it waiting. A
    request that was already sent is allowed to finish and its result is
-   persisted.
+   persisted. A caller that is cancelled before it starts never starts one.
 8. **Expiry.** A cached token is used while
    `expiresAt - minimumTokenLifetime > now`. Tokens without expiry use
    `defaultTokenLifetime`, or are refreshed on every use when nil.
@@ -481,10 +484,20 @@ Invariants (each has a conformance test):
    default access token, exchange it (`subject_token_type` and
    `requested_token_type` = access token), and cache the result per
    target. A `refresh_token` in such a response is ignored: it is not the
-   root grant.
+   root grant. An `invalid_grant` from the exchange drops the cached default
+   token it used (the server no longer accepts it) and leaves the session
+   intact.
 10. **Invalidation.** `invalidate(token)` drops the cached token only if
    its `generation` is still current, so N concurrent 401s for the same
    token cause one refresh.
+
+`exchangeRefreshToken` is not coalesced (each call sends one request) and its
+result is not cached or run through the acceptance policy: the issued token is
+usually a refresh token for another audience and belongs to the application.
+Its `refresh_token`, the rotated subject, is persisted. Revocation in
+`signOut` also takes a lane turn, reserved before `signOut` suspends, so it
+queues behind operations already sending the old token; the request and the
+wait for it are each limited to 5 s on the client's clock.
 
 ```swift
 public protocol TokenAcceptancePolicy: Sendable {
@@ -495,6 +508,13 @@ public struct AcceptAnyToken: TokenAcceptancePolicy {}
 /// Accepts a token for a target with resources only if at least one of `scopes` was granted.
 public struct RequireAnyScope: TokenAcceptancePolicy {
     public init(_ scopes: ScopeSet, when predicate: @escaping @Sendable (TokenTarget) -> Bool = { !$0.resources.isEmpty })
+}
+
+public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected }
+public struct SignOutResult: Sendable, Equatable {
+    public enum Revocation: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut }
+    public var isStoredCredentialDeleted: Bool     // memory is always cleared
+    public var revocation: Revocation              // .skipped: not requested, no refresh token or no revocation endpoint
 }
 
 public enum SessionEvent: Sendable, Equatable {
@@ -515,7 +535,15 @@ public protocol CredentialStore: Sendable {
     func save(_ credential: Credential, for account: CredentialAccount) async throws
     func delete(_ account: CredentialAccount) async throws
 }
-public actor InMemoryCredentialStore: CredentialStore { ... }
+public actor InMemoryCredentialStore: CredentialStore {
+    public init(credentials: [CredentialAccount: Credential] = [:])
+    public func failNextSaves(_ count: Int = 1)       // injected save failures for tests
+}
+/// Versioned JSON for stores that write bytes: the credential's members plus `"version": 1`.
+public enum CredentialCoding {
+    public static func encode(_ credential: Credential) throws -> Data
+    public static func decode(_ data: Data) throws -> Credential   // .storageFailure for malformed data or an unknown version
+}
 ```
 
 The library has no default service or account names. Only the root
@@ -523,7 +551,13 @@ credential is persisted; access tokens stay in memory. Stored records
 are versioned JSON (`{"version": 1, ...}`).
 
 `TokenManager.load()` ignores (and does not delete) a stored credential
-whose `clientID` or `issuer` differ from the configuration.
+whose `clientID` or `issuer` differ from the configuration. It does nothing
+when a session is already active. `accessToken(for:)` does not load: with no
+session it throws `.notAuthenticated`.
+
+`events` returns a new stream per access, delivers events from then on (no
+replay) and finishes when the manager is released. `OAuthClient.configuration`
+and `OAuthClient.wallClock` are public read-only properties.
 
 ## 10. Using tokens: `RequestAuthorizer`
 

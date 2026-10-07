@@ -11,9 +11,9 @@ change.
 
 | Module | Purpose | May import |
 |---|---|---|
-| `PassportKit` | Core: grants, token model, refresh coordination, errors, metadata discovery, request authorization | Foundation only; must build on Linux |
+| `PassportKit` | Core: grants, token model, session actor (refresh coordination), credential store protocol and in-memory store, errors, metadata discovery, request authorization | Foundation only; must build on Linux |
 | `PassportKitApple` | Apple adapters: Keychain storage, `ASWebAuthenticationSession`, loopback redirect listener | `PassportKit`, Apple frameworks |
-| `PassportKitTesting` | Fake authorization server and in-memory storage for tests; public so consumers can test against it | `PassportKit` |
+| `PassportKitTesting` | Fake authorization server and test clocks; public so consumers can test against it | `PassportKit` |
 
 Dependencies point inward only: adapters and testing depend on the core,
 never the reverse. The core has no third-party runtime dependencies.
