@@ -1,0 +1,21 @@
+name: Feature request
+description: Propose new functionality.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what prevents it today?
+    validations:
+      required: true
+  - type: input
+    id: standard
+    attributes:
+      label: Standard
+      description: The RFC or specification section this relates to, if any.
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How you would like it to work.
