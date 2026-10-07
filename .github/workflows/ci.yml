@@ -34,6 +34,12 @@ jobs:
       - run: swift build --build-tests --target PassportKitTests --target ConformanceTests
       - run: swift test --parallel --skip PassportKitAppleTests
 
+  docs:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - run: make docs
+
   integration:
     runs-on: macos-26
     steps:
@@ -48,7 +54,7 @@ jobs:
 
   ci-success:
     if: always()
-    needs: [lint, macos, linux, integration]
+    needs: [lint, macos, linux, docs, integration]
     runs-on: ubuntu-latest
     steps:
       - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false"
