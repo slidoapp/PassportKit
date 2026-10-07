@@ -5,12 +5,31 @@
 /// when its turn starts, never when it was queued, so it sees what the previous turn persisted.
 ///
 /// Turns are held by tasks the manager owns and never cancels, so a reserved turn is always used and left.
-struct RefreshLane {
+/// Each session has a lane of its own (ADR 0007): turns of an ended session finish on its old lane, so a
+/// request of that session that never answers cannot hold up the next one.
+final class RefreshLane: @unchecked Sendable {
+    // @unchecked Sendable: the queue is only touched by code running on the owning `TokenManager` actor, where
+    // turns are reserved and finished; a turn is merely carried into the tasks that run on that actor.
+
+    /// A reserved place in a lane.
+    struct Turn {
+        fileprivate let lane: RefreshLane
+        fileprivate let ticket: Completion<Void>
+
+        /// Waits for the turn to start. The waiting task is never cancelled, so this cannot be cut short.
+        func start() async {
+            _ = try? await ticket.wait()
+        }
+
+        /// Ends the turn and starts the next one.
+        func finish() { lane.leave() }
+    }
+
     private var isBusy = false
     private var queue: [Completion<Void>] = []
 
-    /// Reserves the next turn. The returned ticket completes when the turn starts.
-    mutating func reserve() -> Completion<Void> {
+    /// Reserves the next turn.
+    func reserve() -> Turn {
         let ticket = Completion<Void>()
         if isBusy {
             queue.append(ticket)
@@ -18,22 +37,14 @@ struct RefreshLane {
             isBusy = true
             ticket.complete(.success(()))
         }
-        return ticket
+        return Turn(lane: self, ticket: ticket)
     }
 
-    /// Ends the current turn and starts the next one.
-    mutating func leave() {
+    private func leave() {
         if queue.isEmpty {
             isBusy = false
         } else {
             queue.removeFirst().complete(.success(()))
         }
-    }
-}
-
-extension Completion where Value == Void {
-    /// Waits for a lane turn. The waiting task is never cancelled, so this cannot be cut short.
-    func turn() async {
-        _ = try? await wait()
     }
 }

@@ -22,11 +22,11 @@ extension TokenManager {
         try Task.checkCancellation()
         guard current?.refreshToken != nil else { throw Self.signedOut }
         let session = generation
-        let ticket = lane.reserve()
+        let turn = lane.reserve()
         let completion = Completion<TokenResponse>()
         Task {
             do {
-                let response = try await spendRefreshToken(ticket: ticket, session: session, adoptsIDToken: false) {
+                let response = try await spendRefreshToken(turn: turn, session: session, adoptsIDToken: false) {
                     try await self.client.exchange(
                         TokenExchangeRequest(
                             subjectToken: $0, subjectTokenType: .refreshToken, requestedTokenType: requestedTokenType,
@@ -37,7 +37,11 @@ extension TokenManager {
                 completion.complete(.failure(error))
             }
         }
-        return try await completion.wait()
+        do {
+            return try await completion.wait()
+        } catch is SessionSuperseded {
+            throw Self.superseded
+        }
     }
 
     /// One lane turn: sends the refresh token with `send` and persists the rotated one before the turn ends.
@@ -46,20 +50,24 @@ extension TokenManager {
     /// ``superseded`` instead of sending, or instead of returning, when the session changed meanwhile; a stale
     /// `invalid_grant` therefore never ends a newer session.
     func spendRefreshToken(
-        ticket: Completion<Void>,
+        turn: RefreshLane.Turn,
         session: Int,
         adoptsIDToken: Bool,
         send: (Secret) async throws -> TokenResponse
     ) async throws -> TokenResponse {
-        await ticket.turn()
-        defer { lane.leave() }
-        guard session == generation else { throw Self.superseded }
-        guard let refreshToken = current?.refreshToken else { throw Self.signedOut }
+        await turn.start()
+        defer { turn.finish() }
+        guard session == generation else { throw SessionSuperseded() }
+        guard let refreshToken = current?.refreshToken else {
+            // A grant that issued no refresh token cannot be renewed: its session ends with its access token.
+            await endSession(reason: .expiredWithoutRefreshToken)
+            throw Self.expiredWithoutRefreshToken
+        }
         let response: TokenResponse
         do {
             response = try await send(refreshToken)
         } catch {
-            guard session == generation else { throw Self.superseded }
+            guard session == generation else { throw SessionSuperseded() }
             // Only a rejected refresh token ends the session; resource-level failures never do.
             if (error as? PassportError)?.recovery == .reauthenticate {
                 await endSession(reason: .refreshTokenRejected)
@@ -68,10 +76,10 @@ extension TokenManager {
         }
         guard session == generation else {
             handOverRotation(of: response, session: session)
-            throw Self.superseded
+            throw SessionSuperseded()
         }
         await persistRotation(from: response, adoptsIDToken: adoptsIDToken)
-        guard session == generation else { throw Self.superseded }
+        guard session == generation else { throw SessionSuperseded() }
         return response
     }
 
@@ -109,14 +117,17 @@ extension TokenManager {
     ///
     /// The turn is reserved before this returns; the token is read when the turn starts. The request is limited to `revocationTimeLimit` on the
     /// client's clock so a hung server cannot hold the lane.
-    func startRevocation(of refreshToken: Secret, session: Int) -> Completion<SignOutResult.Revocation>? {
+    func startRevocation(of refreshToken: Secret, session: Int, lane: RefreshLane) -> Completion<
+        SignOutResult.Revocation
+    >? {
         guard client.configuration.endpoints.revocation != nil else { return nil }
         revocableTokens[session] = refreshToken
-        let ticket = lane.reserve()
+        // The lane of the ended session: behind its in-flight requests, and not holding up the next session.
+        let turn = lane.reserve()
         let completion = Completion<SignOutResult.Revocation>()
         Task {
-            await ticket.turn()
-            defer { lane.leave() }
+            await turn.start()
+            defer { turn.finish() }
             let client = self.client
             let refreshToken = revocableTokens.removeValue(forKey: session) ?? refreshToken
             let outcome: SignOutResult.Revocation

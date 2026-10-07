@@ -40,7 +40,8 @@ struct LifecycleTests {
         let fresh = try await harness.signInAgain()
         harness.clock.advance(by: .seconds(10))
 
-        #expect(await thrownError { try await stale.value }?.code == .notAuthenticated)
+        // The caller is not told its session ended: it gets a token of the session that replaced it.
+        #expect(try await stale.value.value == fresh.accessToken)
         let freshRefreshToken = fresh.refreshToken?.reveal()
         #expect(await harness.currentRefreshToken() == freshRefreshToken)
         #expect(await harness.storedRefreshToken() == freshRefreshToken)
