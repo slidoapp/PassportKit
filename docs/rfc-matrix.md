@@ -11,7 +11,7 @@ reason in Notes).
 | RFC | Title | Status | Notes |
 |---|---|---|---|
 | 6749 | OAuth 2.0 Authorization Framework | partial | Authorization code, refresh, client credentials. No implicit or password grants. |
-| 6750 | Bearer Token Usage | partial | Authorization header only; `WWW-Authenticate` challenge parsing. |
+| 6750 | Bearer Token Usage | partial | Authorization header only; `WWW-Authenticate` challenge parsing; `RequestAuthorizer`. No form-body or query-parameter tokens. |
 | 7636 | PKCE | done | S256 always; `plain` not supported. |
 | 8252 | OAuth 2.0 for Native Apps | partial | System browser, loopback and claimed HTTPS redirects. |
 | 8628 | Device Authorization Grant | planned | |
@@ -93,3 +93,7 @@ reason in Notes).
 | SES-6 | 6749 §5.1; 8693 §2.2.1 | SHOULD | Expiry from `expires_in`, else the default lifetime, else refresh on every use; derived tokens never outlive their subject | done | `Sources/PassportKit/Session/TokenManager+Targets.swift` | `ExpiryTests` |
 | SES-7 | 7009 §2.1; ADR 0005 | SHOULD | Sign-out clears local state first, then revokes the refresh token in the lane, best effort within a time limit | done | `Sources/PassportKit/Session/TokenManager.swift` | `LifecycleTests` |
 | SES-8 | 6750 §3.1 | SHOULD | A token reported as rejected is dropped only if it is still the cached one, so concurrent 401s cause one refresh | done | `Sources/PassportKit/Session/TokenCache.swift` | `LaneTests` |
+| RES-1 | 6750 §2.1; 6750 §5.3 | MUST | Protected requests carry `Authorization: Bearer <token>`; no request is ever sent without a token, and a token is sent only over `https` or to a loopback host | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
+| RES-2 | 6750 §3.1 | MUST | 401 with `invalid_token` or no Bearer error: invalidate the token and retry once; a second 401 fails with `unauthorized` | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
+| RES-3 | 6750 §3.1 | MUST | `insufficient_scope` and every 403 are never refreshed; the session survives | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerTests`, `RequestAuthorizerConformanceTests` |
+| RES-4 | 6750 §3.1 | SHOULD | Concurrent 401s for one token cause one refresh; a 401 after another caller refreshed retries with the new token without a refresh | done | `Sources/PassportKit/Authorization/RequestAuthorizer.swift` | `RequestAuthorizerConformanceTests` |
