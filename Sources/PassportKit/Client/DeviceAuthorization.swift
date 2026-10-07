@@ -80,13 +80,16 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
 extension DeviceAuthorization {
     /// The interval used when the server omits `interval` (RFC 8628 §3.2).
     static let defaultInterval = Duration.seconds(5)
+    /// The longest `user_code` accepted, in characters.
+    static let maximumUserCodeLength = 64
     /// The longest polling interval accepted from the server or reached through `slow_down`. A larger value is
     /// not a usable polling schedule, and converting it unchecked would trap.
     static let maximumInterval = Duration.seconds(3600)
 
     /// Parses the body of a 2xx device authorization response (RFC 8628 §3.2).
     ///
-    /// `device_code`, `user_code`, a verification URI and `expires_in` are required. A missing, non-positive
+    /// `device_code`, `user_code` (at most 64 characters, without control, line-separator or invisible format
+    /// characters), a verification URI and `expires_in` are required. A missing, non-positive
     /// or unparsable `interval` means 5 seconds, an `interval` above one hour is rejected; a `verification_uri_complete` that is unparsable or not `https` is dropped. A verification URI must be `https`
     /// (or `http` on a loopback host), else the response is invalid.
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidResponse``.
@@ -123,6 +126,15 @@ extension DeviceAuthorization {
                 .invalidResponse,
                 detail: "The device authorization response lacks a required member."
             )
+        }
+        // The code is shown to a person, so it must be plain text of a sensible length.
+        guard userCode.count <= Self.maximumUserCodeLength,
+            !userCode.unicodeScalars.contains(where: {
+                [.control, .format, .lineSeparator, .paragraphSeparator].contains($0.properties.generalCategory)
+            })
+        else {
+            throw PassportError(
+                .invalidResponse, detail: "The device authorization response has an unusable user code.")
         }
         let pollInterval = seconds("interval").flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         if let pollInterval, pollInterval > Double(Self.maximumInterval.components.seconds) {
