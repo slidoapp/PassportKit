@@ -38,17 +38,6 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
         task?.cancel()
     }
 
-    /// Request headers that carry no credential and stay on a cross-origin redirect.
-    private static let retainedAcrossOrigins: Set<String> = ["accept", "accept-language", "user-agent"]
-
-    private static func isSameOrigin(_ left: URL, _ right: URL) -> Bool {
-        func origin(_ url: URL) -> [String?] {
-            let scheme = url.scheme?.lowercased()
-            return [scheme, url.host?.lowercased(), String(url.port ?? (scheme == "https" ? 443 : 80))]
-        }
-        return origin(left) == origin(right)
-    }
-
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -56,25 +45,7 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
         newRequest request: URLRequest,
         completionHandler: @escaping @Sendable (URLRequest?) -> Void
     ) {
-        let original = task.originalRequest
-        if original?.httpMethod?.uppercased() == "POST" {
-            completionHandler(nil)
-            return
-        }
-        var redirected = request
-        if let from = original?.url, let target = request.url {
-            if from.scheme?.lowercased() == "https", target.scheme?.lowercased() != "https" {
-                completionHandler(nil)
-                return
-            }
-            if !Self.isSameOrigin(from, target) {
-                for name in (redirected.allHTTPHeaderFields ?? [:]).keys
-                where !Self.retainedAcrossOrigins.contains(name.lowercased()) {
-                    redirected.setValue(nil, forHTTPHeaderField: name)
-                }
-            }
-        }
-        completionHandler(redirected)
+        completionHandler(RedirectPolicy.followed(request, from: task.originalRequest, followsPOST: false))
     }
 
     func urlSession(
