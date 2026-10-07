@@ -117,6 +117,12 @@ First development cycle; nothing is released yet.
   `.noInteraction` (the value `none`), `.login`, `.consent` and `.selectAccount`, sent as one space-delimited
   parameter, so several values can be combined.
 
+- Conformances: `Hashable` for `HTTPRequest`, `HTTPResponse`, `TokenResponse`, `TokenExchangeRequest`,
+  `AuthorizationRequest` and `SessionEvent`; `Codable` for `PassportError.Code`; `PassportError` is a
+  `LocalizedError` whose `errorDescription` is its redacted `description`. The sanitized server text that was
+  `PassportError.errorDescription` is now `PassportError.detail` (and the `detail:` initializer parameter),
+  because the name belongs to `LocalizedError`.
+
 ### Security
 
 - `RequestAuthorizer` sends only `Bearer` tokens (compared case-insensitively). Another token type fails with

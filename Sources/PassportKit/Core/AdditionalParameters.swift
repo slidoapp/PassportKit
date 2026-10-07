@@ -47,7 +47,7 @@ public struct AdditionalParameters: Sendable, Hashable, ExpressibleByDictionaryL
         if let collision = items.first(where: { reserved.contains($0.name) }) {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "Additional parameter '\(collision.name)' collides with a standard parameter."
+                detail: "Additional parameter '\(collision.name)' collides with a standard parameter."
             )
         }
         return standard + items.map { ($0.name, $0.value) }

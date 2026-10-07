@@ -172,13 +172,13 @@
                 return PassportError(
                     .storageFailure,
                     recovery: .retryLater(after: nil),
-                    errorDescription: "The Keychain is not available while the device is locked.",
+                    detail: "The Keychain is not available while the device is locked.",
                     underlying: underlying
                 )
             }
             return PassportError(
                 .storageFailure,
-                errorDescription: "The Keychain operation failed with status \(status).",
+                detail: "The Keychain operation failed with status \(status).",
                 underlying: underlying
             )
         }

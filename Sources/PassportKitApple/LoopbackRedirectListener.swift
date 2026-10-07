@@ -39,7 +39,7 @@
             else {
                 throw PassportError(
                     .invalidConfiguration,
-                    errorDescription: "The loopback path must start with / and contain no query or fragment."
+                    detail: "The loopback path must start with / and contain no query or fragment."
                 )
             }
             let parameters = NWParameters.tcp
@@ -51,7 +51,7 @@
             } catch {
                 throw PassportError(
                     .transportFailure,
-                    errorDescription: "The loopback listener could not be created.",
+                    detail: "The loopback listener could not be created.",
                     underlying: error
                 )
             }
@@ -82,7 +82,7 @@
             let assignedPort = port.withLock { $0 }
             guard let redirectURI = URL(string: "http://127.0.0.1:\(assignedPort)\(path)") else {
                 listener.cancel()
-                throw PassportError(.invalidConfiguration, errorDescription: "The loopback path is not valid.")
+                throw PassportError(.invalidConfiguration, detail: "The loopback path is not valid.")
             }
             return LoopbackRedirectListener(
                 redirectURI: redirectURI,
@@ -128,7 +128,7 @@
                         throw PassportError(
                             .timedOut,
                             recovery: .reauthenticate,
-                            errorDescription: "The redirect did not arrive in time."
+                            detail: "The redirect did not arrive in time."
                         )
                     }
                     defer { group.cancelAll() }
@@ -176,7 +176,7 @@
                                 .failure(
                                     PassportError(
                                         .transportFailure,
-                                        errorDescription: "The loopback listener failed to start.",
+                                        detail: "The loopback listener failed to start.",
                                         underlying: error
                                     )
                                 )

@@ -49,7 +49,7 @@ public struct ClientConfiguration: Sendable {
         if requiresIssuerInAuthorizationResponse, issuer == nil {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "Requiring an issuer in the authorization response needs a configured issuer."
+                detail: "Requiring an issuer in the authorization response needs a configured issuer."
             )
         }
     }

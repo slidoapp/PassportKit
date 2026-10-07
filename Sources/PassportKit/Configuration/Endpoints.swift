@@ -38,7 +38,7 @@ public struct Endpoints: Sendable, Hashable {
         guard isAllowed, url.host?.isEmpty == false else {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "The \(name) must use https, or http on a loopback host."
+                detail: "The \(name) must use https, or http on a loopback host."
             )
         }
     }

@@ -12,7 +12,7 @@ enum PKCE {
     static func makeRandomValue(random: any RandomSource) throws -> Secret {
         let bytes = random.bytes(count: verifierByteCount)
         guard bytes.count == verifierByteCount else {
-            throw PassportError(.invalidConfiguration, errorDescription: "The random source returned too few bytes.")
+            throw PassportError(.invalidConfiguration, detail: "The random source returned too few bytes.")
         }
         return Secret(Base64URL.encode(bytes))
     }

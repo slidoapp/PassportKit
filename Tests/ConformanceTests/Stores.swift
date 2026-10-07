@@ -47,7 +47,7 @@ actor GatedStore: CredentialStore {
         log.append("delete")
         if failingDeletes > 0 {
             failingDeletes -= 1
-            throw PassportError(.storageFailure, errorDescription: "Deleting the credential failed.")
+            throw PassportError(.storageFailure, detail: "Deleting the credential failed.")
         }
         await base.delete(account)
     }

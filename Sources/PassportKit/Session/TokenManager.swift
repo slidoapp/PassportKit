@@ -257,24 +257,24 @@ public actor TokenManager {
 
     static func storageError(_ error: any Error) -> PassportError {
         error as? PassportError
-            ?? PassportError(.storageFailure, errorDescription: "The credential store failed.", underlying: error)
+            ?? PassportError(.storageFailure, detail: "The credential store failed.", underlying: error)
     }
 
     static var superseded: PassportError {
         PassportError(
             .notAuthenticated,
             recovery: .reauthenticate,
-            errorDescription: "The session ended or was replaced while the request was in flight."
+            detail: "The session ended or was replaced while the request was in flight."
         )
     }
 
     static var expiredWithoutRefreshToken: PassportError {
         PassportError(
             .notAuthenticated, recovery: .reauthenticate,
-            errorDescription: "The access token expired and the grant has no refresh token.")
+            detail: "The access token expired and the grant has no refresh token.")
     }
 
     static var signedOut: PassportError {
-        PassportError(.notAuthenticated, recovery: .reauthenticate, errorDescription: "There is no signed-in session.")
+        PassportError(.notAuthenticated, recovery: .reauthenticate, detail: "There is no signed-in session.")
     }
 }

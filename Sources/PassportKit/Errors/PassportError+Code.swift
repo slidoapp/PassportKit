@@ -2,13 +2,24 @@ extension PassportError {
     /// An open set of error codes: server codes are preserved verbatim.
     ///
     /// Client-side codes use a `client.` raw value prefix to keep them apart from OAuth codes.
-    public struct Code: RawRepresentable, Sendable, Hashable {
+    public struct Code: RawRepresentable, Sendable, Hashable, Codable {
         /// The code string as sent by the server, or the prefixed client-side string.
         public let rawValue: String
 
         /// Creates a code from its string.
         public init(rawValue: String) {
             self.rawValue = rawValue
+        }
+
+        /// Decodes the plain string value.
+        public init(from decoder: any Decoder) throws {
+            rawValue = try decoder.singleValueContainer().decode(String.self)
+        }
+
+        /// Encodes the plain string value.
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
         }
 
         /// The longest error code accepted from a server or a redirect.

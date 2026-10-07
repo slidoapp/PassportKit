@@ -77,7 +77,7 @@
                             continuation.resume(
                                 throwing: PassportError(
                                     .invalidConfiguration,
-                                    errorDescription: "The web authentication session could not start."
+                                    detail: "The web authentication session could not start."
                                 )
                             )
                         }
@@ -104,7 +104,7 @@
                 guard #available(macOS 14.4, iOS 17.4, visionOS 1.1, *) else {
                     throw PassportError(
                         .invalidConfiguration,
-                        errorDescription: "An https redirect URI needs macOS 14.4, iOS 17.4 or visionOS 1.1."
+                        detail: "An https redirect URI needs macOS 14.4, iOS 17.4 or visionOS 1.1."
                     )
                 }
                 return ASWebAuthenticationSession(

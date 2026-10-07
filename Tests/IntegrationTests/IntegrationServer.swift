@@ -115,7 +115,7 @@ struct RedirectFollowingUserAgent: UserAgent {
             let location = http.value(forHTTPHeaderField: "Location"),
             let target = URL(string: location, relativeTo: http.url)?.absoluteURL
         else {
-            throw PassportError(.invalidResponse, errorDescription: "The server did not redirect to the redirect URI.")
+            throw PassportError(.invalidResponse, detail: "The server did not redirect to the redirect URI.")
         }
         return target
     }

@@ -13,7 +13,7 @@ public enum SignOutReason: Sendable, Hashable {
 /// Something that happened to the session, delivered through ``TokenManager/events``.
 ///
 /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
-public enum SessionEvent: Sendable, Equatable {
+public enum SessionEvent: Sendable, Hashable {
     /// A credential was adopted by ``TokenManager/signIn(with:requestedScope:)`` or restored by ``TokenManager/load()``.
     case signedIn
     /// A token for `target` was issued, accepted and cached.

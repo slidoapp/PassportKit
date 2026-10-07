@@ -34,7 +34,7 @@ final class RenderingLog: Sendable {
         if let error = error as? PassportError {
             look(error.code)
             look(error.recovery)
-            renderings.update { $0 += [error.errorDescription ?? "", error.errorURI?.absoluteString ?? ""] }
+            renderings.update { $0 += [error.detail ?? "", error.errorURI?.absoluteString ?? ""] }
         }
     }
 

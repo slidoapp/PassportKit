@@ -119,13 +119,13 @@ Rules:
 ## 4. HTTP
 
 ```swift
-public struct HTTPRequest: Sendable, CustomStringConvertible {   // description redacts body and Authorization
+public struct HTTPRequest: Sendable, Hashable, CustomStringConvertible {   // description redacts body and Authorization
     public var method: HTTPMethod
     public var url: URL
     public var headers: HTTPHeaders
     public var body: Data?
 }
-public struct HTTPResponse: Sendable { public var statusCode: Int; public var headers: HTTPHeaders; public var body: Data }
+public struct HTTPResponse: Sendable, Hashable { public var statusCode: Int; public var headers: HTTPHeaders; public var body: Data }
 public struct HTTPHeaders: Sendable, Hashable, Sequence, ExpressibleByDictionaryLiteral {
     // case-insensitive names, preserves multiple values (multiple WWW-Authenticate lines)
     public subscript(name: String) -> String? { get set }   // first value
@@ -209,8 +209,8 @@ HTTP `http` endpoints are rejected unless the host is a loopback address
 ## 6. Errors
 
 ```swift
-public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible {
-    public struct Code: RawRepresentable, Sendable, Hashable {   // open set; server codes preserved
+public struct PassportError: LocalizedError, Sendable, Equatable, CustomStringConvertible {   // errorDescription (LocalizedError) is the redacted `description`
+    public struct Code: RawRepresentable, Sendable, Hashable, Codable {   // open set; server codes preserved
         // RFC 6749 §5.2, RFC 8628 §3.5, RFC 8693 §2.2.2, RFC 8707 §2, RFC 6750 §3.1
         public static let invalidRequest, invalidClient, invalidGrant, unauthorizedClient,
             unsupportedGrantType, invalidScope, invalidTarget, accessDenied, expiredToken,
@@ -231,7 +231,7 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
     public var code: Code
     public var recovery: Recovery
     public var statusCode: Int?
-    public var errorDescription: String?    // server text, redacted and truncated to 200 characters; never used for logic
+    public var detail: String?    // server `error_description` or the library's explanation, redacted and truncated to 200 characters; never used for logic
     public var errorURI: URL?
     public var underlying: (any Error & Sendable)?
 }
@@ -263,7 +263,7 @@ Classification rules (tested exhaustively):
 Cancellation is not wrapped: `CancellationError` propagates unchanged.
 User cancellation of a browser sheet is `.userCancelled`.
 
-`errorDescription` is untrusted text. It loses control, line-separator and
+`detail` is untrusted text. It loses control, line-separator and
 invisible format characters, token-like runs of 24 or more characters
 become `<redacted>`, and it is cut to 200 characters. In addition, every
 credential the library sent in the request (refresh, subject, actor and
@@ -276,7 +276,7 @@ than four characters are left alone.
 ## 7. Token responses
 
 ```swift
-public struct TokenResponse: Sendable, CustomStringConvertible {
+public struct TokenResponse: Sendable, Hashable, CustomStringConvertible {
     public var accessToken: Secret
     public var tokenType: String                    // compared case-insensitively
     public var expiresIn: Duration?
@@ -343,7 +343,7 @@ client ID and the token endpoint only, so a dump never reaches the injected
 transport or observer.
 
 ```swift
-public struct TokenExchangeRequest: Sendable {
+public struct TokenExchangeRequest: Sendable, Hashable {
     public var subjectToken: Secret
     public var subjectTokenType: TokenTypeIdentifier
     public var actorToken: Secret?
@@ -398,7 +398,7 @@ cancellation stops immediately. The library never opens a browser.
 ### Authorization code with PKCE
 
 ```swift
-public struct AuthorizationRequest: Sendable {
+public struct AuthorizationRequest: Sendable, Hashable {
     public struct Prompt: RawRepresentable, Sendable, Hashable {   // open; OIDC Core §3.1.2.1
         public static let noInteraction, login, consent, selectAccount: Prompt   // "none", "login", "consent", "select_account"
     }
@@ -657,7 +657,7 @@ public struct SignOutResult: Sendable, Equatable {
     public var revocation: Revocation              // .skipped: not requested, no refresh token or no revocation endpoint
 }
 
-public enum SessionEvent: Sendable, Equatable {
+public enum SessionEvent: Sendable, Hashable {
     case signedIn
     case refreshed(target: TokenTarget)
     case tokenRejected(target: TokenTarget, grantedScope: ScopeSet?)

@@ -51,11 +51,11 @@ for diagnostics only. A response that is not an OAuth error maps by status:
 
 ## Server text is untrusted
 
-``PassportError/errorDescription`` and ``PassportError/errorURI`` come from
-the network. The description has control and invisible characters removed, is
+``PassportError/detail`` and ``PassportError/errorURI`` come from
+the network. The detail has control and invisible characters removed, is
 cut to 200 characters, and has token-like runs and the credentials the library
 sent replaced by `<redacted>`. `errorURI` keeps only `http` and `https`
-links. Show the description for diagnostics, never branch on it, and never put it into
+links. Show the detail for diagnostics, never branch on it, and never put it into
 a place that interprets markup.
 
 ## Cancellation

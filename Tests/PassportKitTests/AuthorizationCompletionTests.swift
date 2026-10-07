@@ -162,7 +162,7 @@ struct AuthorizationCompletionTests {
         let error = try #require(await failure(client, pending, callback))
         #expect(error.code == .accessDenied)
         #expect(error.recovery == PassportError.Recovery.noAction)
-        #expect(error.errorDescription == "The user said no")
+        #expect(error.detail == "The user said no")
         #expect(error.errorURI == URL(string: "https://as.example.com/help"))
         #expect(await transport.requests.isEmpty)
     }

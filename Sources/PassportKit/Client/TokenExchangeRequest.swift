@@ -1,7 +1,7 @@
 import Foundation
 
 /// A token exchange request (RFC 8693 §2.1).
-public struct TokenExchangeRequest: Sendable {
+public struct TokenExchangeRequest: Sendable, Hashable {
     /// The token to exchange: `subject_token`.
     public var subjectToken: Secret
     /// The type of ``subjectToken``: `subject_token_type`.

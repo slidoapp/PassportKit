@@ -86,7 +86,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
             return .fail(
                 PassportError(
                     .insufficientScope, statusCode: statusCode,
-                    errorDescription: challenge?.parameters["error_description"]
+                    detail: challenge?.parameters["error_description"]
                 ).redacting([token.value.reveal()]))
         }
         guard attempt == 0 else {
@@ -141,7 +141,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
                 throw PassportError(.transportFailure, underlying: error)
             }
             guard let http = response as? HTTPURLResponse else {
-                throw PassportError(.invalidResponse, errorDescription: "The response was not an HTTP response.")
+                throw PassportError(.invalidResponse, detail: "The response was not an HTTP response.")
             }
             var headers = HTTPHeaders()
             for (name, value) in http.allHeaderFields {
@@ -159,7 +159,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         guard token.tokenType.lowercased() == "bearer" else {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "Only Bearer tokens can be sent; the server issued another type.")
+                detail: "Only Bearer tokens can be sent; the server issued another type.")
         }
     }
 
@@ -167,7 +167,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         let scheme = url?.scheme?.lowercased()
         guard scheme == "https" || (scheme == "http" && LoopbackHost.isLoopback(url?.host)) else {
             throw PassportError(
-                .invalidConfiguration, errorDescription: "Bearer tokens are only sent over https or to loopback.")
+                .invalidConfiguration, detail: "Bearer tokens are only sent over https or to loopback.")
         }
     }
 }

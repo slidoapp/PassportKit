@@ -56,7 +56,7 @@ extension OAuthClient {
                 throw PassportError(
                     .expiredToken,
                     recovery: .reauthenticate,
-                    errorDescription: "The device authorization expired before it was approved."
+                    detail: "The device authorization expired before it was approved."
                 )
             }
 
