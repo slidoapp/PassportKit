@@ -154,7 +154,7 @@ struct LifecycleTests {
             try await harness.store.save(foreign, for: harness.account)
             #expect(try await harness.manager.load() == nil)
             #expect(await harness.manager.credential == nil)
-            #expect(await harness.store.load(harness.account) == foreign, "an ignored credential is not deleted")
+            #expect(try await harness.store.load(harness.account) == foreign, "an ignored credential is not deleted")
         }
 
         try await harness.store.save(credential, for: harness.account)

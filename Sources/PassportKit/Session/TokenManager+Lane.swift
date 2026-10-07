@@ -66,15 +66,18 @@ extension TokenManager {
             }
             throw error
         }
-        guard session == generation else { throw Self.superseded }
+        guard session == generation else {
+            handOverRotation(of: response, session: session)
+            throw Self.superseded
+        }
         await persistRotation(from: response, adoptsIDToken: adoptsIDToken)
         guard session == generation else { throw Self.superseded }
         return response
     }
 
-    /// Stores the refresh token carried by `response`, in memory first so that a sign-out during the save
-    /// revokes the newest token, then in the store. A failing store is reported, not thrown: the session
-    /// continues from memory.
+    /// Stores the refresh token carried by `response`: in memory first, so that `current` is always the newest
+    /// token the manager knows, then in the store. A failing store is reported, not thrown: the session continues
+    /// from memory.
     private func persistRotation(from response: TokenResponse, adoptsIDToken: Bool) async {
         guard var credential = current, let rotated = response.refreshToken else { return }
         credential.refreshToken = rotated
@@ -84,30 +87,38 @@ extension TokenManager {
         await save(credential)
     }
 
+    /// A request that finished after its session ended still made the server rotate the refresh token. The result
+    /// is discarded, but if the session was signed out with revocation, the revocation must target this newer
+    /// token: revoking the one it replaced would leave the live one valid (RFC 7009 §2.1 only promises the
+    /// token and, at the server's discretion, its grant).
+    private func handOverRotation(of response: TokenResponse, session: Int) {
+        guard revocableTokens[session] != nil, let rotated = response.refreshToken else { return }
+        revocableTokens[session] = rotated
+    }
+
     /// Ends the session because the server rejected the refresh token.
     private func endSession(reason: SignOutReason) async {
         startNewSession()
         current = nil
-        do {
-            try await store.delete(account)
-        } catch {
-            eventHub.emit(.storageFailed)
-        }
         eventHub.emit(.signedOut(reason: reason))
+        await deleteStoredCredential()
     }
 
-    /// Starts revoking `refreshToken` in its own lane turn, and returns what will become of it.
+    /// Starts revoking the refresh token of the ended session `session`, which is `refreshToken` as of now, in
+    /// its own lane turn, and returns what will become of it.
     ///
-    /// The turn is reserved before this returns. The request is limited to `revocationTimeLimit` on the
+    /// The turn is reserved before this returns; the token is read when the turn starts. The request is limited to `revocationTimeLimit` on the
     /// client's clock so a hung server cannot hold the lane.
-    func startRevocation(of refreshToken: Secret) -> Completion<SignOutResult.Revocation>? {
+    func startRevocation(of refreshToken: Secret, session: Int) -> Completion<SignOutResult.Revocation>? {
         guard client.configuration.endpoints.revocation != nil else { return nil }
+        revocableTokens[session] = refreshToken
         let ticket = lane.reserve()
         let completion = Completion<SignOutResult.Revocation>()
         Task {
             await ticket.turn()
             defer { lane.leave() }
             let client = self.client
+            let refreshToken = revocableTokens.removeValue(forKey: session) ?? refreshToken
             let outcome: SignOutResult.Revocation
             do {
                 let finished = try await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) {
