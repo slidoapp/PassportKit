@@ -21,13 +21,17 @@ public struct RequestAuthorizer: Sendable {
     ///
     /// Throws what ``TokenManager/accessToken(for:)`` throws when no token can be obtained, and
     /// ``PassportError/Code-swift.struct/invalidConfiguration`` when the URL is neither `https` nor
-    /// `http` on a loopback host, so a token never travels in clear text. Never returns an unsigned request.
+    /// `http` on a loopback host, so a token never travels in clear text, or when the token's
+    /// ``AccessToken/tokenType`` is not `Bearer` (compared case-insensitively): other types, such as
+    /// sender-constrained `DPoP` tokens, need proof this authorizer cannot produce. Never returns an
+    /// unsigned request.
     public func authorize(
         _ request: URLRequest,
         for target: TokenTarget = .default
     ) async throws -> (URLRequest, AccessToken) {
         try Self.requireSecureTransport(request.url)
         let token = try await manager.accessToken(for: target)
+        try Self.requireBearer(token)
         var signed = request
         signed.setValue("Bearer \(token.value.reveal())", forHTTPHeaderField: "Authorization")
         return (signed, token)
@@ -42,6 +46,7 @@ public struct RequestAuthorizer: Sendable {
     ) async throws -> (HTTPRequest, AccessToken) {
         try Self.requireSecureTransport(request.url)
         let token = try await manager.accessToken(for: target)
+        try Self.requireBearer(token)
         var signed = request
         signed.headers["Authorization"] = "Bearer \(token.value.reveal())"
         return (signed, token)
@@ -135,6 +140,13 @@ public struct RequestAuthorizer: Sendable {
             case .retry: attempt += 1
             case .fail(let error): throw error
             }
+        }
+    }
+
+    private static func requireBearer(_ token: AccessToken) throws {
+        guard token.tokenType.lowercased() == "bearer" else {
+            throw PassportError(
+                .invalidConfiguration, errorDescription: "Only Bearer tokens can be sent; the server issued another type.")
         }
     }
 

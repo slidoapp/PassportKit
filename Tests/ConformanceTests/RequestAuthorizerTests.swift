@@ -133,6 +133,31 @@ struct RequestAuthorizerConformanceTests {
         #expect(await transport.requests.isEmpty)
     }
 
+    @Test("RFC 6750 §2.1: only Bearer tokens are sent, compared case-insensitively")
+    func tokenType() async throws {
+        let harness = try await Harness(signedIn: false)
+        let transport = RecordingTransport()
+        let authorizer = RequestAuthorizer(manager: harness.manager)
+
+        try await harness.manager.signIn(
+            with: TokenResponse(
+                accessToken: Secret("sender-constrained"), tokenType: "DPoP", expiresIn: .seconds(600),
+                refreshToken: Secret("refresh")),
+            requestedScope: ["read"])
+        let error = await thrownError { try await authorizer.send(resource, using: transport) }
+        #expect(error?.code == .invalidConfiguration)
+        #expect(await transport.requests.isEmpty)
+        #expect(await harness.manager.credential != nil, "a configuration error does not end the session")
+
+        try await harness.manager.signIn(
+            with: TokenResponse(
+                accessToken: Secret("plain"), tokenType: "bEaReR", expiresIn: .seconds(600),
+                refreshToken: Secret("refresh")),
+            requestedScope: ["read"])
+        let (signed, _) = try await authorizer.authorize(resource)
+        #expect(signed.headers["Authorization"] == "Bearer plain")
+    }
+
     @Test("RFC 6750 §5.3: a plain http URL fails before any token is requested")
     func insecureURL() async throws {
         let harness = try await Harness()
