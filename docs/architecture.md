@@ -27,9 +27,18 @@ never the reverse. The core has no third-party runtime dependencies.
   per session, because servers may rotate refresh tokens and allow little
   or no reuse.
 - A rotated refresh token is persisted before the new access token is
-  handed out.
+  handed out. Every change of the stored credential goes through one
+  FIFO, so a slow store cannot apply an older save after a newer delete.
 - Results that arrive after the session was cleared or replaced are
-  discarded (generation check), never written back.
+  discarded (generation check), never written back. Each session has its
+  own refresh lane, so a stuck request of an ended session cannot block
+  the next one; a sign-out's revocation runs on the ended session's lane
+  and sends the newest refresh token it learned of, including one issued
+  to a request that finished after the sign-out (ADR 0007).
+- Everything that waits on application code or the network is bounded or
+  abandonable: the acceptance policy has a time limit, revocation has a
+  time limit, and a time limit does not wait for work that ignores
+  cancellation.
 - Every long-running operation (device polling, interactive
   authorization, refresh) honours task cancellation.
 
@@ -42,7 +51,8 @@ never the reverse. The core has no third-party runtime dependencies.
    (RFC 8707) and never reused for another resource.
 3. Granted scope is always recorded: the response `scope`, or the
    requested scope when the response omits it (RFC 6749 §5.1).
-4. Only `invalid_grant` on refresh ends a session. Resource-level denials
+4. Only `invalid_grant` on refresh (or the expiry of a grant that has no
+   refresh token) ends a session. Resource-level denials
    (`access_denied`, `invalid_target`, acceptance-hook rejection,
    `insufficient_scope`) are reported to the caller and leave the session
    intact.

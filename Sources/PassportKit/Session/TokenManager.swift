@@ -170,7 +170,10 @@ public actor TokenManager {
     /// Ends the session: clears local state, then revokes the refresh token at the server (RFC 7009).
     ///
     /// Local state is cleared first and always, whatever happens to the revocation, which is best effort and
-    /// limited to five seconds. In-flight operations of the ended session are discarded.
+    /// limited to five seconds. In-flight operations of the ended session are discarded, but the revocation
+    /// targets the newest refresh token the session was issued, including one rotated by a request that was
+    /// already in flight. If the store cannot delete the credential, ``SignOutResult/isStoredCredentialDeleted``
+    /// is false, ``SessionEvent/storageFailed`` is emitted, and ``load()`` would restore the session.
     public func signOut(revoke: Bool = true) async -> SignOutResult {
         let endedSession = generation
         let endedLane = lane

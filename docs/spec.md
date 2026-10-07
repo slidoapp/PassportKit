@@ -438,7 +438,9 @@ One actor per signed-in root grant.
 ```swift
 public actor TokenManager {
     public init(client: OAuthClient, store: any CredentialStore, account: CredentialAccount,
-                acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken())
+                acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
+                acceptancePolicyTimeLimit: Duration = .seconds(10),    // no answer in time = rejection
+                rejectedTokenCacheDuration: Duration = .seconds(30))   // .zero: ask the server every time
 
     public func load() async throws -> Credential?                 // restores from the store
     public func signIn(with response: TokenResponse, requestedScope: ScopeSet?) async throws  // adopt a grant result; throws .tokenRejected if the policy rejects its access token (the session still exists)
@@ -453,7 +455,7 @@ public actor TokenManager {
     public nonisolated var events: AsyncStream<SessionEvent> { get }   // multiple subscribers supported
 }
 
-public struct TokenTarget: Sendable, Hashable {
+public struct TokenTarget: Sendable, Hashable {   // == and hash: method, scope and the SETS of resources and audiences
     public enum Method: Sendable, Hashable {
         case refreshGrant             // refresh_token grant with `resources` (narrowing, RFC 8707 §2.2)
         case exchangeAccessToken      // RFC 8693: exchange the default access token for one bound to `resources`/`audiences`
@@ -491,34 +493,69 @@ Invariants (each has a conformance test):
 
 1. **One lane.** Every operation that sends the refresh token (refresh
    grant, refresh-token exchange, revocation of the refresh token) runs
-   in one FIFO lane per manager and reads the refresh token when it
-   starts, not when it is queued.
+   in one FIFO lane per session and reads the refresh token when it
+   starts, not when it is queued. A new session gets a new lane, so a
+   request of an ended session that never answers cannot hold up the
+   next one. A revocation takes its turn on the lane of the session it
+   ends and sends the newest refresh token of that session: a request
+   that was already in flight when the user signed out, and rotated the
+   token, hands the new token over (ADR 0007).
 2. **Coalescing.** Concurrent `accessToken(for:)` calls for the same
    target share one in-flight operation. Different targets never receive
-   each other's tokens.
+   each other's tokens. Targets are equal when method, scope and the
+   sets of resources and audiences are equal; order and repetition of
+   resources and audiences do not matter. A nil scope and an empty scope
+   differ. `signIn` registers the operation for the default target
+   before it suspends, so callers during its save and policy check join
+   it instead of refreshing.
 3. **Persist before publish.** A rotated refresh token (any response
    carrying `refresh_token`, including token exchanges whose subject is
    the refresh token) is saved to the store before the access token is
    returned. If saving fails, the new credential is kept in memory, the
    token is returned, and `SessionEvent.storageFailed` is emitted.
+   Saves and deletes of the stored credential are applied one after the
+   other in the order the manager decided them, whatever the store's
+   speed, so a late save never undoes a sign-out. If a delete fails the
+   stored credential survives and `load()` would restore it:
+   `SignOutResult.isStoredCredentialDeleted` is false and
+   `.storageFailed` is emitted.
 4. **Acceptance.** Every issued access token goes through the
-   `TokenAcceptancePolicy` before it is cached or returned. On
-   rejection the token is discarded, the rotated refresh token from the
-   same response is still persisted, the call throws `.tokenRejected`
-   with `.resourceDenied`, and the session stays signed in.
+   `TokenAcceptancePolicy` before it is cached or returned. The policy
+   has `acceptancePolicyTimeLimit` to answer (the default policy is not
+   timed); no answer is a rejection. On rejection the token is
+   discarded, the rotated refresh token from the same response is still
+   persisted, the call throws `.tokenRejected` with `.resourceDenied`,
+   and the session stays signed in. The rejection is remembered per
+   target for `rejectedTokenCacheDuration`: asking again within that time
+   throws the same error without a request and without a second
+   `.tokenRejected` event, so a retrying caller cannot make the manager
+   rotate the refresh token in a loop. A sign-in, a sign-out, the end of
+   the session and `invalidate(_:)` for the target forget it.
 5. **Session end.** Only an error with recovery `.reauthenticate` on a
    lane operation ends the session, which in practice means `invalid_grant`
-   for the refresh token (`invalid_client` is `.fixConfiguration` and does
-   not end it). The credential is deleted, `SessionEvent.signedOut` with
-   reason `.refreshTokenRejected` is emitted, and subsequent calls throw
-   `.notAuthenticated` (recovery `.reauthenticate`). An `invalid_grant` that
-   arrives after the session was replaced is ignored (invariant 6).
+   for the refresh token, whether the refresh was narrowed to resources or
+   a scope or not (RFC 6749 §5.2 defines `invalid_grant` as a problem with
+   the grant; `invalid_client` is `.fixConfiguration`, `invalid_scope` is
+   `.fixConfiguration` and `invalid_target` is `.resourceDenied`, none of
+   them ends it). The credential is deleted, `SessionEvent.signedOut`
+   with reason `.refreshTokenRejected` is emitted, and subsequent calls
+   throw `.notAuthenticated` (recovery `.reauthenticate`). An
+   `invalid_grant` that arrives after the session was replaced is ignored
+   (invariant 6). A grant that issued no refresh token ends the same way,
+   with reason `.expiredWithoutRefreshToken`, when its access token has
+   expired and a new one is needed.
 6. **Generations.** `signOut`, `signIn` and session end increment the
    session generation. An operation that completes under an older
-   generation discards its result and writes nothing.
+   generation discards its result and writes nothing. A caller that was
+   waiting for such an operation asks again once on the session that
+   exists now, if there is one, instead of failing; with none it throws
+   `.notAuthenticated`. `.signedOut` and `.signedIn` are emitted before
+   the manager first suspends, so their order is the order of the calls.
 7. **Cancellation.** Cancelling a caller only stops it waiting. A
    request that was already sent is allowed to finish and its result is
-   persisted. A caller that is cancelled before it starts never starts one.
+   persisted. A caller that is cancelled before it starts never starts
+   one. A cancelled `signOut` clears the session and reports the
+   revocation as `.cancelled`.
 8. **Expiry.** A cached token is used while
    `expiresAt - minimumTokenLifetime > now`. Tokens without expiry use
    `defaultTokenLifetime`, or are refreshed on every use when nil.
@@ -541,7 +578,8 @@ usually a refresh token for another audience and belongs to the application.
 Its `refresh_token`, the rotated subject, is persisted. Revocation in
 `signOut` also takes a lane turn, reserved before `signOut` suspends, so it
 queues behind operations already sending the old token; the request and the
-wait for it are each limited to 5 s on the client's clock.
+wait for it are each limited to 5 s on the client's clock. A time limit gives up
+on an operation that ignores cancellation, which then runs on in the background.
 
 ```swift
 public protocol TokenAcceptancePolicy: Sendable {
@@ -554,9 +592,9 @@ public struct RequireAnyScope: TokenAcceptancePolicy {
     public init(_ scopes: ScopeSet, when predicate: @escaping @Sendable (TokenTarget) -> Bool = { !$0.resources.isEmpty })
 }
 
-public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected }
+public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected, expiredWithoutRefreshToken }
 public struct SignOutResult: Sendable, Equatable {
-    public enum Revocation: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut }
+    public enum Revocation: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut, cancelled }
     public var isStoredCredentialDeleted: Bool     // memory is always cleared
     public var revocation: Revocation              // .skipped: not requested, no refresh token or no revocation endpoint
 }
@@ -566,7 +604,7 @@ public enum SessionEvent: Sendable, Equatable {
     case refreshed(target: TokenTarget)
     case tokenRejected(target: TokenTarget, grantedScope: ScopeSet?)
     case storageFailed
-    case signedOut(reason: SignOutReason)     // .userInitiated, .refreshTokenRejected
+    case signedOut(reason: SignOutReason)     // .userInitiated, .refreshTokenRejected, .expiredWithoutRefreshToken
 }
 ```
 
@@ -600,7 +638,9 @@ when a session is already active. `accessToken(for:)` does not load: with no
 session it throws `.notAuthenticated`.
 
 `events` returns a new stream per access, delivers events from then on (no
-replay) and finishes when the manager is released. `OAuthClient.configuration`
+replay) and finishes when the manager is released (sign-out does not finish
+it: the manager can sign in again). A stream buffers the newest 64 events it
+has not yielded; older ones are dropped. `OAuthClient.configuration`
 and `OAuthClient.wallClock` are public read-only properties.
 
 ## 10. Using tokens: `RequestAuthorizer`
