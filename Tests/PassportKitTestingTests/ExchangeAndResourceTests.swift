@@ -143,6 +143,14 @@ struct ExchangeAndResourceTests {
         #expect(reply.error == "invalid_target")
     }
 
+    @Test("a resource without a host is an absolute URI (RFC 8707 §2)")
+    func uriResource() async throws {
+        let fixture = Fixture()
+        let reply = try await fixture.token(
+            [("grant_type", "client_credentials"), ("resource", "urn:example:api")], as: .basic("service", "s3cret"))
+        #expect(reply.status == 200)
+    }
+
     @Test("resource endpoint challenges follow RFC 6750")
     func resourceChallenges() async throws {
         let fixture = Fixture()

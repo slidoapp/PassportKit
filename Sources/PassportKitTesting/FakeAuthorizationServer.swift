@@ -148,6 +148,9 @@ public actor FakeAuthorizationServer: HTTPTransport {
         public var exchangeForUnauthorizedResource = ExchangeForUnauthorizedResource.accessDenied401
         /// The scope reported when a grant is narrowed because of an unauthorized resource.
         public var narrowedScope: ScopeSet = ["none"]
+        /// Whether token responses leave out `scope`, which RFC 6749 §5.1 allows when it equals the requested
+        /// scope (default: `false`).
+        public var omitsScope = false
         /// The scope the protected resource requires; a token without it gets 403 `insufficient_scope`.
         public var requiredScope: ScopeSet?
         /// The `iss` parameter on authorization responses.
@@ -356,8 +359,8 @@ public actor FakeAuthorizationServer: HTTPTransport {
 
     func resources(of request: RecordedRequest) throws -> [URL] {
         try request.values("resource").map { text in
-            guard let url = URL(string: text), url.scheme != nil, url.host != nil, !text.contains("#") else {
-                throw Failure.oauth("invalid_target", "A resource must be an absolute URL without a fragment.")
+            guard let url = URL(string: text), url.scheme != nil, !text.contains("#") else {
+                throw Failure.oauth("invalid_target", "A resource must be an absolute URI without a fragment.")
             }
             return url
         }

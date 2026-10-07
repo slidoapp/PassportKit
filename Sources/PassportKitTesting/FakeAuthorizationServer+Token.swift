@@ -67,8 +67,8 @@ extension FakeAuthorizationServer {
         var body: [String: Any] = [
             "access_token": accessToken, "token_type": tokenType,
             "expires_in": Int(client.accessTokenLifetime.timeInterval),
-            "scope": scope.rawValue,
         ]
+        if !controls.omitsScope { body["scope"] = scope.rawValue }
         body["refresh_token"] = refreshToken
         body["issued_token_type"] = issuedTokenType?.rawValue
         return jsonResponse(200, body, headers: ["Cache-Control": "no-store", "Pragma": "no-cache"])
