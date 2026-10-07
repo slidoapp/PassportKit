@@ -130,7 +130,7 @@ public struct HTTPHeaders: Sendable, Hashable, Sequence, ExpressibleByDictionary
     // case-insensitive names, preserves multiple values (multiple WWW-Authenticate lines)
     public subscript(name: String) -> String? { get set }   // first value
     public func values(for name: String) -> [String]
-    public mutating func add(name: String, value: String)
+    public mutating func append(_ name: String, _ value: String)
 }
 public protocol HTTPTransport: Sendable {
     /// Throws only for transport failures; any HTTP status is a normal response.
@@ -324,7 +324,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     // RFC 7009
     public func revoke(_ token: Secret, typeHint: TokenTypeHint? = nil) async throws
     // RFC 8628
-    public func startDeviceAuthorization(scope: ScopeSet? = nil, resources: [URL] = [],
+    public func beginDeviceAuthorization(scope: ScopeSet? = nil, resources: [URL] = [],
                                          additionalParameters: AdditionalParameters = [:]) async throws -> DeviceAuthorization
     public func completeDeviceAuthorization(_ authorization: DeviceAuthorization,
                                             additionalParameters: AdditionalParameters = [:]) async throws -> TokenResponse
@@ -332,7 +332,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     public func beginAuthorization(_ request: AuthorizationRequest) throws -> PendingAuthorization
     public func completeAuthorization(_ pending: PendingAuthorization, callbackURL: URL,
                                       additionalParameters: AdditionalParameters = [:]) async throws -> TokenResponse
-    public func authorize(_ request: AuthorizationRequest, using userAgent: any UserAgent) async throws -> TokenResponse
+    public func authorize(_ request: AuthorizationRequest, using userAgent: any AuthorizationUserAgent) async throws -> TokenResponse
     // Extension grants (e.g. vendor-specific): full error parsing and redaction
     public func requestToken(grantType: GrantType, parameters: AdditionalParameters) async throws -> TokenResponse
 }
@@ -415,7 +415,7 @@ public struct PendingAuthorization: Sendable, CustomStringConvertible {
     public let redirectURI: URL
     // internal: state (Secret), codeVerifier (Secret), stopwatch; expires after `AuthorizationRequest.lifetime`; single use
 }
-public protocol UserAgent: Sendable {
+public protocol AuthorizationUserAgent: Sendable {
     /// Presents `url` and returns the callback URL that matched `redirectURI`.
     func present(_ url: URL, redirectURI: URL) async throws -> URL
 }
@@ -483,7 +483,7 @@ public actor TokenManager {
 
     public func accessToken(for target: TokenTarget = .default) async throws -> AccessToken
     public func invalidate(_ token: AccessToken)                    // after a 401 with this token
-    public func exchangeRefreshToken(audience: String?, resources: [URL] = [], scope: ScopeSet? = nil,
+    public func exchangeRefreshToken(audiences: [String] = [], resources: [URL] = [], scope: ScopeSet? = nil,
                                      requestedTokenType: TokenTypeIdentifier = .refreshToken) async throws -> TokenResponse
     public func signOut(revoke: Bool = true) async -> SignOutResult
 
@@ -861,7 +861,7 @@ secrets.
   closes, and returns the full redirect URL; it throws `.timedOut`. The
   listener is started first so that its `redirectURI` goes into the
   `AuthorizationRequest`.
-- `LoopbackUserAgent(listener:timeout:openURL:)`: a `UserAgent` for a
+- `LoopbackUserAgent(listener:timeout:openURL:)`: a `AuthorizationUserAgent` for a
   running listener; opens the URL through an injected
   `@Sendable (URL) async throws -> Void` (default `NSWorkspace` /
   `UIApplication`), then `waitForCallback(timeout:)` (default 5 minutes).

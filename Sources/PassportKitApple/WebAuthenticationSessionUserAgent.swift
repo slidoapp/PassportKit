@@ -9,13 +9,13 @@
         import UIKit
     #endif
 
-    /// A `UserAgent` backed by `ASWebAuthenticationSession` (RFC 8252 §6).
+    /// A `AuthorizationUserAgent` backed by `ASWebAuthenticationSession` (RFC 8252 §6).
     ///
     /// Redirect URIs with a private-use scheme work on every supported version. An `https` redirect URI
     /// (a claimed URL) needs macOS 14.4, iOS 17.4 or visionOS 1.1; on older systems `present` throws
     /// `.invalidConfiguration`. A user who dismisses the sheet gets `.userCancelled`; cancelling the task
     /// closes the sheet and throws `CancellationError`.
-    public struct WebAuthenticationSessionUserAgent: UserAgent {
+    public struct WebAuthenticationSessionUserAgent: AuthorizationUserAgent {
         private let prefersEphemeralWebBrowserSession: Bool
         private let presentationAnchor: @MainActor @Sendable () -> ASPresentationAnchor
         private let launcher: any WebAuthenticationSessionLauncher

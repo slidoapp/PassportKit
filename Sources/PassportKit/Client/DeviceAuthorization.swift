@@ -23,7 +23,7 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
     private let stopwatch: Stopwatch
 
     /// Creates a value, for example to show the device flow screen in a preview or a UI test. A real value comes
-    /// from ``OAuthClient/startDeviceAuthorization(scope:resources:additionalParameters:)``.
+    /// from ``OAuthClient/beginDeviceAuthorization(scope:resources:additionalParameters:)``.
     ///
     /// `clock` measures ``remainingLifetime``.
     public init(

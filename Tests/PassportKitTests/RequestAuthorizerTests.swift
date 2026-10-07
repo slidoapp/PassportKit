@@ -64,7 +64,7 @@ struct RequestAuthorizerTests {
     @Test("RFC 6750 §3.1: the decision table", arguments: table)
     func decisionTable(_ row: Case) async throws {
         var headers = HTTPHeaders()
-        for line in row.challenges { headers.add(name: "WWW-Authenticate", value: line) }
+        for line in row.challenges { headers.append("WWW-Authenticate", line) }
         let decision = try await authorizer().evaluate(
             statusCode: row.status, headers: headers, token: token, attempt: row.attempt)
         #expect(decision == row.expected)

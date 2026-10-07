@@ -21,7 +21,7 @@ final class CountingRandomSource: RandomSource, @unchecked Sendable {
 }
 
 /// Test-only user agent that records what it was shown and answers with a scripted callback or error.
-actor FakeUserAgent: UserAgent {
+actor FakeUserAgent: AuthorizationUserAgent {
     enum Behavior: Sendable {
         case callback(@Sendable (URL) -> URL)
         case fail(any Error)

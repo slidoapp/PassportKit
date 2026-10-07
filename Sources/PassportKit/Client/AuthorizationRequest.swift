@@ -68,7 +68,7 @@ public struct AuthorizationRequest: Sendable, Hashable {
 
 /// Presents an authorization URL to the user and returns the redirect, for example in a system browser sheet
 /// (RFC 8252 §4). The library never opens a browser itself.
-public protocol UserAgent: Sendable {
+public protocol AuthorizationUserAgent: Sendable {
     /// Presents `url` and returns the callback URL that matched `redirectURI`.
     ///
     /// Throw ``PassportError`` with code ``PassportError/Code-swift.struct/userCancelled`` when the user

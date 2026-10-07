@@ -3,7 +3,7 @@
 The authorization code flow ends with a redirect back to your app. How the
 redirect reaches you depends on the platform. RFC 8252 describes the
 options; PassportKit's `PassportKitApple` module implements the common ones.
-The core library only defines the ``UserAgent`` protocol, so you can bring
+The core library only defines the ``AuthorizationUserAgent`` protocol, so you can bring
 your own.
 
 ## ASWebAuthenticationSession
@@ -73,7 +73,7 @@ registered for the grant.
 | iOS, macOS or visionOS app with UI | `WebAuthenticationSessionUserAgent` |
 | macOS tool or app without a registered scheme | `LoopbackUserAgent` |
 | tvOS, watchOS, headless | Device flow |
-| Linux | Device flow, or your own ``UserAgent`` |
+| Linux | Device flow, or your own ``AuthorizationUserAgent`` |
 
 Never present the authorization page in an embedded web view that your app
 can read: the person's credentials would pass through your code.

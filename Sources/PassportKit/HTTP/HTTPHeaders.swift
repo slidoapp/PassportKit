@@ -50,7 +50,7 @@ public struct HTTPHeaders: Sendable, Hashable, Sequence, ExpressibleByDictionary
     }
 
     /// Appends a line, keeping existing lines with the same name.
-    public mutating func add(name: String, value: String) {
+    public mutating func append(_ name: String, _ value: String) {
         entries.append(Entry(name: name, value: value))
     }
 

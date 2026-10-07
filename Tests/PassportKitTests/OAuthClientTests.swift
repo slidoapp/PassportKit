@@ -25,7 +25,7 @@ struct OAuthClientTests {
             additionalHeaders: ["X-Trace": "t1"]
         )
         _ = try await client.refresh(
-            refreshToken: Secret("rt-1"),
+            Secret("rt-1"),
             scope: ["b", "a"],
             resources: [URL(string: "https://api.example.com/v1")!, URL(string: "https://other.example.com")!],
             additionalParameters: ["tenant": "x", "tenant2": "y"]
@@ -129,7 +129,7 @@ struct OAuthClientTests {
         parameters.append(name, "evil")
         await #expect(throws: PassportError.self) {
             try await client.refresh(
-                refreshToken: Secret("rt"), scope: ["a"], resources: [URL(string: "https://api.example.com")!],
+                Secret("rt"), scope: ["a"], resources: [URL(string: "https://api.example.com")!],
                 additionalParameters: parameters)
         }
         #expect(await transport.requests.isEmpty)
@@ -151,7 +151,7 @@ struct OAuthClientTests {
     @Test func parsesTokenResponse() async throws {
         let transport = RecordingTransport([.tokens("new", extra: #","refresh_token":"rt2","scope":"a""#)])
         let client = try ClientFixtures.client(transport)
-        let response = try await client.refresh(refreshToken: Secret("rt"))
+        let response = try await client.refresh(Secret("rt"))
         #expect(response.accessToken.reveal() == "new")
         #expect(response.refreshToken?.reveal() == "rt2")
         #expect(response.scope == ["a"])
@@ -178,7 +178,7 @@ struct OAuthClientTests {
 
     @Test func refreshInvalidGrantMeansReauthenticate() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.oauthError("invalid_grant")]))
-        let error = await #expect(throws: PassportError.self) { try await client.refresh(refreshToken: Secret("rt")) }
+        let error = await #expect(throws: PassportError.self) { try await client.refresh(Secret("rt")) }
         #expect(error?.code == .invalidGrant)
         #expect(error?.recovery == .reauthenticate)
     }

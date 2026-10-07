@@ -49,7 +49,7 @@ appear in descriptions, errors or events.
 
 - ``AuthorizationRequest``
 - ``PendingAuthorization``
-- ``UserAgent``
+- ``AuthorizationUserAgent``
 - ``DeviceAuthorization``
 
 ### Token requests and responses
