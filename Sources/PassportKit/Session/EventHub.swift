@@ -2,11 +2,16 @@ import Foundation
 
 /// Fans session events out to any number of `AsyncStream` subscribers.
 ///
+/// Each subscriber buffers at most ``bufferSize`` events it has not read yet; beyond that the oldest are dropped,
+/// so a subscriber that stops reading cannot make the manager hold events for ever.
+///
 /// Subscribing must work from nonisolated code (`TokenManager.events`), so the hub is a lock-guarded class
 /// rather than part of the actor's state.
 final class EventHub: @unchecked Sendable {
     // @unchecked Sendable: `continuations` and `isFinished` are only touched under `lock`; events are yielded
     // outside it.
+    static let bufferSize = 64
+
     private let lock = NSLock()
     private var continuations: [Int: AsyncStream<SessionEvent>.Continuation] = [:]
     private var nextIdentifier = 0
@@ -14,7 +19,7 @@ final class EventHub: @unchecked Sendable {
 
     /// A new stream that receives every event emitted from now on. It ends when the hub finishes.
     func subscribe() -> AsyncStream<SessionEvent> {
-        AsyncStream { continuation in
+        AsyncStream(bufferingPolicy: .bufferingNewest(Self.bufferSize)) { continuation in
             let identifier = lock.withLock { () -> Int? in
                 guard !isFinished else { return nil }
                 nextIdentifier += 1
