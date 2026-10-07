@@ -41,7 +41,7 @@ public struct ClientConfiguration: Sendable {
     /// ``requiresIssuerInAuthorizationResponse`` has an ``issuer`` to compare with.
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` otherwise.
-    public func validate() throws {
+    func validate() throws {
         try endpoints.validate()
         if let issuer {
             try Endpoints.validateSecureTransport(of: issuer, name: "issuer")

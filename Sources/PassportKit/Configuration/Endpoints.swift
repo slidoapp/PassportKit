@@ -11,7 +11,7 @@ public struct Endpoints: Sendable, Hashable {
     /// The revocation endpoint (RFC 7009 §2).
     public var revocation: URL?
 
-    /// Creates endpoints. Call ``validate()`` (or `ClientConfiguration.validate()`) before use.
+    /// Creates endpoints. ``OAuthClient`` validates them when it is created.
     public init(authorization: URL? = nil, token: URL, deviceAuthorization: URL? = nil, revocation: URL? = nil) {
         self.authorization = authorization
         self.token = token
@@ -22,7 +22,7 @@ public struct Endpoints: Sendable, Hashable {
     /// Checks that every endpoint uses `https`, or `http` with a loopback host (RFC 6749 §3.1, §3.2, RFC 8252 §8.3).
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` otherwise.
-    public func validate() throws {
+    func validate() throws {
         for (name, url) in [
             ("authorization", authorization), ("token", token), ("deviceAuthorization", deviceAuthorization),
             ("revocation", revocation),
