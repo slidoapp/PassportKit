@@ -720,22 +720,43 @@ secrets.
 
 ## 13. Apple module
 
-- `KeychainCredentialStore(accessGroup: String? = nil, accessibility: .afterFirstUnlockThisDeviceOnly, useDataProtectionKeychain: Bool = false)`:
-  generic password items keyed by service/account; add-or-update without
-  delete-then-add; versioned JSON payload; distinguishes "not found" from
-  errors (`errSecInteractionNotAllowed` → `.storageFailure`, recovery
-  `.retryLater`).
+- `KeychainCredentialStore(accessGroup: String? = nil, accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly, useDataProtectionKeychain: Bool = false, decodeLegacy: (@Sendable (Data) -> Credential?)? = nil)`:
+  generic password items, `kSecAttrService` = `account.service`,
+  `kSecAttrAccount` = `account.account`; versioned JSON payload
+  (`CredentialCoding`). `save` is `SecItemUpdate`, then `SecItemAdd` on
+  `errSecItemNotFound`, then one more update on `errSecDuplicateItem`
+  (never delete-then-add). `load` returns `nil` for `errSecItemNotFound`;
+  an undecodable payload and any other status are `.storageFailure` (the
+  status number in the description, never item data);
+  `errSecInteractionNotAllowed` (device locked) has recovery
+  `.retryLater(after: nil)`. `delete` treats "not found" as success.
+  Items are never synchronizable (`kSecAttrSynchronizable` is `false`, no
+  option): a refresh token must not sync between devices.
+  `useDataProtectionKeychain` maps to `kSecUseDataProtectionKeychain` on
+  macOS and is ignored elsewhere; `accessibility` applies on iOS-family
+  platforms and the macOS data protection keychain only. Calls block, so
+  each runs on a private serial `DispatchQueue` bridged with a
+  continuation. `decodeLegacy` is the migration hook: it is called only
+  when versioned decoding fails, and a credential it returns is written
+  back in the current format.
 - `WebAuthenticationSessionUserAgent` (`@MainActor`): wraps
   `ASWebAuthenticationSession` with a presentation-anchor provider and
   `prefersEphemeralWebBrowserSession`; private-use-scheme callbacks on all
   supported versions, HTTPS callbacks where available; maps
   `canceledLogin` to `.userCancelled`.
-- `LoopbackUserAgent`: `NWListener` bound to `127.0.0.1` on an ephemeral
-  port; `redirectURI` in the request is rewritten with the actual port
-  (RFC 8252 §7.3); accepts exactly one request whose path matches,
-  answers with a short HTML page, closes; times out (default 5 minutes);
-  opens the URL through an injected `@Sendable (URL) async -> Void`
-  (default `NSWorkspace`/`UIApplication`).
+- `LoopbackRedirectListener`: `static func start(path: String = "/callback", clock:)`
+  binds an `NWListener` to `127.0.0.1` on an ephemeral port and returns
+  once it is ready; `redirectURI` carries the real port (RFC 8252 §7.3).
+  `waitForCallback(timeout:)` accepts requests whose path matches (others
+  get 404), answers with a short HTML page without echoing the query,
+  closes, and returns the full redirect URL; it throws `.timedOut`. The
+  listener is started first so that its `redirectURI` goes into the
+  `AuthorizationRequest`.
+- `LoopbackUserAgent(listener:timeout:openURL:)`: a `UserAgent` for a
+  running listener; opens the URL through an injected
+  `@Sendable (URL) async throws -> Void` (default `NSWorkspace` /
+  `UIApplication`), then `waitForCallback(timeout:)` (default 5 minutes).
+  It rejects a request whose `redirectURI` is not the listener's.
 
 ## 14. Testing module
 
