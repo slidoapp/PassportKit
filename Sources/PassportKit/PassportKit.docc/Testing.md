@@ -54,6 +54,8 @@ the person: it approves, or with `.deny` declines, every authorization request.
 - `scopePolicy` narrows grants. `refreshWithUnauthorizedResource` and
   `exchangeForUnauthorizedResource` reproduce the two ways servers refuse a
   resource, so you can test your handling of both (see <doc:ResourceAccessAndScopes>).
+- `omitsScope` leaves `scope` out of token responses, as RFC 6749 §5.1 allows
+  when it equals the requested scope.
 - `override` replaces the answer to a request, with a status, body, headers,
   delay or a transport failure.
 - `responseDelay` holds back an answer after the server handled the request,

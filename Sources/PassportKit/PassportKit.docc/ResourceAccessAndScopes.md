@@ -6,7 +6,8 @@ access to what you asked for.
 ## What the server granted
 
 Every token response carries the granted `scope` (RFC 6749 §3.3, §5.1). When
-the response omits it, the granted scope is the requested scope.
+the response omits it, the granted scope is the requested scope, and for a
+refresh that names none, the scope originally granted (RFC 6749 §6).
 PassportKit records it on ``TokenResponse/scope`` and on
 ``AccessToken/grantedScope``, and never decides what a scope means. A server
 may grant less than you asked for and still answer 200. Treating the 200 as
@@ -99,9 +100,31 @@ to ask the server every time.
   ``PassportError/Code-swift.struct/insufficientScope`` and recovery
   ``PassportError/Recovery-swift.enum/resourceDenied``. A new token would
   not carry more scope.
+- A 401 that only offers other schemes (`Basic`, `DPoP`) is delivered to you
+  as it is: a new bearer token would not change the answer.
 - A 403 is delivered to you as it is. It is never refreshed.
 - A second 401 after the retry fails with
   ``PassportError/Code-swift.struct/unauthorized``, also `resourceDenied`.
+
+Retrying once after `invalid_token` is the library's policy; RFC 6750 §3.1
+does not prescribe it.
+
+The token goes to whichever host the request names. If you build request URLs
+from data you do not control (links in a response, stored addresses), pass the
+origins you trust, so the token is never sent anywhere else:
+
+```swift
+let authorizer = RequestAuthorizer(
+    manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
+```
+
+A request for another origin fails with
+``PassportError/Code-swift.struct/invalidConfiguration`` before a token is
+obtained. A token that is not a valid `b64token` (RFC 6750 §2.1) is refused
+with ``PassportError/Code-swift.struct/invalidResponse`` instead of being
+written into a header. `data(for:target:session:)` never lets a redirect take
+the token to another origin or from HTTPS to HTTP, whatever the session's own
+delegate does.
 
 Resource-level failures never end the session. Only an invalid refresh token
 does.
