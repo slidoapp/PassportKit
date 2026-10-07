@@ -242,6 +242,28 @@ struct OAuthClientTests {
         #expect(sent.request.headers["Accept"] == "application/json")
     }
 
+    @Test("RFC 7009 §2.1: a confidential client authenticates the revocation request")
+    func revokeAuthenticatesConfidentialClients() async throws {
+        let post = RecordingTransport([.json(200, "")])
+        try await ClientFixtures.client(
+            post, authentication: .clientSecretPost(clientID: "app", secret: Secret("s3cret"))
+        )
+        .revoke(Secret("rt"), typeHint: .refreshToken)
+        let sentPost = try #require(await post.requests.first)
+        #expect(
+            pairs(sentPost) == ["token=rt", "token_type_hint=refresh_token", "client_id=app", "client_secret=s3cret"])
+        #expect(sentPost.request.headers["Authorization"] == nil)
+
+        let basic = RecordingTransport([.json(200, "")])
+        try await ClientFixtures.client(
+            basic, authentication: .clientSecretBasic(clientID: "app", secret: Secret("s3cret"))
+        )
+        .revoke(Secret("rt"))
+        let sentBasic = try #require(await basic.requests.first)
+        #expect(pairs(sentBasic) == ["token=rt"])
+        #expect(sentBasic.request.headers["Authorization"] == "Basic YXBwOnMzY3JldA==")
+    }
+
     @Test func revokeOmitsMissingHint() async throws {
         let transport = RecordingTransport([.json(200, "")])
         try await ClientFixtures.client(transport).revoke(Secret("rt"))
