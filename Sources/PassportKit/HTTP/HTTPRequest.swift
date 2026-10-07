@@ -4,7 +4,8 @@ import Foundation
 ///
 /// Descriptions and reflection show the method, the URL without query, userinfo or fragment,
 /// the header names and the body size. They never show the body or any header value.
-public struct HTTPRequest: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+public struct HTTPRequest: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable
+{
     /// The request method.
     public var method: HTTPMethod
     /// The target URL.

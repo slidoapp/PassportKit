@@ -3,7 +3,8 @@ import Foundation
 /// An HTTP response returned by an ``HTTPTransport``. Any status code is a normal response.
 ///
 /// Descriptions and reflection show the status, header names and body size, never the body.
-public struct HTTPResponse: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+public struct HTTPResponse: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable
+{
     /// The HTTP status code.
     public var statusCode: Int
     /// The response headers.

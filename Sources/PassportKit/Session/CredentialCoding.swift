@@ -17,7 +17,7 @@ public enum CredentialCoding {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
         guard case .object(var members) = try JSONDecoder().decode(JSONValue.self, from: encoder.encode(credential))
-        else { throw PassportError(.storageFailure, errorDescription: "The credential could not be encoded.") }
+        else { throw PassportError(.storageFailure, detail: "The credential could not be encoded.") }
         members["version"] = .number(Double(currentVersion))
         let output = JSONEncoder()
         output.outputFormatting = [.sortedKeys]
@@ -34,13 +34,13 @@ public enum CredentialCoding {
         do {
             let header = try decoder.decode(Header.self, from: data)
             guard header.version == currentVersion else {
-                throw PassportError(.storageFailure, errorDescription: "The stored credential has an unknown version.")
+                throw PassportError(.storageFailure, detail: "The stored credential has an unknown version.")
             }
             return try decoder.decode(Credential.self, from: data)
         } catch let error as PassportError {
             throw error
         } catch {
-            throw PassportError(.storageFailure, errorDescription: "The stored credential is malformed.")
+            throw PassportError(.storageFailure, detail: "The stored credential is malformed.")
         }
     }
 }

@@ -17,7 +17,7 @@ extension TokenResponse {
     /// `issued_token_type`.
     init(parsing data: Data, exchange: Bool = false) throws {
         guard case .object(var members)? = try? JSONDecoder().decode(JSONValue.self, from: data) else {
-            throw PassportError(.invalidResponse, errorDescription: "The token response is not a JSON object.")
+            throw PassportError(.invalidResponse, detail: "The token response is not a JSON object.")
         }
         let knownMembers = [
             "access_token", "token_type", "expires_in", "refresh_token", "id_token", "scope", "issued_token_type",
@@ -33,18 +33,18 @@ extension TokenResponse {
         }
 
         guard let accessToken = takeString("access_token"), !accessToken.isEmpty else {
-            throw PassportError(.invalidResponse, errorDescription: "The token response has no access_token.")
+            throw PassportError(.invalidResponse, detail: "The token response has no access_token.")
         }
         let issuedTokenType = takeString("issued_token_type").map { TokenTypeIdentifier(rawValue: $0) }
         if exchange, issuedTokenType == nil || issuedTokenType?.rawValue.isEmpty == true {
-            throw PassportError(.invalidResponse, errorDescription: "The exchange response has no issued_token_type.")
+            throw PassportError(.invalidResponse, detail: "The exchange response has no issued_token_type.")
         }
         var tokenType = takeString("token_type") ?? ""
         if tokenType.isEmpty, exchange, let issuedTokenType, issuedTokenType != .accessToken {
             tokenType = "N_A"
         }
         guard !tokenType.isEmpty else {
-            throw PassportError(.invalidResponse, errorDescription: "The token response has no token_type.")
+            throw PassportError(.invalidResponse, detail: "The token response has no token_type.")
         }
 
         var expiresIn: Duration?

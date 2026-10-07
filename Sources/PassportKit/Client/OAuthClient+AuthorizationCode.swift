@@ -17,13 +17,13 @@ extension OAuthClient {
         let endpoint = try requireEndpoint(configuration.endpoints.authorization, name: "authorization")
         try Self.validate(redirectURI: request.redirectURI)
         guard request.lifetime > .zero else {
-            throw PassportError(.invalidConfiguration, errorDescription: "The authorization lifetime must be positive.")
+            throw PassportError(.invalidConfiguration, detail: "The authorization lifetime must be positive.")
         }
         guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false), components.fragment == nil
         else {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "The authorization endpoint must not contain a fragment."
+                detail: "The authorization endpoint must not contain a fragment."
             )
         }
         let state = try PKCE.makeRandomValue(random: random)
@@ -48,14 +48,14 @@ extension OAuthClient {
         guard !existing.contains(where: { names.contains($0.name.removingPercentEncoding ?? $0.name) }) else {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "The authorization endpoint query collides with a request parameter."
+                detail: "The authorization endpoint query collides with a request parameter."
             )
         }
         let added = String(decoding: FormEncoding.encode(parameters), as: UTF8.self)
         let kept = components.percentEncodedQuery.flatMap { $0.isEmpty ? nil : $0 }
         components.percentEncodedQuery = [kept, added].compactMap { $0 }.joined(separator: "&")
         guard let url = components.url else {
-            throw PassportError(.invalidConfiguration, errorDescription: "The authorization URL could not be built.")
+            throw PassportError(.invalidConfiguration, detail: "The authorization URL could not be built.")
         }
         return PendingAuthorization(
             url: url,
@@ -116,46 +116,46 @@ extension OAuthClient {
         guard !pending.isConsumed else {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "This authorization was already completed; start a new one."
+                detail: "This authorization was already completed; start a new one."
             )
         }
         guard !pending.isExpired else {
             throw PassportError(
                 .timedOut,
                 recovery: .reauthenticate,
-                errorDescription: "The authorization was not completed in time."
+                detail: "The authorization was not completed in time."
             )
         }
         guard AuthorizationCallback.matches(callbackURL, redirectURI: pending.redirectURI) else {
-            throw PassportError(.invalidResponse, errorDescription: "The callback does not match the redirect URI.")
+            throw PassportError(.invalidResponse, detail: "The callback does not match the redirect URI.")
         }
         guard let values = AuthorizationCallback.parameters(of: callbackURL) else {
-            throw PassportError(.invalidResponse, errorDescription: "The callback parameters are malformed.")
+            throw PassportError(.invalidResponse, detail: "The callback parameters are malformed.")
         }
         guard let state = values["state"], AuthorizationCallback.constantTimeEquals(state, pending.state.reveal())
         else {
-            throw PassportError(.stateMismatch, errorDescription: "The authorization response state did not match.")
+            throw PassportError(.stateMismatch, detail: "The authorization response state did not match.")
         }
         guard pending.consume() else {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription: "This authorization was already completed; start a new one."
+                detail: "This authorization was already completed; start a new one."
             )
         }
         try validateIssuer(values["iss"])
         if let error = values["error"], !error.isEmpty {
             guard let code = PassportError.Code.fromServer(error) else {
-                throw PassportError(.invalidResponse, errorDescription: "The authorization error code is malformed.")
+                throw PassportError(.invalidResponse, detail: "The authorization error code is malformed.")
             }
             throw PassportError.fromServerError(
                 code: code,
-                errorDescription: values["error_description"],
+                detail: values["error_description"],
                 errorURI: values["error_uri"].flatMap(PassportError.errorURI(from:)),
                 context: .authorizationResponse
             ).redacting([pending.state.reveal(), pending.codeVerifier.reveal(), values["code"] ?? ""])
         }
         guard let code = values["code"], !code.isEmpty else {
-            throw PassportError(.invalidResponse, errorDescription: "The authorization response has no code.")
+            throw PassportError(.invalidResponse, detail: "The authorization response has no code.")
         }
         return Secret(code)
     }
@@ -165,7 +165,7 @@ extension OAuthClient {
             guard !configuration.requiresIssuerInAuthorizationResponse else {
                 throw PassportError(
                     .issuerMismatch,
-                    errorDescription: "The authorization response lacks the required issuer."
+                    detail: "The authorization response lacks the required issuer."
                 )
             }
             return
@@ -173,7 +173,7 @@ extension OAuthClient {
         if let expected = configuration.issuer, issuer != expected.absoluteString {
             throw PassportError(
                 .issuerMismatch,
-                errorDescription: "The authorization response came from a different issuer."
+                detail: "The authorization response came from a different issuer."
             )
         }
     }
@@ -186,7 +186,7 @@ extension OAuthClient {
         else {
             throw PassportError(
                 .invalidConfiguration,
-                errorDescription:
+                detail:
                     "The redirect URI must be absolute, without fragment, and use https, a private-use scheme, or http on a loopback host."
             )
         }

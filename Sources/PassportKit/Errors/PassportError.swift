@@ -5,10 +5,10 @@ import Foundation
 /// ``code`` preserves the server's OAuth error code; ``recovery`` tells the caller what to do.
 /// Cancellation is never wrapped: `CancellationError` propagates unchanged. Descriptions never
 /// include the underlying error, response bodies or any credential.
-public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
+public struct PassportError: LocalizedError, Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
     CustomReflectable
 {
-    /// The largest number of characters kept in ``errorDescription``.
+    /// The largest number of characters kept in ``detail``.
     static let maximumDescriptionLength = 200
 
     /// The error code: an OAuth error code (RFC 6749 §5.2) or a client-side code.
@@ -17,9 +17,9 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
     public var recovery: Recovery
     /// The HTTP status of the response that produced the error, if any. Recorded, never used for classification.
     public var statusCode: Int?
-    /// The server's `error_description`, with control characters removed, token-like runs redacted and
-    /// truncated to 200 characters. For display only; never use it for logic.
-    public internal(set) var errorDescription: String?
+    /// The server's `error_description` or the library's own explanation, with control characters removed,
+    /// token-like runs redacted and truncated to 200 characters. For display only; never use it for logic.
+    public internal(set) var detail: String?
     /// The server's `error_uri` (RFC 6749 §5.2), if any.
     public var errorURI: URL?
     /// The lower-level error, such as a `URLError`. Never printed by ``description``.
@@ -30,14 +30,14 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
         _ code: Code,
         recovery: Recovery,
         statusCode: Int? = nil,
-        errorDescription: String? = nil,
+        detail: String? = nil,
         errorURI: URL? = nil,
         underlying: (any Error & Sendable)? = nil
     ) {
         self.code = code
         self.recovery = recovery
         self.statusCode = statusCode
-        self.errorDescription = errorDescription.map(Self.sanitize)
+        self.detail = detail.map(Self.sanitize)
         self.errorURI = errorURI
         self.underlying = underlying
     }
@@ -47,7 +47,7 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
     public init(
         _ code: Code,
         statusCode: Int? = nil,
-        errorDescription: String? = nil,
+        detail: String? = nil,
         errorURI: URL? = nil,
         underlying: (any Error & Sendable)? = nil
     ) {
@@ -55,7 +55,7 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
             code,
             recovery: Self.recovery(for: code, context: .other, statusCode: statusCode, retryAfter: nil),
             statusCode: statusCode,
-            errorDescription: errorDescription,
+            detail: detail,
             errorURI: errorURI,
             underlying: underlying
         )
@@ -70,10 +70,14 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
     public var description: String {
         var parts = ["code: \(code.rawValue)", "recovery: \(recovery)"]
         if let statusCode { parts.append("status: \(statusCode)") }
-        if let errorDescription { parts.append("description: \(errorDescription)") }
+        if let detail { parts.append("description: \(detail)") }
         if let underlying { parts.append("underlying: \(type(of: underlying))") }
         return "PassportError(\(parts.joined(separator: ", ")))"
     }
+
+    /// What `localizedDescription` returns: the redacted ``description``, so a generic `catch` that prints an error
+    /// shows the code and the sanitized ``detail`` and never a credential.
+    public var errorDescription: String? { description }
 
     /// Same as ``description``.
     public var debugDescription: String { description }

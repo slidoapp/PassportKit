@@ -68,7 +68,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
             throw PassportError(
                 .transportFailure,
-                errorDescription: "The request to the authorization server failed.",
+                detail: "The request to the authorization server failed.",
                 underlying: error
             )
         }
@@ -123,7 +123,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     /// The URL of an optional endpoint, or an `invalidConfiguration` error naming it.
     func requireEndpoint(_ url: URL?, name: String) throws -> URL {
         guard let url else {
-            throw PassportError(.invalidConfiguration, errorDescription: "The \(name) endpoint is not configured.")
+            throw PassportError(.invalidConfiguration, detail: "The \(name) endpoint is not configured.")
         }
         return url
     }

@@ -107,7 +107,7 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
         guard let entry = lock.withLock({ pending.removeValue(forKey: task.taskIdentifier) }) else { return }
         if entry.exceededLimit {
             entry.continuation.resume(
-                throwing: PassportError(.invalidResponse, errorDescription: "Response body exceeds the size limit.")
+                throwing: PassportError(.invalidResponse, detail: "Response body exceeds the size limit.")
             )
         } else if error == nil, let response = entry.response {
             // A complete response wins over a late cancellation: a rotated refresh token must not be lost.
@@ -122,11 +122,11 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
             entry.continuation.resume(throwing: CancellationError())
         } else if let error {
             entry.continuation.resume(
-                throwing: PassportError(.transportFailure, errorDescription: "The request failed.", underlying: error)
+                throwing: PassportError(.transportFailure, detail: "The request failed.", underlying: error)
             )
         } else {
             entry.continuation.resume(
-                throwing: PassportError(.invalidResponse, errorDescription: "The response was not an HTTP response.")
+                throwing: PassportError(.invalidResponse, detail: "The response was not an HTTP response.")
             )
         }
     }

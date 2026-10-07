@@ -23,7 +23,7 @@ extension PassportError {
                 code,
                 recovery: recovery(for: code, context: context, statusCode: statusCode, retryAfter: retryAfter),
                 statusCode: statusCode,
-                errorDescription: "The server response was not a well-formed OAuth error."
+                detail: "The server response was not a well-formed OAuth error."
             )
         }
         var description: String?
@@ -32,7 +32,7 @@ extension PassportError {
         if case .string(let text)? = members["error_uri"] { uri = Self.errorURI(from: text) }
         return fromServerError(
             code: code,
-            errorDescription: description,
+            detail: description,
             errorURI: uri,
             statusCode: statusCode,
             retryAfter: retryAfter,
@@ -46,12 +46,12 @@ extension PassportError {
     /// values the library itself sent, which a careless server may repeat in `error_description`. Values of fewer than
     /// four characters are left alone: they would also match ordinary words.
     func redacting(_ secrets: [String]) -> PassportError {
-        guard var text = errorDescription else { return self }
+        guard var text = detail else { return self }
         for secret in secrets where secret.count >= 4 {
             text = text.replacingOccurrences(of: secret, with: "<redacted>")
         }
         var copy = self
-        copy.errorDescription = text
+        copy.detail = text
         return copy
     }
 
@@ -67,7 +67,7 @@ extension PassportError {
     /// Builds the error for an OAuth error code that was already extracted, for example from a redirect.
     static func fromServerError(
         code: Code,
-        errorDescription: String? = nil,
+        detail: String? = nil,
         errorURI: URL? = nil,
         statusCode: Int? = nil,
         retryAfter: Duration? = nil,
@@ -77,7 +77,7 @@ extension PassportError {
             code,
             recovery: recovery(for: code, context: context, statusCode: statusCode, retryAfter: retryAfter),
             statusCode: statusCode,
-            errorDescription: errorDescription,
+            detail: detail,
             errorURI: errorURI
         )
     }

@@ -19,7 +19,7 @@ struct ParameterList {
             guard resource.scheme != nil, resource.host?.isEmpty == false, !text.contains("#") else {
                 throw PassportError(
                     .invalidConfiguration,
-                    errorDescription: "A resource indicator must be an absolute URL without a fragment."
+                    detail: "A resource indicator must be an absolute URL without a fragment."
                 )
             }
             add("resource", text)

@@ -22,7 +22,7 @@ public actor InMemoryCredentialStore: CredentialStore {
     public func save(_ credential: Credential, for account: CredentialAccount) throws {
         if failingSaves > 0 {
             failingSaves -= 1
-            throw PassportError(.storageFailure, errorDescription: "Saving the credential failed.")
+            throw PassportError(.storageFailure, detail: "Saving the credential failed.")
         }
         credentials[account] = credential
     }

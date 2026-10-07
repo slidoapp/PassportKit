@@ -60,7 +60,7 @@ struct ErrorClassificationTests {
         #expect(error.code == .accessDenied)
         #expect(error.recovery == .resourceDenied)
         #expect(error.statusCode == 401)
-        #expect(error.errorDescription == "No access")
+        #expect(error.detail == "No access")
     }
 
     @Test func refreshInvalidGrantEndsSessionButOtherGrantsDoNot() {

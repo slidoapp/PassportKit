@@ -40,7 +40,7 @@ extension TokenManager {
         guard current != nil else { throw Self.signedOut }
         if target.derivation == .refreshGrant, !target.audiences.isEmpty {
             throw PassportError(
-                .invalidConfiguration, errorDescription: "A refresh grant target cannot name audiences.")
+                .invalidConfiguration, detail: "A refresh grant target cannot name audiences.")
         }
         let minimumLifetime = client.configuration.minimumTokenLifetime.seconds
         if let token = cache.usableToken(for: target, now: client.wallClock.now(), minimumLifetime: minimumLifetime) {
@@ -127,7 +127,7 @@ extension TokenManager {
         }
         guard session == generation else { throw SessionSuperseded() }
         if let issued = response.issuedTokenType, issued != .accessToken {
-            throw PassportError(.invalidResponse, errorDescription: "The exchange did not issue an access token.")
+            throw PassportError(.invalidResponse, detail: "The exchange did not issue an access token.")
         }
         let token = makeToken(from: response, target: target, requestedScope: target.scope, notAfter: subject.expiresAt)
         try await accept(token, response: response, session: session)
@@ -169,7 +169,7 @@ extension TokenManager {
                 await policy.evaluate(TokenAcceptanceContext(token: token, response: response))
             }) ?? .reject(reason: "The acceptance policy did not answer in time.")
         guard case .reject(let reason) = verdict, session == generation else { return }
-        let error = PassportError(.tokenRejected, recovery: .resourceDenied, errorDescription: reason)
+        let error = PassportError(.tokenRejected, recovery: .resourceDenied, detail: reason)
         cache.reject(
             target: token.target, error: error,
             until: client.wallClock.now().addingTimeInterval(rejectedTokenCacheDuration.seconds))
