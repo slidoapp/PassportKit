@@ -11,6 +11,9 @@
     /// A `AuthorizationUserAgent` that opens the authorization URL in the system browser and waits for the redirect on
     /// a running ``LoopbackRedirectListener`` (RFC 8252 §7.3).
     ///
+    /// The agent ignores redirects whose `state` differs from the authorization URL's, so a stray request
+    /// cannot end the flow.
+    ///
     /// ```swift
     /// let listener = try await LoopbackRedirectListener.start()
     /// let request = AuthorizationRequest(redirectURI: listener.redirectURI, scope: scope)
@@ -61,7 +64,14 @@
                     underlying: error
                 )
             }
-            return try await listener.waitForCallback(timeout: timeout)
+            // Only a redirect that carries this request's `state` may end the wait; the client checks it again.
+            let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                .first { $0.name == "state" }?.value
+            return try await listener.waitForCallback(timeout: timeout) { callback in
+                guard let state else { return true }
+                return URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems?
+                    .contains { $0.name == "state" && $0.value == state } ?? false
+            }
         }
 
         /// Opens `url` with the platform's default browser.

@@ -96,6 +96,23 @@ enum LoopbackRoute: Equatable {
         else { return .reject(status: 400) }
         guard head.method == "GET" else { return .reject(status: 405) }
         guard head.path == path else { return .reject(status: 404) }
+        // A browser that follows the authorization server's redirect navigates; a page that makes a
+        // cross-site request in the background (fetch, image, frame) says so in the `Sec-Fetch-*` headers.
+        // Clients that do not send them (old browsers, tools) are not refused.
+        guard head.headers["sec-fetch-mode"].map({ $0.lowercased() == "navigate" }) ?? true,
+            head.headers["sec-fetch-dest"].map({ $0.lowercased() == "document" }) ?? true,
+            isAuthorizationResponse(head.target)
+        else { return .reject(status: 400) }
         return .callback(target: head.target)
+    }
+
+    /// Whether the query has the shape of an authorization response (RFC 6749 §4.1.2): `state`, which every
+    /// request of this library carries, and `code` or `error`. Anything else is a stray request that must
+    /// not use up the one-shot listener.
+    private static func isAuthorizationResponse(_ target: String) -> Bool {
+        guard let names = URLComponents(string: "http://127.0.0.1\(target)")?.queryItems?.map(\.name) else {
+            return false
+        }
+        return names.contains("state") && (names.contains("code") || names.contains("error"))
     }
 }

@@ -7,8 +7,9 @@ import Foundation
 ///
 /// - Single use: the first callback that reaches the `state` check consumes the value, and a second
 ///   completion throws `invalidConfiguration`. Copies share this state. Callbacks rejected before that check
-///   (wrong redirect, wrong `state`) do not consume it, so a stray request to a loopback listener cannot
-///   cancel the real flow.
+///   (wrong redirect, wrong `state`) do not consume it. A user agent that receives redirects by itself must
+///   drop stray requests before it hands one over, because the first hand-over ends its wait; the loopback
+///   listener does.
 /// - Expires after ``AuthorizationRequest/lifetime`` (10 minutes by default), measured on the client's injected clock (ADR 0006); completing it
 ///   later throws `timedOut` with recovery `reauthenticate`.
 /// - The description shows the redirect target and age only: neither `state` nor the PKCE verifier is printed.

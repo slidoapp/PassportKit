@@ -44,7 +44,7 @@
             let waiting = Task { try await listener.waitForCallback() }
             let (_, other) = try await session.data(from: try url(listener, "/favicon.ico"))
             #expect((other as? HTTPURLResponse)?.statusCode == 404)
-            let target = try url(listener, "/callback?code=1")
+            let target = try url(listener, "/callback?code=1&state=s")
             let (_, response) = try await session.data(from: target)
             #expect((response as? HTTPURLResponse)?.statusCode == 200)
             #expect(try await waiting.value == target)
@@ -55,11 +55,11 @@
             let waiting = Task { try await listener.waitForCallback() }
             let port = try #require(listener.redirectURI.port)
             let reply = try await RawClient.send(
-                "GET /callback?code=1 HTTP/1.1\r\nHost: attacker.example:\(port)\r\n\r\n",
+                "GET /callback?code=1&state=s HTTP/1.1\r\nHost: attacker.example:\(port)\r\n\r\n",
                 toPort: port
             )
             #expect(reply.hasPrefix("HTTP/1.1 400"))
-            let target = try url(listener, "/callback?code=2")
+            let target = try url(listener, "/callback?code=2&state=s")
             _ = try await session.data(from: target)
             #expect(try await waiting.value == target)
         }
@@ -81,11 +81,11 @@
             let port = try #require(listener.redirectURI.port)
             let padding = String(repeating: "a", count: 16 * 1024)
             let reply = try await RawClient.send(
-                "GET /callback?code=1 HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\nX-Padding: \(padding)\r\n\r\n",
+                "GET /callback?code=1&state=s HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\nX-Padding: \(padding)\r\n\r\n",
                 toPort: port
             )
             #expect(reply.hasPrefix("HTTP/1.1 431"))
-            let target = try url(listener, "/callback?code=2")
+            let target = try url(listener, "/callback?code=2&state=s")
             _ = try await session.data(from: target)
             #expect(try await waiting.value == target)
         }
@@ -93,7 +93,7 @@
         @Test func takesOnlyTheFirstRedirect() async throws {
             let listener = try await LoopbackRedirectListener.start()
             let waiting = Task { try await listener.waitForCallback() }
-            let first = try url(listener, "/callback?code=first")
+            let first = try url(listener, "/callback?code=first&state=s")
             _ = try await session.data(from: first)
             #expect(try await waiting.value == first)
             await #expect(throws: (any Error).self) { _ = try await session.data(from: first) }
@@ -122,6 +122,89 @@
             await #expect(throws: CancellationError.self) { try await waiting.value }
             await #expect(throws: (any Error).self) {
                 _ = try await RawClient.send("GET / HTTP/1.1\r\n\r\n", toPort: port)
+            }
+        }
+
+        @Test func ignoresStrayRequestsThatDoNotLookLikeAResponse() async throws {
+            let listener = try await LoopbackRedirectListener.start()
+            let waiting = Task { try await listener.waitForCallback() }
+            let port = try #require(listener.redirectURI.port)
+            for target in ["/callback", "/callback?code=1"] {
+                let reply = try await RawClient.send(
+                    "GET \(target) HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\n\r\n", toPort: port)
+                #expect(reply.hasPrefix("HTTP/1.1 400"))
+            }
+            let background = try await RawClient.send(
+                "GET /callback?code=1&state=s HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\nSec-Fetch-Mode: no-cors\r\n\r\n",
+                toPort: port
+            )
+            #expect(background.hasPrefix("HTTP/1.1 400"))
+            let target = try url(listener, "/callback?code=2&state=s")
+            _ = try await session.data(from: target)
+            #expect(try await waiting.value == target)
+        }
+
+        @Test func skipsRedirectsTheAcceptPredicateRefuses() async throws {
+            let clock = ManualClock()
+            let listener = try await LoopbackRedirectListener.start(clock: clock)
+            let waiting = Task { try await listener.waitForCallback { $0.query?.contains("state=expected") == true } }
+            let port = try #require(listener.redirectURI.port)
+            await clock.waitForSleeper()  // the predicate is installed before the wait starts sleeping
+            let refused = try await RawClient.send(
+                "GET /callback?code=1&state=other HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\n\r\n", toPort: port)
+            #expect(refused.hasPrefix("HTTP/1.1 400"))
+            let target = try url(listener, "/callback?code=2&state=expected")
+            _ = try await session.data(from: target)
+            #expect(try await waiting.value == target)
+        }
+
+        @Test func closesAConnectionThatStaysSilent() async throws {
+            let clock = ManualClock()
+            let listener = try await LoopbackRedirectListener.start(clock: clock)
+            defer { listener.cancel() }
+            let port = try #require(listener.redirectURI.port)
+            let waiting = Task { try await listener.waitForCallback() }
+            defer { waiting.cancel() }
+            async let reply = RawClient.send("", toPort: port)
+            // The timeout of the wait and the deadline of the connection.
+            try await clock.waitForSleepers(2)
+            clock.advance(by: LoopbackConnection.timeout)
+            #expect((try? await reply)?.isEmpty ?? true)
+        }
+
+        @Test func cancelClosesOpenConnections() async throws {
+            let clock = ManualClock()
+            let listener = try await LoopbackRedirectListener.start(clock: clock)
+            let port = try #require(listener.redirectURI.port)
+            let waiting = Task { try await listener.waitForCallback() }
+            async let reply = RawClient.send("GET /callback", toPort: port)
+            try await clock.waitForSleepers(2)
+            listener.cancel()
+            #expect((try? await reply)?.isEmpty ?? true)
+            await #expect(throws: CancellationError.self) { try await waiting.value }
+        }
+
+        @Test func refusesConnectionsBeyondTheLimit() {
+            let connections = LoopbackConnections()
+            let opened = (0..<LoopbackConnections.maximum + 1).map { _ in
+                NWConnection(host: .ipv4(.loopback), port: 9, using: .tcp)
+            }
+            #expect(opened.map { connections.admit($0) }.filter { $0 }.count == LoopbackConnections.maximum)
+            connections.release(opened[0])
+            #expect(connections.admit(opened[LoopbackConnections.maximum]))
+            connections.closeAll()
+            #expect(!connections.admit(opened[0]))
+        }
+
+        @Test func stopsWhenTheLastReferenceIsReleased() async throws {
+            var listener: LoopbackRedirectListener? = try await LoopbackRedirectListener.start()
+            let port = try #require(listener?.redirectURI.port)
+            listener = nil
+            // Closing is asynchronous: until it happens the listener still answers.
+            let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+            while (try? await RawClient.send("GET / HTTP/1.1\r\n\r\n", toPort: port)).map(\.isEmpty) != nil {
+                try #require(ContinuousClock.now < deadline, "The listener was still open.")
+                try await Task.sleep(for: .milliseconds(10))
             }
         }
 
@@ -162,6 +245,17 @@
             let authorization = try #require(URL(string: "https://as.example.com/authorize"))
             await #expect(throws: PassportError(.invalidConfiguration)) {
                 _ = try await agent.present(authorization, redirectURI: listener.redirectURI)
+            }
+        }
+    }
+
+    extension ManualClock {
+        /// Waits, in real time and without sleeping on this clock, until `count` tasks sleep on it.
+        func waitForSleepers(_ count: Int) async throws {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+            while sleeperCount < count {
+                try #require(ContinuousClock.now < deadline, "Expected \(count) sleepers.")
+                try await Task.sleep(for: .milliseconds(1))
             }
         }
     }

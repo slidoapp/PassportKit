@@ -77,15 +77,17 @@
         }
 
         @Test func routesOnlyTheLoopbackHostOnThisPort() {
-            func route(method: String = "GET", target: String = "/callback?code=1", host: String?) -> LoopbackRoute {
+            func route(method: String = "GET", target: String = "/callback?code=1&state=s", host: String?)
+                -> LoopbackRoute
+            {
                 LoopbackRoute.route(
                     LoopbackRequestHead(method: method, target: target, headers: host.map { ["host": $0] } ?? [:]),
                     path: "/callback",
                     port: 5000
                 )
             }
-            #expect(route(host: "127.0.0.1:5000") == .callback(target: "/callback?code=1"))
-            #expect(route(host: "LocalHost:5000") == .callback(target: "/callback?code=1"))
+            #expect(route(host: "127.0.0.1:5000") == .callback(target: "/callback?code=1&state=s"))
+            #expect(route(host: "LocalHost:5000") == .callback(target: "/callback?code=1&state=s"))
             #expect(route(host: "127.0.0.1:5001") == .reject(status: 400))
             #expect(route(host: "127.0.0.1") == .reject(status: 400))
             #expect(route(host: "attacker.example:5000") == .reject(status: 400))
@@ -93,6 +95,31 @@
             #expect(route(method: "POST", host: "127.0.0.1:5000") == .reject(status: 405))
             #expect(route(target: "/other", host: "127.0.0.1:5000") == .reject(status: 404))
             #expect(route(target: "/callback/", host: "127.0.0.1:5000") == .reject(status: 404))
+        }
+
+        @Test(arguments: [
+            "/callback", "/callback?code=1", "/callback?state=s", "/callback?other=1&state=s",
+        ])
+        func refusesRequestsThatAreNotAuthorizationResponses(target: String) {
+            let head = LoopbackRequestHead(method: "GET", target: target, headers: ["host": "127.0.0.1:5000"])
+            #expect(LoopbackRoute.route(head, path: "/callback", port: 5000) == .reject(status: 400))
+        }
+
+        @Test func acceptsAnErrorResponse() {
+            let head = LoopbackRequestHead(
+                method: "GET", target: "/callback?error=access_denied&state=s", headers: ["host": "127.0.0.1:5000"])
+            #expect(LoopbackRoute.route(head, path: "/callback", port: 5000) == .callback(target: head.target))
+        }
+
+        @Test(arguments: [
+            ("sec-fetch-mode", "no-cors", 400), ("sec-fetch-mode", "cors", 400), ("sec-fetch-mode", "navigate", 200),
+            ("sec-fetch-dest", "image", 400), ("sec-fetch-dest", "iframe", 400), ("sec-fetch-dest", "document", 200),
+        ])
+        func refusesBackgroundRequests(header: String, value: String, status: Int) {
+            let head = LoopbackRequestHead(
+                method: "GET", target: "/callback?code=1&state=s", headers: ["host": "127.0.0.1:5000", header: value])
+            let route = LoopbackRoute.route(head, path: "/callback", port: 5000)
+            #expect(route == (status == 200 ? .callback(target: head.target) : .reject(status: status)))
         }
     }
 #endif
