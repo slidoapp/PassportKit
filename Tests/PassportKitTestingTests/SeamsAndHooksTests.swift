@@ -48,6 +48,16 @@ struct SeamsAndHooksTests {
         try await clock.sleep(for: .zero)
     }
 
+    @Test("waitForSleeper(timeout:) reports a missing sleeper instead of hanging, and sees a present one")
+    func waitForSleeperIsBounded() async throws {
+        let clock = ManualClock()
+        #expect(await clock.waitForSleeper(timeout: .milliseconds(20)) == false)
+        let sleeper = Task { try await clock.sleep(for: .seconds(1)) }
+        #expect(await clock.waitForSleeper(timeout: .seconds(10)))
+        await clock.advanceToNextSleeper()
+        try await sleeper.value
+    }
+
     @Test("FixedWallClock moves only when told to; SequenceRandomSource is deterministic")
     func seams() {
         let wall = FixedWallClock(Date(timeIntervalSince1970: 100))
