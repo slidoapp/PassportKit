@@ -475,7 +475,7 @@ public actor TokenManager {
                 rejectedTokenCacheDuration: Duration = .seconds(30))   // .zero: ask the server every time
 
     public func load() async throws -> Credential?                 // restores from the store
-    public func signIn(with response: TokenResponse, requestedScope: ScopeSet?) async throws  // adopt a grant result; throws .tokenRejected if the policy rejects its access token (the session still exists)
+    public func signIn(with response: TokenResponse, requestedScope: ScopeSet? = nil) async throws  // adopt a grant result; throws .tokenRejected if the policy rejects its access token (the session still exists)
     public var credential: Credential? { get }
 
     public func accessToken(for target: TokenTarget = .default) async throws -> AccessToken
@@ -618,13 +618,33 @@ on an operation that ignores cancellation, which then runs on in the background.
 
 ```swift
 public protocol TokenAcceptancePolicy: Sendable {
-    func evaluate(_ token: AccessToken, response: TokenResponse) async -> TokenAcceptance
+    func evaluate(_ context: TokenAcceptanceContext) async -> TokenAcceptance
+}
+public struct TokenAcceptanceContext: Sendable {   // evolvable; the initializer is `package`
+    public var token: AccessToken
+    public var response: TokenResponse
+    public var target: TokenTarget { get }          // token.target
 }
 public enum TokenAcceptance: Sendable { case accept; case reject(reason: String) }
+/// The default: accepts everything, scope narrowing included (documented hazard on `TokenManager.init`).
 public struct AcceptAnyToken: TokenAcceptancePolicy {}
-/// Accepts a token for a target with resources only if at least one of `scopes` was granted.
+/// Which targets a policy applies to. Open struct.
+public struct TargetSelector: Sendable {
+    public static let all: TargetSelector
+    public static let withResources: TargetSelector
+    public static func matching(_ predicate: @escaping @Sendable (TokenTarget) -> Bool) -> TargetSelector
+    public func isSelected(_ target: TokenTarget) -> Bool
+}
+/// Accepts a token for a selected target (default: targets with resources) only if at least one of `scopes` was granted.
 public struct RequireAnyScope: TokenAcceptancePolicy {
-    public init(_ scopes: ScopeSet, when predicate: @escaping @Sendable (TokenTarget) -> Bool = { !$0.resources.isEmpty })
+    public init(_ scopes: ScopeSet, forTargets targets: TargetSelector = .withResources)
+}
+/// A policy from a closure: `acceptancePolicy: .custom { context in ... }`.
+public struct ClosureTokenAcceptancePolicy: TokenAcceptancePolicy {
+    public init(_ body: @escaping @Sendable (TokenAcceptanceContext) async -> TokenAcceptance)
+}
+extension TokenAcceptancePolicy where Self == ClosureTokenAcceptancePolicy {
+    public static func custom(_ body: @escaping @Sendable (TokenAcceptanceContext) async -> TokenAcceptance) -> ClosureTokenAcceptancePolicy
 }
 
 public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected, expiredWithoutRefreshToken }

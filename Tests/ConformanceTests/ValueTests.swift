@@ -72,14 +72,33 @@ struct ValueTests {
         let response = TokenResponse(accessToken: Secret("a"), tokenType: "Bearer")
         func verdict(_ target: TokenTarget, _ scope: ScopeSet?) async -> TokenAcceptance {
             await policy.evaluate(
-                AccessToken(value: Secret("a"), tokenType: "Bearer", grantedScope: scope, target: target),
-                response: response)
+                TokenAcceptanceContext(
+                    token: AccessToken(value: Secret("a"), tokenType: "Bearer", grantedScope: scope, target: target),
+                    response: response))
         }
         let resourceTarget = TokenTarget.refreshGrant(resources: [apiA])
         #expect(await verdict(resourceTarget, ["write", "other"]).isAccepted)
         #expect(await !verdict(resourceTarget, ["none"]).isAccepted)
         #expect(await !verdict(resourceTarget, nil).isAccepted, "an unknown scope proves nothing")
         #expect(await verdict(.default, ["none"]).isAccepted, "the default target is not selected")
+    }
+
+    @Test("target selectors and closure policies")
+    func selectorsAndClosures() async {
+        let all = RequireAnyScope(["read"], forTargets: .all)
+        let named = RequireAnyScope(["read"], forTargets: .matching { $0.scope == ["admin"] })
+        let response = TokenResponse(accessToken: Secret("a"), tokenType: "Bearer")
+        func context(_ target: TokenTarget) -> TokenAcceptanceContext {
+            TokenAcceptanceContext(
+                token: AccessToken(value: Secret("a"), tokenType: "Bearer", grantedScope: ["other"], target: target),
+                response: response)
+        }
+        #expect(await !all.evaluate(context(.default)).isAccepted)
+        #expect(await !named.evaluate(context(.refreshGrant(scope: ["admin"]))).isAccepted)
+        #expect(await named.evaluate(context(.default)).isAccepted)
+        let custom: any TokenAcceptancePolicy = .custom { $0.target == .default ? .reject(reason: "no") : .accept }
+        #expect(await !custom.evaluate(context(.default)).isAccepted)
+        #expect(await custom.evaluate(context(.refreshGrant(scope: ["admin"]))).isAccepted)
     }
 }
 
