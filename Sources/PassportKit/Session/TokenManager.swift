@@ -31,6 +31,8 @@ public actor TokenManager {
     let store: any CredentialStore
     let account: CredentialAccount
     let acceptancePolicy: any TokenAcceptancePolicy
+    let acceptancePolicyTimeLimit: Duration
+    let rejectedTokenCacheDuration: Duration
     let eventHub = EventHub()
 
     /// The root credential; the single source of truth for the refresh token.
@@ -51,17 +53,24 @@ public actor TokenManager {
     /// Creates a manager with no session. Call ``load()`` to restore one from `store`.
     ///
     /// `account` names where the credential is stored. `acceptancePolicy` judges every issued access token
-    /// (ADR 0004).
+    /// (ADR 0004); a policy that has not answered after `acceptancePolicyTimeLimit` rejects the token.
+    /// A rejected token is remembered for `rejectedTokenCacheDuration`: asking for the same target again within
+    /// that time throws the same rejection without a request, so a caller that retries in a loop cannot make the
+    /// manager rotate the refresh token over and over. Pass `.zero` to ask the server every time.
     public init(
         client: OAuthClient,
         store: any CredentialStore,
         account: CredentialAccount,
-        acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken()
+        acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
+        acceptancePolicyTimeLimit: Duration = .seconds(10),
+        rejectedTokenCacheDuration: Duration = .seconds(30)
     ) {
         self.client = client
         self.store = store
         self.account = account
         self.acceptancePolicy = acceptancePolicy
+        self.acceptancePolicyTimeLimit = acceptancePolicyTimeLimit
+        self.rejectedTokenCacheDuration = rejectedTokenCacheDuration
     }
 
     deinit {
@@ -149,9 +158,11 @@ public actor TokenManager {
     /// Marks an access token as unusable, typically after a 401 (RFC 6750 §3.1).
     ///
     /// The cached token of the target is dropped only if it is still `token`, so many concurrent 401s for
-    /// the same token cause one refresh, and a late report cannot discard a newer token.
+    /// the same token cause one refresh, and a late report cannot discard a newer token. A remembered rejection
+    /// of the target is forgotten, so the next call asks the server again.
     public func invalidate(_ token: AccessToken) {
         cache.remove(target: token.target, generation: token.generation)
+        cache.forgetRejection(of: token.target)
     }
 
     /// Ends the session: clears local state, then revokes the refresh token at the server (RFC 7009).

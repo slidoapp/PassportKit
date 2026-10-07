@@ -79,6 +79,7 @@ struct Harness {
         defaultTokenLifetime: Duration? = nil,
         accessTokenLifetime: TimeInterval = 900,
         store: any CredentialStore = InMemoryCredentialStore(),
+        rejectedTokenCacheDuration: Duration = .seconds(30),
         signedIn: Bool = true
     ) async throws {
         self.store = store
@@ -98,7 +99,9 @@ struct Harness {
         client = try OAuthClient(
             configuration: configuration, transport: GaugedTransport(server: server, gauge: gauge),
             wallClock: wallClock, clock: clock, random: SequenceRandomSource())
-        manager = TokenManager(client: client, store: store, account: account, acceptancePolicy: policy)
+        manager = TokenManager(
+            client: client, store: store, account: account, acceptancePolicy: policy,
+            rejectedTokenCacheDuration: rejectedTokenCacheDuration)
         events = manager.events
         if signedIn { try await signInAgain() }
     }
