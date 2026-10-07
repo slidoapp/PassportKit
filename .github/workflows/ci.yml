@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - run: make lint
+
+  macos:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - run: make build
+      - run: make test
+
+  linux:
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v5
+      - run: swift build --build-tests --target PassportKitTests --target ConformanceTests
+      - run: swift test --parallel --skip PassportKitAppleTests
+
+  ci-success:
+    if: always()
+    needs: [lint, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false"
