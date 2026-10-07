@@ -5,9 +5,11 @@ import Foundation
 /// The client keeps no tokens. Every operation sends one request (device polling sends several) and returns
 /// the parsed result or throws ``PassportError``; cancellation propagates as `CancellationError`.
 public struct OAuthClient: Sendable {
-    let configuration: ClientConfiguration
+    /// The configuration the client was created with.
+    public let configuration: ClientConfiguration
     let transport: any HTTPTransport
-    let wallClock: any WallClock
+    /// The calendar clock used for expiry decisions.
+    public let wallClock: any WallClock
     let clock: any Clock<Duration>
     let random: any RandomSource
     let observer: (any PassportObserver)?

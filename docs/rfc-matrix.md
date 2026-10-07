@@ -15,7 +15,7 @@ reason in Notes).
 | 7636 | PKCE | done | S256 always; `plain` not supported. |
 | 8252 | OAuth 2.0 for Native Apps | partial | System browser, loopback and claimed HTTPS redirects. |
 | 8628 | Device Authorization Grant | planned | |
-| 8693 | Token Exchange | planned | Access-token and refresh-token subjects. |
+| 8693 | Token Exchange | partial | Access-token and refresh-token subjects. |
 | 8707 | Resource Indicators | planned | |
 | 8414 | Authorization Server Metadata | done | Configurable issuer validation. |
 | 7009 | Token Revocation | planned | |
@@ -78,4 +78,11 @@ reason in Notes).
 | CHAL-2 | 9110 §11.1, §11.2 | MUST | Scheme and parameter names are case-insensitive and stored lower-cased | done | `Sources/PassportKit/HTTP/AuthenticationChallenge.swift` | `AuthenticationChallengeTests` |
 | CHAL-3 | 9110 §11.2 | MUST | The `token68` form is recognised, including `=` padding | done | `Sources/PassportKit/HTTP/AuthenticationChallenge.swift` | `AuthenticationChallengeTests` |
 | CHAL-4 | 6750 §3.1; 9449 §7.1 | MUST | `error`, `error_description`, `scope`, `algs` and other parameters are exposed verbatim; empty or malformed input never crashes | done | `Sources/PassportKit/HTTP/AuthenticationChallenge.swift` | `AuthenticationChallengeTests` |
-
+| SES-1 | 6749 §6; 9700 §4.14 | MUST | Refresh tokens may rotate: every response carrying `refresh_token` is persisted before the access token is returned; an unsaveable one is kept in memory | done | `Sources/PassportKit/Session/TokenManager+Lane.swift` | `PersistenceTests` |
+| SES-2 | 9700 §4.14; ADR 0005 | MUST | Operations that send the refresh token (refresh, exchange, revocation) run one at a time, each reading the token when it starts | done | `Sources/PassportKit/Session/RefreshLane.swift` | `LaneTests` |
+| SES-3 | 8693 §2.1, §2.2.1 | MUST | A refresh-token subject is spent like a refresh grant and its rotated `refresh_token` is persisted; a `refresh_token` in an access-token-subject response is not the root grant and is ignored | done | `Sources/PassportKit/Session/TokenManager+Lane.swift`, `TokenManager+Targets.swift` | `PersistenceTests`, `ExpiryTests` |
+| SES-4 | 6749 §3.3, §5.1; ADR 0004 | MUST | Every issued access token passes the acceptance policy before it is cached or returned; a rejection keeps the rotated refresh token and the session | done | `Sources/PassportKit/Session/TokenManager+Targets.swift` | `PersistenceTests` |
+| SES-5 | 6749 §5.2 | MUST | Only `invalid_grant` for the refresh token (recovery `reauthenticate`) from a lane operation ends the session; a stale one from a replaced session is ignored | done | `Sources/PassportKit/Session/TokenManager+Lane.swift` | `LifecycleTests` |
+| SES-6 | 6749 §5.1; 8693 §2.2.1 | SHOULD | Expiry from `expires_in`, else the default lifetime, else refresh on every use; derived tokens never outlive their subject | done | `Sources/PassportKit/Session/TokenManager+Targets.swift` | `ExpiryTests` |
+| SES-7 | 7009 §2.1; ADR 0005 | SHOULD | Sign-out clears local state first, then revokes the refresh token in the lane, best effort within a time limit | done | `Sources/PassportKit/Session/TokenManager.swift` | `LifecycleTests` |
+| SES-8 | 6750 §3.1 | SHOULD | A token reported as rejected is dropped only if it is still the cached one, so concurrent 401s cause one refresh | done | `Sources/PassportKit/Session/TokenCache.swift` | `LaneTests` |
