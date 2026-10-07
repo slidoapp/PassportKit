@@ -1,0 +1,13 @@
+{
+  "name": "passportkit-integration-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "smoke": "bash smoke.sh"
+  },
+  "dependencies": {
+    "oidc-provider": "9.12.2"
+  }
+}
