@@ -9,7 +9,7 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
     CustomReflectable
 {
     /// The largest number of characters kept in ``errorDescription``.
-    public static let maximumDescriptionLength = 200
+    static let maximumDescriptionLength = 200
 
     /// The error code: an OAuth error code (RFC 6749 §5.2) or a client-side code.
     public var code: Code
@@ -83,7 +83,7 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
 
     /// Replaces control and line-separator characters, drops invisible format characters (bidirectional overrides,
     /// zero-width characters), redacts runs of 24 or more token-like characters (a token echoed by a
-    /// server would look like one) and truncates to ``maximumDescriptionLength`` characters.
+    /// server would look like one) and truncates to 200 characters.
     static func sanitize(_ text: String) -> String {
         var output = ""
         var run = ""

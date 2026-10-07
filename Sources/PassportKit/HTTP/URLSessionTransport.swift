@@ -16,7 +16,7 @@ import Foundation
 /// - Reports transport errors as ``PassportError/Code-swift.struct/transportFailure`` with the underlying error.
 public struct URLSessionTransport: HTTPTransport {
     /// The largest accepted response body, in bytes.
-    public static let maximumBodySize = 1_048_576
+    static let maximumBodySize = 1_048_576
 
     private let session: SessionOwner
 

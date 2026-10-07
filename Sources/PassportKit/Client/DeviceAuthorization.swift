@@ -7,20 +7,40 @@ import Foundation
 /// (ADR 0006), so ``remainingLifetime`` keeps counting down after this value is created.
 public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// The code the user types at ``verificationURI`` (`user_code`).
-    public var userCode: String
+    public internal(set) var userCode: String
     /// Where the user enters ``userCode`` (`verification_uri`; the `verification_url` alias is also accepted).
-    public var verificationURI: URL
+    public internal(set) var verificationURI: URL
     /// A verification URI that already contains the user code, for QR codes. Used verbatim.
-    public var verificationURIComplete: URL?
+    public internal(set) var verificationURIComplete: URL?
     /// The lifetime granted by the server (`expires_in`).
-    public var expiresIn: Duration
+    public internal(set) var expiresIn: Duration
     /// The wall-clock time the authorization expires, for display. Polling uses the injected clock, not this value.
-    public var expiresAt: Date
+    public internal(set) var expiresAt: Date
     /// The minimum polling interval (`interval`); 5 seconds when the server omits it (RFC 8628 §3.2).
-    public var interval: Duration
+    public internal(set) var interval: Duration
 
     let deviceCode: Secret
     private let stopwatch: Stopwatch
+
+    /// Creates a value, for example to show the device flow screen in a preview or a UI test. A real value comes
+    /// from ``OAuthClient/startDeviceAuthorization(scope:resources:additionalParameters:)``.
+    ///
+    /// `clock` measures ``remainingLifetime``.
+    public init(
+        deviceCode: Secret,
+        userCode: String,
+        verificationURI: URL,
+        verificationURIComplete: URL? = nil,
+        expiresIn: Duration,
+        expiresAt: Date,
+        interval: Duration = .seconds(5),
+        clock: any Clock<Duration> = ContinuousClock()
+    ) {
+        self.init(
+            deviceCode: deviceCode, userCode: userCode, verificationURI: verificationURI,
+            verificationURIComplete: verificationURIComplete, expiresIn: expiresIn, expiresAt: expiresAt,
+            interval: interval, stopwatch: Stopwatch(clock: clock))
+    }
 
     init(
         deviceCode: Secret,

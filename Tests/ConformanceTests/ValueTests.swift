@@ -1,10 +1,26 @@
 import Foundation
 import PassportKit
+import PassportKitTesting
 import Testing
 
 @Suite("Session value types")
 struct ValueTests {
     static let canaries = ["canary-access-token", "canary-refresh-token", "canary-id-token", "canary-extra-field"]
+
+    @Test("a DeviceAuthorization can be created for previews and keeps its device code private")
+    func deviceAuthorizationForPreviews() {
+        let clock = ManualClock()
+        let authorization = DeviceAuthorization(
+            deviceCode: Secret(Self.canaries[1]), userCode: "ABCD-EFGH",
+            verificationURI: URL(string: "https://as.example.com/device")!, expiresIn: .seconds(600),
+            expiresAt: Date(timeIntervalSince1970: 600), clock: clock)
+        clock.advance(by: .seconds(100))
+        #expect(authorization.remainingLifetime == .seconds(500))
+        #expect(authorization.interval == .seconds(5))
+        var dumped = ""
+        dump(authorization, to: &dumped)
+        for output in [authorization.description, dumped] { #expect(!output.contains(Self.canaries[1])) }
+    }
 
     @Test("descriptions and reflection of AccessToken and Credential never show secrets")
     func redaction() {
