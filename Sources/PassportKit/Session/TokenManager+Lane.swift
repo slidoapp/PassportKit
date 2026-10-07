@@ -53,6 +53,7 @@ extension TokenManager {
         turn: RefreshLane.Turn,
         session: Int,
         adoptsIDToken: Bool,
+        adoptsScope: Bool = false,
         send: (Secret) async throws -> TokenResponse
     ) async throws -> TokenResponse {
         await turn.start()
@@ -81,18 +82,20 @@ extension TokenManager {
             handOverRotation(of: response, session: session)
             throw SessionSuperseded()
         }
-        await persistRotation(from: response, adoptsIDToken: adoptsIDToken)
+        await persistRotation(from: response, adoptsIDToken: adoptsIDToken, adoptsScope: adoptsScope)
         guard session == generation else { throw SessionSuperseded() }
         return response
     }
 
-    /// Stores the refresh token carried by `response`: in memory first, so that `current` is always the newest
+    /// Stores the refresh token, and with `adoptsScope` the scope, carried by `response`: in memory first, so that `current` is always the newest
     /// token the manager knows, then in the store. A failing store is reported, not thrown: the session continues
     /// from memory.
-    private func persistRotation(from response: TokenResponse, adoptsIDToken: Bool) async {
-        guard var credential = current, let rotated = response.refreshToken else { return }
-        credential.refreshToken = rotated
-        if adoptsIDToken, let idToken = response.idToken { credential.idToken = idToken }
+    private func persistRotation(from response: TokenResponse, adoptsIDToken: Bool, adoptsScope: Bool) async {
+        guard var credential = current, response.refreshToken != nil || (adoptsScope && response.scope != nil)
+        else { return }
+        if let rotated = response.refreshToken { credential.refreshToken = rotated }
+        if adoptsIDToken, response.refreshToken != nil, let idToken = response.idToken { credential.idToken = idToken }
+        if adoptsScope, let scope = response.scope { credential.grantedScope = scope }
         credential.updatedAt = client.wallClock.now()
         current = credential
         await save(credential)

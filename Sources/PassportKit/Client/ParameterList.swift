@@ -12,14 +12,15 @@ struct ParameterList {
         if let scope, !scope.isEmpty { add("scope", scope.rawValue) }
     }
 
-    /// Adds repeated `resource` parameters (RFC 8707 §2): absolute URLs without a fragment.
+    /// Adds repeated `resource` parameters (RFC 8707 §2): absolute URIs without a fragment. A host is not
+    /// required, so `urn:example:api` is valid, and a query is allowed although the RFC says it SHOULD NOT be used.
     mutating func add(resources: [URL]) throws {
         for resource in resources {
             let text = resource.absoluteString
-            guard resource.scheme != nil, resource.host?.isEmpty == false, !text.contains("#") else {
+            guard resource.scheme != nil, !text.contains("#") else {
                 throw PassportError(
                     .invalidConfiguration,
-                    detail: "A resource indicator must be an absolute URL without a fragment."
+                    detail: "A resource indicator must be an absolute URI without a fragment."
                 )
             }
             add("resource", text)
