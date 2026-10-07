@@ -5,6 +5,11 @@ enum PKCE {
 
     /// A new `code_verifier`: 32 random bytes as base64url without padding (RFC 7636 §4.1).
     static func makeVerifier(random: any RandomSource) throws -> Secret {
+        try makeRandomValue(random: random)
+    }
+
+    /// 32 random bytes as base64url without padding: a verifier, or an unguessable `state` (RFC 6749 §10.12).
+    static func makeRandomValue(random: any RandomSource) throws -> Secret {
         let bytes = random.bytes(count: verifierByteCount)
         guard bytes.count == verifierByteCount else {
             throw PassportError(.invalidConfiguration, errorDescription: "The random source returned too few bytes.")
