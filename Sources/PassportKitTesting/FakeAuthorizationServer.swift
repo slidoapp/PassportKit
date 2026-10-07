@@ -158,6 +158,11 @@ public actor FakeAuthorizationServer: HTTPTransport {
         public var deviceCodeLifetime: TimeInterval = 600
         /// The polling interval in seconds advertised to device clients.
         public var deviceInterval = 5
+        /// How long to hold back the answer to a request after the server has handled it, on the server's clock.
+        ///
+        /// Unlike an override delay, the request takes effect (tokens rotate) immediately; only the response is
+        /// late, like a slow network. A caller that gives up waiting still changed the server's state.
+        public var responseDelay: (@Sendable (RecordedRequest) -> Duration?)?
         /// Inspects each request before routing; a non-`nil` result replaces the normal answer.
         public var override: (@Sendable (RecordedRequest) -> ResponseOverride?)?
     }
@@ -250,15 +255,18 @@ public actor FakeAuthorizationServer: HTTPTransport {
             if let failure = override.failure { throw failure }
             return override.response
         }
+        let response: HTTPResponse
         do {
             switch request.url.host {
-            case "as.example.com": return try routeAuthorizationServer(recorded)
-            case "api.example.com": return try handleResource(recorded)
+            case "as.example.com": response = try routeAuthorizationServer(recorded)
+            case "api.example.com": response = try handleResource(recorded)
             default: throw URLError(.cannotFindHost)
             }
         } catch let failure as Failure {
-            return failure.response
+            response = failure.response
         }
+        if let delay = controls.responseDelay?(recorded) { try await clock.sleep(for: delay) }
+        return response
     }
 
     private func routeAuthorizationServer(_ request: RecordedRequest) throws -> HTTPResponse {

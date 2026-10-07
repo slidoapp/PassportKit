@@ -15,12 +15,22 @@ extension FakeAuthorizationServer {
         case .refreshToken: kind = .refresh
         default: throw Failure.oauth("invalid_request", "The subject token type is not supported.")
         }
-        if let requested = request.value("requested_token_type"), requested != TokenTypeIdentifier.accessToken.rawValue
-        {
-            throw Failure.oauth("invalid_request", "Only access tokens can be requested.")
+        let requestedType = request.value("requested_token_type").map { TokenTypeIdentifier(rawValue: $0) }
+        guard
+            requestedType == nil || requestedType == .accessToken
+                || (requestedType == .refreshToken && kind == .refresh)
+        else {
+            throw Failure.oauth("invalid_request", "The requested token type is not supported for this subject.")
         }
-        guard let subject = liveRecord(subjectToken, kind: kind) else {
+        guard var subject = liveRecord(subjectToken, kind: kind), subject.clientID == client.id else {
             throw Failure.oauth("invalid_grant", "The subject token is invalid, expired or revoked.")
+        }
+        // A refresh token subject is spent like in a refresh grant: rotation applies, and a retired token is
+        // answered with invalid_grant outside the leeway.
+        var current = subjectToken
+        var isReuse = false
+        if kind == .refresh {
+            (current, isReuse) = try resolveRotation(of: subjectToken, record: &subject, client: client)
         }
         let audience = request.values("audience")
         // Audiences are logical names; only those that parse as URLs can be judged like resources.
@@ -40,8 +50,21 @@ extension FakeAuthorizationServer {
         let issuance = Issuance(
             client: client, grantID: subject.grantID, subject: subject.subject, resources: resources, audience: audience
         )
+        let rootIssuance = Issuance(
+            client: client, grantID: subject.grantID, subject: subject.subject, resources: subject.resources,
+            audience: subject.audience)
+        let rotated =
+            kind == .refresh
+            ? rotate(current, isReuse: isReuse, issuance: rootIssuance, scope: subject.scope, client: client) : nil
+        if requestedType == .refreshToken {
+            // The issued token is itself a refresh token, carried in access_token (RFC 8693 §2.2.1).
+            let issued = mint(.refresh, issuance, scope: granted)
+            return tokenResponse(
+                accessToken: issued, scope: granted, client: client, refreshToken: rotated,
+                issuedTokenType: .refreshToken, tokenType: "N_A")
+        }
         return tokenResponse(
             accessToken: mint(.access, issuance, scope: granted), scope: granted, client: client,
-            issuedTokenType: .accessToken)
+            refreshToken: rotated, issuedTokenType: .accessToken)
     }
 }

@@ -37,6 +37,30 @@ struct ExchangeAndResourceTests {
         #expect(recorded.values("resource").count == 2)
     }
 
+    @Test("exchange with a refresh token subject rotates it and can issue a refresh token")
+    func exchangeRotatesSubject() async throws {
+        let fixture = Fixture([.app(rotates: true)])
+        let signedIn = try await fixture.signIn()
+        let reply = try await exchange(
+            fixture, subject: signedIn.refreshToken, type: Self.refreshType,
+            extra: [("requested_token_type", Self.refreshType), ("audience", "billing")])
+        #expect(reply.status == 200)
+        #expect(reply["issued_token_type"] == Self.refreshType)
+        #expect(reply["token_type"] == "N_A")
+        let rotated = reply.refreshToken
+        #expect(!rotated.isEmpty && rotated != signedIn.refreshToken)
+        #expect(reply.accessToken != rotated)
+        #expect(try await fixture.refresh(signedIn.refreshToken).error == "invalid_grant")
+        #expect(try await fixture.refresh(reply.accessToken).status == 200)
+        let reuse = try await exchange(fixture, subject: signedIn.refreshToken, type: Self.refreshType)
+        #expect(reuse.error == "invalid_grant")
+        #expect(
+            try await exchange(
+                fixture, subject: signedIn.accessToken, type: Self.accessType,
+                extra: [("requested_token_type", Self.refreshType)]
+            ).error == "invalid_request")
+    }
+
     @Test("exchange of a refresh token, and invalid subjects")
     func exchangeRefreshToken() async throws {
         let fixture = Fixture()

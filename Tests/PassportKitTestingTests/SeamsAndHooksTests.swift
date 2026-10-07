@@ -122,3 +122,24 @@ actor Order {
     private(set) var values: [String] = []
     func append(_ value: String) { values.append(value) }
 }
+
+@Suite("Testing module: response delay")
+struct ResponseDelayTests {
+    @Test("a delayed response still takes effect on the server immediately")
+    func delayedResponse() async throws {
+        let clock = ManualClock()
+        let server = FakeAuthorizationServer(clients: [.app(rotates: true)], clock: clock)
+        await server.configure { $0.responseDelay = { $0.value("grant_type") == "refresh_token" ? .seconds(5) : nil } }
+        let request = HTTPRequest(
+            method: .post, url: FakeAuthorizationServer.tokenEndpoint,
+            headers: ["Content-Type": "application/x-www-form-urlencoded"],
+            body: FormEncoding.encode([
+                ("grant_type", "refresh_token"), ("refresh_token", "nope"), ("client_id", "app"),
+            ]))
+        let pending = Task { try await server.send(request) }
+        await clock.waitForSleeper()
+        #expect(await server.requests.count == 1)
+        clock.advance(by: .seconds(5))
+        #expect(try await pending.value.statusCode == 400)
+    }
+}

@@ -62,10 +62,10 @@ extension FakeAuthorizationServer {
 
     func tokenResponse(
         accessToken: String, scope: ScopeSet, client: ClientRegistration, refreshToken: String? = nil,
-        issuedTokenType: TokenTypeIdentifier? = nil
+        issuedTokenType: TokenTypeIdentifier? = nil, tokenType: String = "Bearer"
     ) -> HTTPResponse {
         var body: [String: Any] = [
-            "access_token": accessToken, "token_type": "Bearer", "expires_in": Int(client.accessTokenLifetime),
+            "access_token": accessToken, "token_type": tokenType, "expires_in": Int(client.accessTokenLifetime),
             "scope": scope.rawValue,
         ]
         body["refresh_token"] = refreshToken
@@ -131,25 +131,7 @@ extension FakeAuthorizationServer {
         guard let name = request.value("refresh_token"),
             var record = liveRecord(name, kind: .refresh), record.clientID == client.id
         else { throw Failure.oauth("invalid_grant", "The refresh token is invalid, expired or revoked.") }
-        var current = name
-        var isReuse = false
-        if client.rotatesRefreshTokens, record.successor != nil {
-            // An already rotated token: allowed again only inside the leeway, answered with the newest token.
-            guard let leeway = client.rotationLeeway, let rotatedAt = record.rotatedAt,
-                now().timeIntervalSince(rotatedAt) <= leeway.seconds, record.reuseCount < leeway.maximumReuse
-            else {
-                if client.revokesGrantOnReuse { revokeGrant(record.grantID) }
-                throw Failure.oauth("invalid_grant", "The refresh token was already used.")
-            }
-            tokens[name]?.reuseCount += 1
-            isReuse = true
-            while let next = record.successor, let successor = tokens[next] {
-                (current, record) = (next, successor)
-            }
-            guard liveRecord(current, kind: .refresh) != nil else {
-                throw Failure.oauth("invalid_grant", "The refresh token is invalid, expired or revoked.")
-            }
-        }
+        let (current, isReuse) = try resolveRotation(of: name, record: &record, client: client)
         var scope = record.scope
         if let text = request.value("scope") {
             scope = ScopeSet(parsing: text)
@@ -167,16 +149,46 @@ extension FakeAuthorizationServer {
         let issuance = Issuance(
             client: client, grantID: record.grantID, subject: record.subject,
             resources: resources.isEmpty ? record.resources : resources, audience: record.audience)
-        var rotated: String?
-        if client.rotatesRefreshTokens && isReuse {
-            rotated = current
-        } else if client.rotatesRefreshTokens {
-            rotated = mint(.refresh, issuance, scope: record.scope)
-            tokens[current]?.successor = rotated
-            tokens[current]?.rotatedAt = now()
-        }
+        let rotated = rotate(current, isReuse: isReuse, issuance: issuance, scope: record.scope, client: client)
         return tokenResponse(
             accessToken: mint(.access, issuance, scope: granted), scope: granted, client: client, refreshToken: rotated)
+    }
+
+    /// Applies the rotation rules to a presented refresh token (RFC 9700 §4.14).
+    ///
+    /// A retired token is accepted again only inside the leeway and then resolves to the newest token of its
+    /// chain (`record` is updated to it); otherwise the grant may be revoked and `invalid_grant` is thrown.
+    func resolveRotation(
+        of name: String, record: inout TokenRecord, client: ClientRegistration
+    ) throws -> (current: String, isReuse: Bool) {
+        var current = name
+        guard client.rotatesRefreshTokens, record.successor != nil else { return (current, false) }
+        guard let leeway = client.rotationLeeway, let rotatedAt = record.rotatedAt,
+            now().timeIntervalSince(rotatedAt) <= leeway.seconds, record.reuseCount < leeway.maximumReuse
+        else {
+            if client.revokesGrantOnReuse { revokeGrant(record.grantID) }
+            throw Failure.oauth("invalid_grant", "The refresh token was already used.")
+        }
+        tokens[name]?.reuseCount += 1
+        while let next = record.successor, let successor = tokens[next] {
+            (current, record) = (next, successor)
+        }
+        guard liveRecord(current, kind: .refresh) != nil else {
+            throw Failure.oauth("invalid_grant", "The refresh token is invalid, expired or revoked.")
+        }
+        return (current, true)
+    }
+
+    /// Retires `current` and returns its successor, or returns `current` again for a leeway reuse.
+    func rotate(_ current: String, isReuse: Bool, issuance: Issuance, scope: ScopeSet, client: ClientRegistration)
+        -> String?
+    {
+        guard client.rotatesRefreshTokens else { return nil }
+        if isReuse { return current }
+        let successor = mint(.refresh, issuance, scope: scope)
+        tokens[current]?.successor = successor
+        tokens[current]?.rotatedAt = now()
+        return successor
     }
 
     func handleRevocation(_ request: RecordedRequest) throws -> HTTPResponse {
