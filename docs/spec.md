@@ -308,8 +308,10 @@ public struct DeviceAuthorization: Sendable {
     public var userCode: String
     public var verificationURI: URL
     public var verificationURIComplete: URL?     // used verbatim; may already contain a query
-    public var expiresAt: ContinuousClock.Instant
-    public var interval: Duration                 // 5 s when omitted
+    public var expiresIn: Duration                 // as granted; see ADR 0006
+    public var expiresAt: Date                     // for display only
+    public var remainingLifetime: Duration { get } // measured on the injected clock
+    public var interval: Duration                  // 5 s when omitted
     // internal: deviceCode (Secret)
 }
 ```
