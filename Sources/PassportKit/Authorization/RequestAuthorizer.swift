@@ -74,7 +74,8 @@ public struct RequestAuthorizer: Sendable {
             return .fail(
                 PassportError(
                     .insufficientScope, statusCode: statusCode,
-                    errorDescription: challenge?.parameters["error_description"]))
+                    errorDescription: challenge?.parameters["error_description"]
+                ).redacting([token.value.reveal()]))
         }
         guard attempt == 0 else {
             return .fail(PassportError(.unauthorized, recovery: .resourceDenied, statusCode: statusCode))
@@ -146,7 +147,8 @@ public struct RequestAuthorizer: Sendable {
     private static func requireBearer(_ token: AccessToken) throws {
         guard token.tokenType.lowercased() == "bearer" else {
             throw PassportError(
-                .invalidConfiguration, errorDescription: "Only Bearer tokens can be sent; the server issued another type.")
+                .invalidConfiguration,
+                errorDescription: "Only Bearer tokens can be sent; the server issued another type.")
         }
     }
 

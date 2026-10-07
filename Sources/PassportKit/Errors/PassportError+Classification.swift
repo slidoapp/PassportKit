@@ -40,6 +40,21 @@ extension PassportError {
         )
     }
 
+    /// Returns the error with every occurrence of `secrets` in its description replaced, however short.
+    ///
+    /// The description rule that redacts long token-like runs cannot recognise a short token; this is for the
+    /// values the library itself sent, which a careless server may repeat in `error_description`. Values of fewer than
+    /// four characters are left alone: they would also match ordinary words.
+    func redacting(_ secrets: [String]) -> PassportError {
+        guard var text = errorDescription else { return self }
+        for secret in secrets where secret.count >= 4 {
+            text = text.replacingOccurrences(of: secret, with: "<redacted>")
+        }
+        var copy = self
+        copy.errorDescription = text
+        return copy
+    }
+
     /// Parses an `error_uri` (RFC 6749 §5.2). Only `http` and `https` are kept: the value is server-controlled
     /// and an application may open it.
     static func errorURI(from text: String) -> URL? {

@@ -4,7 +4,10 @@ import Foundation
 ///
 /// The client keeps no tokens. Every operation sends one request (device polling sends several) and returns
 /// the parsed result or throws ``PassportError``; cancellation propagates as `CancellationError`.
-public struct OAuthClient: Sendable {
+///
+/// Descriptions and reflection show the client ID and the token endpoint only, not the transport, observer or
+/// any other member, so dumping a client cannot reveal what an injected component holds.
+public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// The configuration the client was created with.
     public let configuration: ClientConfiguration
     let transport: any HTTPTransport
@@ -34,6 +37,17 @@ public struct OAuthClient: Sendable {
         self.random = random
         self.observer = observer
     }
+
+    /// A summary naming the client ID and the token endpoint.
+    public var description: String {
+        "OAuthClient(clientID: \(configuration.authentication.clientID), token: \(HTTPRequest.redactedTarget(of: configuration.endpoints.token)))"
+    }
+
+    /// Same as ``description``.
+    public var debugDescription: String { description }
+
+    /// A mirror exposing the summary only.
+    public var customMirror: Mirror { Mirror(self, children: ["summary": description], displayStyle: .struct) }
 
     /// Sends a request, emitting observer events, and returns any HTTP response.
     ///
@@ -90,15 +104,20 @@ public struct OAuthClient: Sendable {
     ) async throws -> TokenResponse {
         let response = try await send(request)
         guard (200..<300).contains(response.statusCode) else {
-            throw PassportError.fromErrorResponse(
-                statusCode: response.statusCode,
-                headers: response.headers,
-                body: response.body,
-                context: context,
-                now: wallClock.now()
-            )
+            throw failure(response, to: request, context: context)
         }
         return try TokenResponse(parsing: response.body, exchange: exchange)
+    }
+
+    /// The error for a non-2xx response to `request`, without any credential `request` carried.
+    func failure(_ response: HTTPResponse, to request: FormRequest, context: ErrorResponseContext) -> PassportError {
+        PassportError.fromErrorResponse(
+            statusCode: response.statusCode,
+            headers: response.headers,
+            body: response.body,
+            context: context,
+            now: wallClock.now()
+        ).redacting(request.secretValues(configuration: configuration))
     }
 
     /// The URL of an optional endpoint, or an `invalidConfiguration` error naming it.

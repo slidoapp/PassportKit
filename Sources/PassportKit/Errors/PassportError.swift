@@ -19,7 +19,7 @@ public struct PassportError: Error, Sendable, Equatable, CustomStringConvertible
     public var statusCode: Int?
     /// The server's `error_description`, with control characters removed, token-like runs redacted and
     /// truncated to 200 characters. For display only; never use it for logic.
-    public private(set) var errorDescription: String?
+    public internal(set) var errorDescription: String?
     /// The server's `error_uri` (RFC 6749 §5.2), if any.
     public var errorURI: URL?
     /// The lower-level error, such as a `URLError`. Never printed by ``description``.

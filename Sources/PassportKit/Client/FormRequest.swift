@@ -43,4 +43,22 @@ struct FormRequest {
         headers["Accept"] = "application/json"
         return HTTPRequest(method: .post, url: url, headers: headers, body: FormEncoding.encode(all))
     }
+
+    /// Parameter names whose values are credentials, in standard and additional parameters.
+    private static let secretParameterNames: Set<String> = [
+        "refresh_token", "subject_token", "actor_token", "code", "code_verifier", "device_code", "token",
+        "client_secret", "assertion", "client_assertion", "password",
+    ]
+
+    /// The credential values of this request and of the client authentication, which a server must not be able
+    /// to make the library repeat in an error.
+    func secretValues(configuration: ClientConfiguration) -> [String] {
+        var values = (parameters.items + additionalParameters.items.map { ($0.name, $0.value) })
+            .filter { Self.secretParameterNames.contains($0.0) }.map(\.1)
+        switch configuration.authentication {
+        case .none: break
+        case .clientSecretPost(_, let secret), .clientSecretBasic(_, let secret): values.append(secret.reveal())
+        }
+        return values
+    }
 }
