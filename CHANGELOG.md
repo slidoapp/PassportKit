@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `IssuerValidation`, and `Endpoints.init(metadata:)`.
 - `AuthenticationChallenge.parse` for `WWW-Authenticate` values (RFC 9110
   §11.6.1, RFC 6750 §3).
+- `TokenManager.init(acceptancePolicyTimeLimit:rejectedTokenCacheDuration:)`,
+  `SignOutReason.expiredWithoutRefreshToken` and
+  `SignOutResult.Revocation.cancelled`.
 - `TokenManager`, the session actor: `load`, `signIn`, `accessToken(for:)`,
   `invalidate`, `exchangeRefreshToken` and `signOut(revoke:)`, with a FIFO
   lane for every operation that sends the refresh token, coalescing per
@@ -82,6 +85,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   redirects and returns a complete response even when the caller cancelled.
 - `ManualClock.waitForSleeper()` stops with a clear message after 10 s
   instead of spinning forever.
+
+- `TokenManager` hardening (ADR 0007): store changes are applied in order, a
+  sign-out revokes the newest refresh token even when a request rotated it
+  meanwhile, each session has its own refresh lane, `signIn` no longer lets a
+  concurrent `accessToken()` spend the grant's first refresh token, callers of
+  a replaced session get a token of the new one, the acceptance policy has a
+  time limit, a rejected token is remembered for 30 s instead of being
+  requested again, event streams buffer 64 events, a grant without a refresh
+  token ends its session when its access token expires, and `TokenTarget`
+  ignores the order and repetition of resources and audiences.
 
 ### Security
 
