@@ -80,7 +80,9 @@ public actor TokenManager {
     /// Session events. Each access returns a new stream that sees every event from then on; earlier events
     /// are not replayed, so subscribe before ``load()`` or ``signIn(with:requestedScope:)``.
     ///
-    /// Streams end when the manager is released.
+    /// A stream keeps the newest 64 events it has not yielded yet and drops older ones, so a subscriber that
+    /// stops reading costs bounded memory. Streams end when the manager is released; signing out does not end
+    /// them, because the manager can sign in again.
     public nonisolated var events: AsyncStream<SessionEvent> {
         eventHub.subscribe()
     }
@@ -184,10 +186,16 @@ public actor TokenManager {
             revoke ? snapshot.flatMap { startRevocation(of: $0, session: endedSession, lane: endedLane) } : nil
         let isDeleted = await deleteStoredCredential()
         guard let revocation else { return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: .skipped) }
-        let outcome = try? await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) {
-            try await revocation.wait()
+        let outcome: SignOutResult.Revocation
+        do {
+            outcome =
+                try await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) { try await revocation.wait() }
+                ?? .timedOut
+        } catch {
+            // Only the caller's cancellation can end the wait early; the revocation itself carries on.
+            outcome = .cancelled
         }
-        return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: outcome ?? .timedOut)
+        return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: outcome)
     }
 
     /// Replaces the session: stale work is discarded, cached tokens and in-flight operations are forgotten.
