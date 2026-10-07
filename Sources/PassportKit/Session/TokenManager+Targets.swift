@@ -179,13 +179,14 @@ extension TokenManager {
         let error = PassportError(.tokenRejected, recovery: .resourceDenied, detail: reason)
         cache.reject(
             target: token.target, error: error,
-            until: client.wallClock.now().addingTimeInterval(rejectedTokenCacheDuration.seconds))
+            until: client.wallClock.now().addingTimeInterval(rejectedTokenCacheDuration.seconds),
+            now: client.wallClock.now())
         eventHub.emit(.tokenRejected(target: token.target, grantedScope: token.grantedScope))
         throw error
     }
 
     /// Caches `token` when its expiry is known. A token without one is used once and then issued again.
     func publish(_ token: AccessToken) {
-        if token.expiresAt != nil { cache.store(token) }
+        if token.expiresAt != nil { cache.store(token, now: client.wallClock.now()) }
     }
 }
