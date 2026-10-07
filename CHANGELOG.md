@@ -20,3 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Device authorization grant: `OAuthClient.startDeviceAuthorization` and
   `completeDeviceAuthorization` with interval, `slow_down`, backoff, expiry
   and cancellation handling, and the `DeviceAuthorization` value.
+- `PassportEvent.transportFailure(endpoint:grantType:duration:)`, emitted when
+  a request ends without an HTTP response, so every `.request` event has a
+  terminating event.

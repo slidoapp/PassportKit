@@ -14,6 +14,10 @@ public enum PassportEvent: Sendable, Equatable {
     /// A response arrived. `errorCode` is the OAuth `error` member of a non-2xx response when it is a plain token.
     /// `duration` is measured with the client's injected clock.
     case response(endpoint: EndpointKind, statusCode: Int, errorCode: String?, duration: Duration)
+    /// A request ended without an HTTP response: no connection, TLS failure, timeout, or task cancellation.
+    /// Every ``request(endpoint:grantType:)`` is followed by exactly one ``response(endpoint:statusCode:errorCode:duration:)``
+    /// or one ``transportFailure(endpoint:grantType:duration:)``. `duration` is measured with the client's injected clock.
+    case transportFailure(endpoint: EndpointKind, grantType: GrantType?, duration: Duration)
 }
 
 /// Which kind of server endpoint a request targets.
