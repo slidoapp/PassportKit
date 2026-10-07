@@ -1,7 +1,7 @@
 import Foundation
 import PassportKit
 
-/// An in-process authorization server and protected resource, used as an ``HTTPTransport``.
+/// An in-process authorization server and protected resource, used as an `HTTPTransport`.
 ///
 /// It serves `https://as.example.com` (metadata, authorization, token, device authorization and
 /// revocation endpoints; see ``FakeAuthorizationServer/issuer``) and `https://api.example.com/...`
@@ -9,7 +9,7 @@ import PassportKit
 /// scripted through ``configure(_:)``, and every request is recorded.
 ///
 /// Tokens are opaque and deterministic (`access-1`, `refresh-2`, ...). Expiry follows the injected
-/// ``WallClock``; per-request delays follow the injected `Clock`.
+/// `WallClock`; per-request delays follow the injected `Clock`.
 public actor FakeAuthorizationServer: HTTPTransport {
     /// The issuer identifier, `https://as.example.com`.
     public static let issuer = URL(string: "https://as.example.com")!
