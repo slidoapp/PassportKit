@@ -94,6 +94,26 @@ struct DeviceAuthorizationTests {
         #expect(error?.code == .invalidResponse)
     }
 
+    @Test(arguments: [
+        #"AB\u0007CD"#, #"AB\nCD"#, #"AB\u202ECD"#, #"AB\u200BCD"#, #"AB\u2028CD"#,
+        String(repeating: "A", count: 65),
+    ])
+    func startRejectsAUserCodeThatCannotBeShownSafely(code: String) async throws {
+        let body =
+            #"{"device_code":"d","user_code":"\#(code)","verification_uri":"https://as.example.com/v","expires_in":60}"#
+        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
+        let error = await #expect(throws: PassportError.self) { try await client.beginDeviceAuthorization() }
+        #expect(error?.code == .invalidResponse)
+    }
+
+    @Test func startAcceptsAUserCodeOfTheLimit() async throws {
+        let code = String(repeating: "A", count: 64)
+        let body =
+            #"{"device_code":"d","user_code":"\#(code)","verification_uri":"https://as.example.com/v","expires_in":60}"#
+        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
+        #expect(try await client.beginDeviceAuthorization().userCode == code)
+    }
+
     @Test(arguments: ["http://as.example.com/device", "javascript:alert(1)", "myapp://device", "/relative"])
     func startRejectsInsecureVerificationURI(uri: String) async throws {
         let body = #"{"device_code":"d","user_code":"u","verification_uri":"\#(uri)","expires_in":60}"#
