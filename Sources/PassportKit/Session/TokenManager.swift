@@ -17,6 +17,10 @@ public actor TokenManager {
     /// The longest `signOut(revoke:)` waits for the revocation request, and the request itself runs.
     static let revocationTimeLimit = Duration.seconds(5)
 
+    /// Thrown inside the manager when work finds that its session ended or was replaced. The public methods
+    /// never let it escape: they resolve again on the session that exists now, or report ``superseded``.
+    struct SessionSuperseded: Error {}
+
     /// An operation producing the token of one target, shared by every caller of that target.
     struct Flight: Sendable {
         let identifier: Int
@@ -41,7 +45,7 @@ public actor TokenManager {
     var lastStoreChange: Task<Bool, Never>?
     /// For each session that ended with a sign-out that revokes: the newest refresh token known to belong to
     /// it. The revocation reads it when its lane turn starts, so it sends the token that is live then, not the
-    /// one that was live when the user signed out (see ``spendRefreshToken(ticket:session:adoptsIDToken:send:)``).
+    /// one that was live when the user signed out (see ``spendRefreshToken(turn:session:adoptsIDToken:send:)``).
     var revocableTokens: [Int: Secret] = [:]
 
     /// Creates a manager with no session. Call ``load()`` to restore one from `store`.
@@ -119,14 +123,27 @@ public actor TokenManager {
             grantedScope: response.grantedScope(requested: requestedScope),
             updatedAt: client.wallClock.now()
         )
-        current = credential
-        await save(credential)
-        guard session == generation else { return }
-        eventHub.emit(.signedIn)
         let token = makeToken(from: response, target: .default, requestedScope: requestedScope)
-        try await accept(token, response: response, session: session)
-        guard session == generation else { return }
-        publish(token)
+        current = credential
+        eventHub.emit(.signedIn)
+        // The token is not cached until it was saved with its credential and judged, which takes a while. Until
+        // then this flight stands in for it: a caller asking for the default token in that time waits here
+        // instead of refreshing, which would spend the grant's first refresh token and then be overwritten by
+        // the older token published below.
+        let flight = registerFlight(for: .default)
+        let result: Result<AccessToken, any Error>
+        do {
+            await save(credential)
+            guard session == generation else { throw SessionSuperseded() }
+            try await accept(token, response: response, session: session)
+            guard session == generation else { throw SessionSuperseded() }
+            publish(token)
+            result = .success(token)
+        } catch {
+            result = .failure(error)
+        }
+        finish(flight, of: .default, with: result)
+        if case .failure(let error) = result, !(error is SessionSuperseded) { throw error }
     }
 
     /// Marks an access token as unusable, typically after a 401 (RFC 6750 §3.1).
@@ -143,6 +160,7 @@ public actor TokenManager {
     /// limited to five seconds. In-flight operations of the ended session are discarded.
     public func signOut(revoke: Bool = true) async -> SignOutResult {
         let endedSession = generation
+        let endedLane = lane
         let snapshot = current?.refreshToken
         startNewSession()
         current = nil
@@ -151,7 +169,8 @@ public actor TokenManager {
         eventHub.emit(.signedOut(reason: .userInitiated))
         // Reserved now, before any suspension, so the revocation queues behind operations that are
         // already sending the old refresh token.
-        let revocation = revoke ? snapshot.flatMap { startRevocation(of: $0, session: endedSession) } : nil
+        let revocation =
+            revoke ? snapshot.flatMap { startRevocation(of: $0, session: endedSession, lane: endedLane) } : nil
         let isDeleted = await deleteStoredCredential()
         guard let revocation else { return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: .skipped) }
         let outcome = try? await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) {
@@ -165,6 +184,7 @@ public actor TokenManager {
         generation += 1
         cache.removeAll()
         flights.removeAll()
+        lane = RefreshLane()
     }
 
     /// Applies `change` to the store after every earlier change has finished, and reports whether it succeeded.
@@ -216,6 +236,12 @@ public actor TokenManager {
             recovery: .reauthenticate,
             errorDescription: "The session ended or was replaced while the request was in flight."
         )
+    }
+
+    static var expiredWithoutRefreshToken: PassportError {
+        PassportError(
+            .notAuthenticated, recovery: .reauthenticate,
+            errorDescription: "The access token expired and the grant has no refresh token.")
     }
 
     static var signedOut: PassportError {

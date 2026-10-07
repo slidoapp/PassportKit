@@ -19,7 +19,19 @@ extension TokenManager {
     /// from the refresh token has ended the session.
     public func accessToken(for target: TokenTarget = .default) async throws -> AccessToken {
         try Task.checkCancellation()
-        return try await resolveToken(for: target)
+        do {
+            return try await resolveToken(for: target)
+        } catch is SessionSuperseded {
+            // The session this call joined ended or was replaced. If a session exists now (a sign-in replaced
+            // it), the caller's question is still open and gets one answer from it; a second supersession
+            // means the session changed again, and the caller is told.
+            guard current != nil else { throw Self.superseded }
+            do {
+                return try await resolveToken(for: target)
+            } catch is SessionSuperseded {
+                throw Self.superseded
+            }
+        }
     }
 
     /// The body of ``accessToken(for:)``. Everything up to the final `await` is synchronous, so a second
@@ -38,41 +50,51 @@ extension TokenManager {
         return try await flight.completion.wait()
     }
 
-    private func startFlight(for target: TokenTarget) -> Flight {
+    /// Registers the operation that will produce the token of `target`, so that later callers wait for it.
+    func registerFlight(for target: TokenTarget) -> Flight {
         lastFlightIdentifier += 1
         let flight = Flight(identifier: lastFlightIdentifier, completion: Completion())
         flights[target] = flight
+        return flight
+    }
+
+    /// Ends `flight`: forgets it and wakes its waiters. No suspension in between, so a caller never sees a gap
+    /// where neither the cache nor a flight holds the token.
+    func finish(_ flight: Flight, of target: TokenTarget, with result: Result<AccessToken, any Error>) {
+        if flights[target]?.identifier == flight.identifier { flights[target] = nil }
+        flight.completion.complete(result)
+    }
+
+    private func startFlight(for target: TokenTarget) -> Flight {
+        let flight = registerFlight(for: target)
         let session = generation
         // The lane turn is reserved here, synchronously, so turns follow the order of calls.
-        let ticket = target.method == .refreshGrant ? lane.reserve() : nil
+        let turn = target.method == .refreshGrant ? lane.reserve() : nil
         Task {
             let result: Result<AccessToken, any Error>
             do {
                 let token =
-                    if let ticket {
-                        try await issueByRefreshGrant(target, ticket: ticket, session: session)
+                    if let turn {
+                        try await issueByRefreshGrant(target, turn: turn, session: session)
                     } else {
                         try await issueByExchange(target, session: session)
                     }
-                // Publishing, ending the flight and waking the waiters happen with no suspension between them,
-                // so a caller never sees a gap where neither the cache nor a flight holds the token.
-                guard session == generation else { throw Self.superseded }
+                guard session == generation else { throw SessionSuperseded() }
                 publish(token)
                 eventHub.emit(.refreshed(target: target))
                 result = .success(token)
             } catch {
                 result = .failure(error)
             }
-            if flights[target]?.identifier == flight.identifier { flights[target] = nil }
-            flight.completion.complete(result)
+            finish(flight, of: target, with: result)
         }
         return flight
     }
 
-    private func issueByRefreshGrant(_ target: TokenTarget, ticket: Completion<Void>, session: Int) async throws
+    private func issueByRefreshGrant(_ target: TokenTarget, turn: RefreshLane.Turn, session: Int) async throws
         -> AccessToken
     {
-        let response = try await spendRefreshToken(ticket: ticket, session: session, adoptsIDToken: true) {
+        let response = try await spendRefreshToken(turn: turn, session: session, adoptsIDToken: true) {
             try await self.client.refresh(refreshToken: $0, scope: target.scope, resources: target.resources)
         }
         let token = makeToken(from: response, target: target, requestedScope: target.scope)
@@ -85,7 +107,7 @@ extension TokenManager {
     private func issueByExchange(_ target: TokenTarget, session: Int) async throws -> AccessToken {
         // The default token has at least `minimumTokenLifetime` left, because the same rules produced it.
         let subject = try await resolveToken(for: .default)
-        guard session == generation else { throw Self.superseded }
+        guard session == generation else { throw SessionSuperseded() }
         let response: TokenResponse
         do {
             response = try await client.exchange(
@@ -93,14 +115,14 @@ extension TokenManager {
                     subjectToken: subject.value, subjectTokenType: .accessToken, requestedTokenType: .accessToken,
                     audiences: target.audiences, resources: target.resources, scope: target.scope))
         } catch {
-            guard session == generation else { throw Self.superseded }
+            guard session == generation else { throw SessionSuperseded() }
             // The server no longer accepts the subject: do not offer it again.
             if (error as? PassportError)?.code == .invalidGrant {
                 cache.remove(target: .default, generation: subject.generation)
             }
             throw error
         }
-        guard session == generation else { throw Self.superseded }
+        guard session == generation else { throw SessionSuperseded() }
         if let issued = response.issuedTokenType, issued != .accessToken {
             throw PassportError(.invalidResponse, errorDescription: "The exchange did not issue an access token.")
         }

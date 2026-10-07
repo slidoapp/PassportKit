@@ -4,6 +4,8 @@ public enum SignOutReason: Sendable, Hashable {
     case userInitiated
     /// The authorization server rejected the refresh token (`invalid_grant`, RFC 6749 §5.2).
     case refreshTokenRejected
+    /// The access token of a grant that issued no refresh token expired, so the session cannot continue.
+    case expiredWithoutRefreshToken
 }
 
 /// Something that happened to the session, delivered through ``TokenManager/events``.
