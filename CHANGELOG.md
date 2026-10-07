@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `RequestAuthorizer` and `RetryDecision`: sign `URLRequest` and `HTTPRequest`
+  with a bearer token (https or loopback only), decide what a 401 or 403
+  means (RFC 6750 §3.1), `send(_:for:using:)` and
+  `data(for:target:session:)` with at most one retry.
 - Foundations of the core module: `Secret`, `ScopeSet`, `AdditionalParameters`,
   `JSONValue`, `GrantType`, `TokenTypeIdentifier`, `TokenTypeHint`, the
   `WallClock` and `RandomSource` seams, HTTP types with `URLSessionTransport`,

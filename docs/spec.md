@@ -615,6 +615,8 @@ public struct RequestAuthorizer: Sendable {
     public func evaluate(statusCode: Int, headers: HTTPHeaders, token: AccessToken, attempt: Int) async -> RetryDecision
     /// Convenience: authorize, send, evaluate, retry at most once.
     public func send(_ request: HTTPRequest, for target: TokenTarget = .default, using transport: any HTTPTransport) async throws -> HTTPResponse
+    /// The same for `URLSession`; the session is required, the library never uses `URLSession.shared`.
+    public func data(for request: URLRequest, target: TokenTarget = .default, session: URLSession) async throws -> (Data, HTTPURLResponse)
 }
 public enum RetryDecision: Sendable, Equatable { case deliver; case retry; case fail(PassportError) }
 
@@ -644,6 +646,10 @@ challenge yields an empty array.
 | 401 with `Bearer error="insufficient_scope"` | `.fail(.insufficientScope)` |
 | 401 with `error="invalid_token"` or no Bearer error, `attempt == 0` | invalidate `token`, `.retry` |
 | 401, `attempt >= 1` | `.fail(.unauthorized, recovery: .resourceDenied)` |
+| 401 at `attempt == 0` with any other Bearer error (`invalid_request`) | `.deliver` |
+
+`authorize` throws `.invalidConfiguration` for a URL that is neither `https`
+nor `http` on a loopback host, before asking for a token.
 
 ## 11. Discovery and extension room
 
