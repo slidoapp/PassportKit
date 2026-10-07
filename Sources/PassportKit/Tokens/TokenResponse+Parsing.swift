@@ -9,9 +9,11 @@ extension TokenResponse {
     /// Tolerates `expires_in` as a number or numeric string (unparsable values mean `nil`; negative values
     /// mean zero), a `null` member (treated as absent), and any unknown member (kept in ``additionalFields``).
     /// A known member of an unexpected type stays in ``additionalFields`` unparsed.
+    /// With `exchange` set, a missing `token_type` is tolerated (and reported as `N_A`) when `issued_token_type`
+    /// names something other than an access token (RFC 8693 §2.2.1).
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidResponse`` when the body is
     /// not a JSON object or lacks a non-empty `access_token` or a `token_type` string (RFC 6749 §5.1).
-    init(parsing data: Data) throws {
+    init(parsing data: Data, exchange: Bool = false) throws {
         guard case .object(var members)? = try? JSONDecoder().decode(JSONValue.self, from: data) else {
             throw PassportError(.invalidResponse, errorDescription: "The token response is not a JSON object.")
         }
@@ -31,7 +33,12 @@ extension TokenResponse {
         guard let accessToken = takeString("access_token"), !accessToken.isEmpty else {
             throw PassportError(.invalidResponse, errorDescription: "The token response has no access_token.")
         }
-        guard let tokenType = takeString("token_type"), !tokenType.isEmpty else {
+        let issuedTokenType = takeString("issued_token_type").map { TokenTypeIdentifier(rawValue: $0) }
+        var tokenType = takeString("token_type") ?? ""
+        if tokenType.isEmpty, exchange, let issuedTokenType, issuedTokenType != .accessToken {
+            tokenType = "N_A"
+        }
+        guard !tokenType.isEmpty else {
             throw PassportError(.invalidResponse, errorDescription: "The token response has no token_type.")
         }
 
@@ -54,7 +61,7 @@ extension TokenResponse {
             refreshToken: takeString("refresh_token").flatMap { $0.isEmpty ? nil : Secret($0) },
             idToken: takeString("id_token").flatMap { $0.isEmpty ? nil : Secret($0) },
             scope: takeString("scope").map { ScopeSet(parsing: $0) },
-            issuedTokenType: takeString("issued_token_type").map { TokenTypeIdentifier(rawValue: $0) },
+            issuedTokenType: issuedTokenType,
             additionalFields: members
         )
     }

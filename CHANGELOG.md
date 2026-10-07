@@ -14,3 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `WallClock` and `RandomSource` seams, HTTP types with `URLSessionTransport`,
   `PassportError`, `TokenResponse`, and the endpoint and client
   authentication configuration types.
+- `OAuthClient` with refresh, client credentials, token exchange, extension
+  grants and revocation, plus `TokenExchangeRequest`, `PassportObserver`,
+  `PassportEvent` and `EndpointKind`.
