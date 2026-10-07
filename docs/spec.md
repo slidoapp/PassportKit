@@ -314,7 +314,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     public let wallClock: any WallClock
 
     // RFC 6749 §6 (+ RFC 8707 resources)
-    public func refresh(refreshToken: Secret, scope: ScopeSet? = nil, resources: [URL] = [],
+    public func refresh(_ refreshToken: Secret, scope: ScopeSet? = nil, resources: [URL] = [],
                         additionalParameters: AdditionalParameters = [:]) async throws -> TokenResponse
     // RFC 6749 §4.4
     public func clientCredentials(scope: ScopeSet? = nil, resources: [URL] = [],
@@ -599,7 +599,7 @@ Invariants (each has a conformance test):
    `defaultTokenLifetime`, or are refreshed on every use when nil.
    Exchanged tokens never outlive their subject token: the subject is
    refreshed first if it would expire within `minimumTokenLifetime`.
-9. **Derived tokens.** `.exchangeAccessToken` targets obtain the
+9. **Derived tokens.** `.tokenExchange` targets (`TokenTarget.exchange`) obtain the
    default access token, exchange it (`subject_token_type` and
    `requested_token_type` = access token), and cache the result per
    target. A `refresh_token` in such a response is ignored: it is not the
