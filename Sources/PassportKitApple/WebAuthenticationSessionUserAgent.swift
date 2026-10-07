@@ -9,7 +9,7 @@
         import UIKit
     #endif
 
-    /// A ``UserAgent`` backed by `ASWebAuthenticationSession` (RFC 8252 §6).
+    /// A `UserAgent` backed by `ASWebAuthenticationSession` (RFC 8252 §6).
     ///
     /// Redirect URIs with a private-use scheme work on every supported version. An `https` redirect URI
     /// (a claimed URL) needs macOS 14.4, iOS 17.4 or visionOS 1.1; on older systems `present` throws

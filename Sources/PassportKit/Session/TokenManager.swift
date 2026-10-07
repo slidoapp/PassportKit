@@ -10,10 +10,10 @@ import Foundation
 /// - Bookkeeping that other callers must see (registering an in-flight operation, reserving a lane turn,
 ///   bumping the generation) happens synchronously, before the first `await` of the call.
 /// - In-flight work runs in an unstructured task the manager owns and never cancels. Callers only wait on a
-///   ``Completion``; cancelling a caller stops that caller waiting, nothing else.
+///   `Completion`; cancelling a caller stops that caller waiting, nothing else.
 /// - Every suspension is followed by a generation check before results are written or published, so work
 ///   started under a session that has since ended or been replaced is discarded.
-/// - Changes to the store are queued in the order they are decided (``changeStore(_:)``), and each session has
+/// - Changes to the store are queued in the order they are decided (`changeStore(_:)`), and each session has
 ///   a lane of its own, so what one session's slow operations do never reorders or blocks another's.
 public actor TokenManager {
     /// The longest `signOut(revoke:)` waits for the revocation request, and the request itself runs.

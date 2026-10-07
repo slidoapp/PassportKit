@@ -4,10 +4,10 @@
     import PassportKit
     import Security
 
-    /// A ``CredentialStore`` that keeps credentials as generic password items in the Keychain.
+    /// A `CredentialStore` that keeps credentials as generic password items in the Keychain.
     ///
-    /// The item's service and account are the ``CredentialAccount``'s `service` and `account`; the library has
-    /// no defaults for either. The payload is the versioned JSON of ``CredentialCoding``. Items are never
+    /// The item's service and account are the `CredentialAccount`'s `service` and `account`; the library has
+    /// no defaults for either. The payload is the versioned JSON of `CredentialCoding`. Items are never
     /// synchronizable: a refresh token is a bearer secret for one device and must not travel through iCloud
     /// Keychain, so `kSecAttrSynchronizable` is always `false` and there is no option to change it.
     ///
@@ -17,7 +17,7 @@
     ///
     /// Keychain access is a security boundary of the app, not of the library: an access group needs the
     /// matching entitlement, and without one the Keychain answers `errSecMissingEntitlement`, reported as
-    /// ``PassportError/Code-swift.struct/storageFailure``.
+    /// `PassportError.Code.storageFailure`.
     public final class KeychainCredentialStore: CredentialStore {
         /// When the Keychain releases an item to the app (`kSecAttrAccessible`).
         ///
@@ -63,7 +63,7 @@
         ///   - useDataProtectionKeychain: On macOS, use the data protection keychain
         ///     (`kSecUseDataProtectionKeychain`) instead of the file-based login keychain. It needs a signed
         ///     app with a keychain entitlement. Ignored on other platforms, where it is the only keychain.
-        ///   - decodeLegacy: The migration hook. When a stored payload is not a record ``CredentialCoding``
+        ///   - decodeLegacy: The migration hook. When a stored payload is not a record `CredentialCoding`
         ///     reads, the hook gets the raw bytes; a credential it returns is used and written back in the
         ///     current format (a failed write-back is ignored and retried by the next ``load(_:)``). Return
         ///     `nil` for data it does not recognise, which then fails as a malformed record. The hook runs on
@@ -82,8 +82,8 @@
 
         /// The stored credential, or `nil` when the item does not exist.
         ///
-        /// - Throws: ``PassportError`` with code ``PassportError/Code-swift.struct/storageFailure``: for a
-        ///   payload that cannot be decoded, with recovery ``PassportError/Recovery/retryLater(after:)`` while
+        /// - Throws: `PassportError` with code `PassportError.Code.storageFailure`: for a
+        ///   payload that cannot be decoded, with recovery `PassportError.Recovery.retryLater(after:)` while
         ///   the device is locked (`errSecInteractionNotAllowed`), and for any other Keychain status.
         public func load(_ account: CredentialAccount) async throws -> Credential? {
             try await perform { try self.loadSynchronously(account) }

@@ -1,7 +1,7 @@
 import Foundation
 import PassportKit
 
-/// A ``WallClock`` that returns a settable date and never moves on its own.
+/// A `WallClock` that returns a settable date and never moves on its own.
 public final class FixedWallClock: WallClock, @unchecked Sendable {
     // @unchecked Sendable: the date is only read and written under `lock`.
     private let lock = NSLock()
@@ -22,7 +22,7 @@ public final class FixedWallClock: WallClock, @unchecked Sendable {
     }
 }
 
-/// A ``RandomSource`` that returns a fixed byte pattern, repeated as often as needed.
+/// A `RandomSource` that returns a fixed byte pattern, repeated as often as needed.
 public final class SequenceRandomSource: RandomSource, @unchecked Sendable {
     // @unchecked Sendable: the read position is only touched under `lock`.
     private let lock = NSLock()
