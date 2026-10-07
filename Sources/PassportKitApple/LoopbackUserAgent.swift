@@ -8,7 +8,7 @@
         import UIKit
     #endif
 
-    /// A ``UserAgent`` that opens the authorization URL in the system browser and waits for the redirect on
+    /// A `UserAgent` that opens the authorization URL in the system browser and waits for the redirect on
     /// a running ``LoopbackRedirectListener`` (RFC 8252 §7.3).
     ///
     /// ```swift
