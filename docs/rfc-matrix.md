@@ -30,6 +30,9 @@ reason in Notes).
 | ID | RFC § | Level | Requirement | Status | Code | Test |
 |---|---|---|---|---|---|---|
 | FORM-1 | 6749 App. B | MUST | Form bodies are UTF-8; all but unreserved characters percent-encoded, space as `+` | done | `Sources/PassportKit/HTTP/FormEncoding.swift` | `FormEncodingTests` |
+| AUTH-1 | 6749 §2.3.1 | MUST | Basic client credentials: client id and secret form-encoded before base64 | done | `Sources/PassportKit/Configuration/ClientAuthentication.swift` | `ClientAuthenticationTests` |
+| AUTH-2 | 6749 §2.3.1, §3.2.1 | MAY | `client_secret` in the body; public clients send `client_id` | done | `Sources/PassportKit/Configuration/ClientAuthentication.swift` | `ClientAuthenticationTests` |
+| TLS-1 | 6749 §3.1, §3.2; 8252 §8.3 | MUST | Endpoints use TLS; plain `http` only on loopback hosts | done | `Sources/PassportKit/Configuration/Endpoints.swift` | `EndpointsTests` |
 | TOK-1 | 6749 §5.1 | MUST | Success response needs `access_token` and `token_type`; `token_type` compared case-insensitively | done | `Sources/PassportKit/Tokens/TokenResponse+Parsing.swift` | `TokenResponseTests` |
 | TOK-2 | 6749 §5.1 | MUST | Unknown response members are ignored by the protocol and preserved for the app | done | `Sources/PassportKit/Tokens/TokenResponse+Parsing.swift` | `TokenResponseTests` |
 | TOK-3 | 6749 §3.3, §5.1 | MUST | Omitted `scope` means the requested scope was granted; response `scope` is exposed as returned | done | `Sources/PassportKit/Tokens/TokenResponse.swift` | `TokenResponseTests` |
