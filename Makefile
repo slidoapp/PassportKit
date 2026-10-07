@@ -24,6 +24,10 @@ test:
 check: lint build test
 	@echo "make check: all checks passed"
 
+# Builds the DocC archives of all three libraries and fails on any documentation warning. Needs Xcode.
+docs:
+	scripts/build-docs.sh
+
 # Runs the integration tests against the local server in Tools/integration-server (needs Node.js and, on the
 # first run, network access for `npm ci`). Not part of `check`.
 integration:
