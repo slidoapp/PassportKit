@@ -152,7 +152,7 @@ extension OAuthClient {
                 errorDescription: values["error_description"],
                 errorURI: values["error_uri"].flatMap(PassportError.errorURI(from:)),
                 context: .authorizationResponse
-            )
+            ).redacting([pending.state.reveal(), pending.codeVerifier.reveal(), values["code"] ?? ""])
         }
         guard let code = values["code"], !code.isEmpty else {
             throw PassportError(.invalidResponse, errorDescription: "The authorization response has no code.")
