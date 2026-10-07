@@ -34,6 +34,9 @@ public struct SignOutResult: Sendable, Equatable {
         case failed(PassportError)
         /// The request did not finish within the time box. It may still complete in the background.
         case timedOut
+        /// The task that called ``TokenManager/signOut(revoke:)`` was cancelled while it waited. The revocation
+        /// continues in the background and may still succeed; the session is cleared either way.
+        case cancelled
     }
 
     /// Whether the stored credential was deleted. The in-memory session is always cleared.
