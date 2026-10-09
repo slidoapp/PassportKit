@@ -80,11 +80,16 @@
             let waiting = Task { try await listener.waitForCallback() }
             let port = try #require(listener.redirectURI.port)
             let padding = String(repeating: "a", count: 16 * 1024)
-            let reply = try await RawClient.send(
-                "GET /callback?code=1&state=s HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\nX-Padding: \(padding)\r\n\r\n",
-                toPort: port
-            )
-            #expect(reply.hasPrefix("HTTP/1.1 431"))
+            do {
+                let reply = try await RawClient.send(
+                    "GET /callback?code=1&state=s HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\nX-Padding: \(padding)\r\n\r\n",
+                    toPort: port
+                )
+                #expect(reply.hasPrefix("HTTP/1.1 431"))
+            } catch NWError.posix(.ECONNRESET) {
+                // The listener closes with the rest of the request unread, so TCP may reset the connection
+                // before the client reads the 431. Either way the request was refused.
+            }
             let target = try url(listener, "/callback?code=2&state=s")
             _ = try await session.data(from: target)
             #expect(try await waiting.value == target)
