@@ -47,6 +47,34 @@ Rules specific to this layer:
 
 CI runs the same target in the `integration` job.
 
+### Live discovery
+
+`LiveDiscoveryTests` fetches public metadata from externally configured hosts.
+It never authenticates or requests tokens. Both lists are whitespace-separated;
+unset or empty lists skip their tests, keeping `make check` offline.
+
+```sh
+PASSPORTKIT_DISCOVERY_ISSUERS='https://as.example.com' \
+PASSPORTKIT_DISCOVERY_ABSENT_HOSTS='https://api.example.com/' \
+swift test --filter LiveDiscoveryTests
+```
+
+- `PASSPORTKIT_DISCOVERY_ISSUERS`: exact published RFC 8414 issuer strings.
+  The tests fetch OAuth metadata with strict issuer validation, require HTTPS
+  authorization and token endpoints, and build a client configuration.
+  They also toggle the issuer's trailing slash, verify the document with an
+  explicit expected issuer, and assert that strict validation rejects the
+  mismatch (RFC 8414 §3.3). Do not add or remove a slash from the published
+  issuer when configuring this list.
+- `PASSPORTKIT_DISCOVERY_ABSENT_HOSTS`: hosts expected to return HTTP 404 at
+  both `/.well-known/oauth-authorization-server` and
+  `/.well-known/openid-configuration`. An outage, transport failure, or
+  malformed successful response fails rather than counting as absent metadata.
+
+These tests have a one-minute time limit and are not part of the local
+authorization server setup. Live availability and metadata changes can cause
+failures independently of library changes.
+
 ## Redaction canary
 
 `RedactionCanaryTests` runs every flow against the fake server with a client

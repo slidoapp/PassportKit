@@ -67,6 +67,9 @@ First development cycle; nothing is released yet.
   warning, and CI runs it. `.spi.yml` for the Swift Package Index.
 - `passportkit-example`, a command-line client for the device and loopback code flows, and an integration test
   suite against a local `oidc-provider` server (`make integration`).
+- Opt-in live discovery integration tests configured through environment variables: RFC 8414 metadata,
+  usable HTTPS OAuth endpoints, strict trailing-slash issuer checks, and HTTP 404 expectations for resource
+  hosts without OAuth or OpenID Connect discovery. Default test runs remain offline.
 - `scripts/check-determinism.sh`, run by `make lint`, keeps system clocks, random APIs and `URLSession.shared` out
   of the core.
 - A redaction canary test that searches every error, event and description for the secrets of every flow.
