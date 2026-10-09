@@ -31,7 +31,7 @@ jobs:
     container: swift:6.2-noble
     steps:
       - uses: actions/checkout@v7
-      - run: swift build --build-tests --target PassportKitTests --target ConformanceTests
+      - run: swift build --build-tests
       - run: swift test --parallel --skip PassportKitAppleTests
 
   docs:
