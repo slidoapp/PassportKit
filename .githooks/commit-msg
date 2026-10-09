@@ -5,7 +5,7 @@
 
 message_file="$1"
 subject=$(head -n 1 "$message_file")
-pattern='^(feat|fix|refactor|test|docs|chore)(\([a-zA-Z0-9-]+\))?: [^ ].*$'
+pattern='^(feat|fix|refactor|test|docs|chore|build|ci)(\([a-zA-Z0-9-]+\))?: [^ ].*$'
 
 # Allow git-generated messages.
 if [[ "$subject" =~ ^(Merge|Revert|fixup!|squash!) ]]; then
@@ -18,7 +18,7 @@ fail() {
     exit 1
 }
 
-[[ "$subject" =~ $pattern ]] || fail "subject must match '<type>(<scope>): <summary>' with type feat|fix|refactor|test|docs|chore"
+[[ "$subject" =~ $pattern ]] || fail "subject must match '<type>(<scope>): <summary>' with type feat|fix|refactor|test|docs|chore|build|ci"
 (( ${#subject} <= 72 )) || fail "subject is longer than 72 characters"
 
 second_line=$(sed -n '2p' "$message_file")
