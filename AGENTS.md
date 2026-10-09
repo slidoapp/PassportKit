@@ -110,8 +110,8 @@ swift test --filter <Suite>/<test>   # a single test
 
 - Branch: `<github-nick>/<short-slug>`.
 - Commit subject: `<type>(<scope>): <summary>`, imperative, ≤ 72 chars.
-  Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. Scope is the
-  module name; omit it for repository-level files.
+  Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `build`, `ci`.
+  Scope is the module name; omit it for repository-level files.
 - Commit body explains why, wrapped at 72 columns. Sign commits
   (`git commit -S`). One intent per commit; keep behaviour changes separate
   from refactoring.
