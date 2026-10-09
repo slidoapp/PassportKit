@@ -2,6 +2,10 @@ import Foundation
 import PassportKit
 import Testing
 
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+
 /// The local `oidc-provider` server in `Tools/integration-server`, started by `make integration`.
 ///
 /// Every test builds its own client and session; nothing is shared between tests.
