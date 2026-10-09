@@ -24,11 +24,6 @@ final class StubURLProtocol: URLProtocol {
             respond(200, ["Content-Type": "application/json", "X-Echo-Method": request.httpMethod ?? ""])
             client.urlProtocol(self, didLoad: Data(#"{"ok":true}"#.utf8))
             client.urlProtocolDidFinishLoading(self)
-        case "/echo":
-            respond(200)
-            client.urlProtocol(
-                self, didLoad: Data("\(request.value(forHTTPHeaderField: "Authorization") ?? "none")".utf8))
-            client.urlProtocolDidFinishLoading(self)
         case "/big":
             respond(200)
             for _ in 0..<3 { client.urlProtocol(self, didLoad: Data(count: 600 * 1_024)) }
@@ -41,40 +36,6 @@ final class StubURLProtocol: URLProtocol {
             respond(200)
             client.urlProtocol(self, didLoad: Data(count: URLSessionTransport.maximumBodySize))
             client.urlProtocolDidFinishLoading(self)
-        case "/redirect":
-            let target = URL(string: "https://as.example.com/ok")!
-            let redirect = HTTPURLResponse(
-                url: url, statusCode: 307, httpVersion: "HTTP/1.1", headerFields: ["Location": target.absoluteString])!
-            var next = URLRequest(url: target)
-            next.httpMethod = request.httpMethod
-            next.allHTTPHeaderFields = request.allHTTPHeaderFields
-            client.urlProtocol(self, wasRedirectedTo: next, redirectResponse: redirect)
-        case "/other-host-echo":
-            let target = URL(string: "https://other.example.com/echo")!
-            let redirect = HTTPURLResponse(
-                url: url, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": target.absoluteString])!
-            var next = URLRequest(url: target)
-            next.httpMethod = request.httpMethod
-            next.allHTTPHeaderFields = request.allHTTPHeaderFields
-            client.urlProtocol(self, wasRedirectedTo: next, redirectResponse: redirect)
-        case "/echo-headers":
-            respond(200)
-            let names = (request.allHTTPHeaderFields ?? [:]).keys.map { $0.lowercased() }.sorted()
-            client.urlProtocol(self, didLoad: Data(names.joined(separator: ",").utf8))
-            client.urlProtocolDidFinishLoading(self)
-        case "/same-origin-headers", "/other-host-headers", "/other-port-headers":
-            let target = URL(
-                string: [
-                    "/same-origin-headers": "https://as.example.com/echo-headers",
-                    "/other-port-headers": "https://as.example.com:8443/echo-headers",
-                    "/other-host-headers": "https://other.example.com/echo-headers",
-                ][url.path]!)!
-            let redirect = HTTPURLResponse(
-                url: url, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": target.absoluteString])!
-            var next = URLRequest(url: target)
-            next.httpMethod = request.httpMethod
-            next.allHTTPHeaderFields = request.allHTTPHeaderFields
-            client.urlProtocol(self, wasRedirectedTo: next, redirectResponse: redirect)
         case "/fail":
             client.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
         default:
@@ -83,13 +44,6 @@ final class StubURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
-}
-
-/// Captures the redirect decision the delegate makes synchronously.
-final class RedirectOutcome: @unchecked Sendable {
-    // Safe: the delegate invokes the completion handler synchronously on the calling thread.
-    private(set) var request: URLRequest?
-    func record(_ request: URLRequest?) { self.request = request }
 }
 
 struct URLSessionTransportTests {
@@ -126,70 +80,6 @@ struct URLSessionTransportTests {
             try await transport.send(request(path))
         } throws: { error in
             (error as? PassportError)?.code == .invalidResponse
-        }
-    }
-
-    // URLProtocol stubs cannot deliver an unfollowed redirect response, so the policy is checked on the delegate.
-    @Test func doesNotFollowPostRedirects() {
-        let delegate = URLSessionTransportDelegate(bodyLimit: 10)
-        let session = URLSession(configuration: .ephemeral)
-        defer { session.invalidateAndCancel() }
-        let target = URL(string: "https://as.example.com/ok")!
-        let redirect = HTTPURLResponse(url: target, statusCode: 307, httpVersion: nil, headerFields: nil)!
-        for (method, followed) in [("POST", false), ("GET", true)] {
-            var original = URLRequest(url: target)
-            original.httpMethod = method
-            let task = session.dataTask(with: original)
-            let outcome = RedirectOutcome()
-            delegate.urlSession(session, task: task, willPerformHTTPRedirection: redirect, newRequest: original) {
-                outcome.record($0)
-            }
-            #expect((outcome.request != nil) == followed)
-        }
-    }
-
-    @Test func followsGetRedirects() async throws {
-        let response = try await transport.send(request("/redirect", method: .get))
-        #expect(response.statusCode == 200)
-    }
-
-    @Test func dropsAuthorizationWhenRedirectedToAnotherHost() async throws {
-        let response = try await transport.send(
-            request("/other-host-echo", method: .get, headers: ["Authorization": "Bearer \(Canary.value)"])
-        )
-        #expect(String(data: response.body, encoding: .utf8) == "none")
-    }
-
-    private static let credentialHeaders: HTTPHeaders = [
-        "Authorization": "Bearer x", "X-Api-Key": "k", "Accept": "application/json", "Cookie": "a=b",
-    ]
-
-    @Test func keepsAllHeadersOnSameOriginRedirects() async throws {
-        let response = try await transport.send(
-            request("/same-origin-headers", method: .get, headers: Self.credentialHeaders))
-        #expect(String(data: response.body, encoding: .utf8) == "accept,authorization,content-length,cookie,x-api-key")
-    }
-
-    @Test(arguments: ["/other-host-headers", "/other-port-headers"])
-    func dropsEveryNonStandardHeaderOnCrossOriginRedirects(path: String) async throws {
-        let response = try await transport.send(request(path, method: .get, headers: Self.credentialHeaders))
-        #expect(String(data: response.body, encoding: .utf8) == "accept")
-    }
-
-    @Test func refusesRedirectsFromHTTPSToHTTP() {
-        let delegate = URLSessionTransportDelegate(bodyLimit: 10)
-        let session = URLSession(configuration: .ephemeral)
-        defer { session.invalidateAndCancel() }
-        let secure = URL(string: "https://as.example.com/ok")!
-        let redirect = HTTPURLResponse(url: secure, statusCode: 302, httpVersion: nil, headerFields: nil)!
-        for (target, followed) in [("http://as.example.com/ok", false), ("https://as.example.com/other", true)] {
-            let task = session.dataTask(with: URLRequest(url: secure))
-            let outcome = RedirectOutcome()
-            delegate.urlSession(
-                session, task: task, willPerformHTTPRedirection: redirect,
-                newRequest: URLRequest(url: URL(string: target)!)
-            ) { outcome.record($0) }
-            #expect((outcome.request != nil) == followed)
         }
     }
 

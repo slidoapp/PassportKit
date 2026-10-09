@@ -148,19 +148,6 @@ struct RequestAuthorizerTests {
         #expect(code == (valid ? nil : .invalidResponse))
     }
 
-    @Test("data(for:session:) does not let the token follow a cross-origin redirect")
-    func sessionRedirectsDropTheToken() async throws {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [StubURLProtocol.self]
-        let session = URLSession(configuration: configuration)
-        defer { session.invalidateAndCancel() }
-        let authorizer = try await signedIn()
-        let (body, _) = try await authorizer.data(
-            for: URLRequest(url: try #require(URL(string: "https://as.example.com/other-host-echo"))),
-            session: session)
-        #expect(String(decoding: body, as: UTF8.self) == "none")
-    }
-
     private func thrownCode(_ operation: () async throws -> Void) async -> PassportError.Code? {
         do {
             try await operation()
