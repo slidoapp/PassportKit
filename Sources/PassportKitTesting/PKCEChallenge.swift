@@ -1,6 +1,6 @@
-import Crypto
+import CryptoKit
 
-/// The S256 code challenge transformation (RFC 7636 §4.2), computed with swift-crypto and its own base64url
+/// The S256 code challenge transformation (RFC 7636 §4.2), computed with CryptoKit and its own base64url
 /// encoder rather than the library's code path, so the fake verifies the client rather than echoing it.
 enum PKCEChallenge {
     static func s256(_ verifier: String) -> String {

@@ -1,4 +1,4 @@
-import Crypto
+import CryptoKit
 
 /// Proof Key for Code Exchange, S256 only (RFC 7636).
 enum PKCE {
