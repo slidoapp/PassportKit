@@ -11,6 +11,10 @@ device authorization, refresh tokens with rotation, token exchange, resource
 indicators, authorization server metadata, token revocation, and bearer
 token usage.
 
+It supports Apple platforms only (macOS 14, iOS 17, tvOS 17, watchOS 10 and
+visionOS 1) and includes Keychain storage and the user agents that complete a
+sign-in in the system browser (see <doc:NativeAppRedirects>).
+
 Two layers fit together:
 
 - ``OAuthClient`` is stateless. Each method sends one protocol request and
@@ -50,6 +54,9 @@ appear in descriptions, errors or events.
 - ``AuthorizationRequest``
 - ``PendingAuthorization``
 - ``AuthorizationUserAgent``
+- ``WebAuthenticationSessionUserAgent``
+- ``LoopbackRedirectListener``
+- ``LoopbackUserAgent``
 - ``DeviceAuthorization``
 
 ### Token requests and responses
@@ -84,6 +91,7 @@ appear in descriptions, errors or events.
 
 - ``CredentialStore``
 - ``CredentialAccount``
+- ``KeychainCredentialStore``
 - ``InMemoryCredentialStore``
 - ``CredentialCoding``
 

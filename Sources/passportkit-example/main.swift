@@ -10,10 +10,6 @@
 import Foundation
 import PassportKit
 
-#if canImport(Network)
-    import PassportKitApple
-#endif
-
 enum Flow: String, CaseIterable {
     case device
     case code
@@ -85,22 +81,18 @@ func signIn(arguments: Arguments, client: OAuthClient) async throws -> TokenResp
         print("Waiting for approval (polling every \(authorization.interval))...")
         return try await client.completeDeviceAuthorization(authorization)
     case .code:
-        #if canImport(Network)
-            let listener = try await LoopbackRedirectListener.start()
-            let request = AuthorizationRequest(
-                redirectURI: listener.redirectURI, scope: arguments.scope, prompt: arguments.prompt)
-            let opensBrowser = arguments.opensBrowser
-            let agent = LoopbackUserAgent(listener: listener) { url in
-                if opensBrowser {
-                    try await LoopbackUserAgent.openInSystemBrowser(url)
-                } else {
-                    print("Open this URL in a browser: \(url)")
-                }
+        let listener = try await LoopbackRedirectListener.start()
+        let request = AuthorizationRequest(
+            redirectURI: listener.redirectURI, scope: arguments.scope, prompt: arguments.prompt)
+        let opensBrowser = arguments.opensBrowser
+        let agent = LoopbackUserAgent(listener: listener) { url in
+            if opensBrowser {
+                try await LoopbackUserAgent.openInSystemBrowser(url)
+            } else {
+                print("Open this URL in a browser: \(url)")
             }
-            return try await client.authorize(request, using: agent)
-        #else
-            throw ExampleError("The code flow needs the loopback listener, which is available on Apple platforms.")
-        #endif
+        }
+        return try await client.authorize(request, using: agent)
     }
 }
 
@@ -142,9 +134,7 @@ func run() async throws {
     print("refresh token rotated: \(after != before ? "yes" : "no")")
 }
 
-#if canImport(Darwin)
-    setvbuf(stdout, nil, _IOLBF, 0)  // show the user code while the flow waits, even when piped
-#endif
+setvbuf(stdout, nil, _IOLBF, 0)  // show the user code while the flow waits, even when piped
 do {
     try await run()
 } catch {

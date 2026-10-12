@@ -2,20 +2,18 @@
 
 The authorization code flow ends with a redirect back to your app. How the
 redirect reaches you depends on the platform. RFC 8252 describes the
-options; PassportKit's `PassportKitApple` module implements the common ones.
-The core library only defines the ``AuthorizationUserAgent`` protocol, so you can bring
-your own.
+options; PassportKit implements the common ones as ``AuthorizationUserAgent``
+types, and you can bring your own.
 
 ## ASWebAuthenticationSession
 
-On iOS, macOS and visionOS use `WebAuthenticationSessionUserAgent`. It wraps
+On iOS, macOS and visionOS use ``WebAuthenticationSessionUserAgent``. It wraps
 `ASWebAuthenticationSession`: the system presents a browser sheet that can
 share the person's sign-in with Safari, and returns the redirect without
 leaving your app.
 
 ```swift
 import PassportKit
-import PassportKitApple
 
 @MainActor
 func signIn(client: OAuthClient) async throws -> TokenResponse {
@@ -37,13 +35,12 @@ get ``PassportError/Code-swift.struct/userCancelled``.
 
 ## Loopback redirect
 
-Desktop apps and command-line tools can listen on `127.0.0.1` (RFC 8252
+Desktop apps and command-line tools (and, with a browser on the same device, iOS and visionOS apps) can listen on `127.0.0.1` (RFC 8252
 §7.3). Start the listener first, because the redirect URI carries the port the
 system assigned:
 
 ```swift
 import PassportKit
-import PassportKitApple
 
 func signIn(client: OAuthClient) async throws -> TokenResponse {
     let listener = try await LoopbackRedirectListener.start()
@@ -63,7 +60,7 @@ The authorization server must accept a loopback redirect URI with any port.
 A listener you never wait on stays open until you call `cancel()` or release
 it. RFC 8252 §7.3 advises against `localhost` in a redirect URI; the listener
 always uses `127.0.0.1`.
-`LoopbackUserAgent` opens the system browser by default; pass `openURL:` to
+``LoopbackUserAgent`` opens the system browser by default; pass `openURL:` to
 open the URL yourself, for example to print it.
 
 ## Device flow
@@ -78,10 +75,9 @@ registered for the grant.
 
 | Situation | Use |
 |---|---|
-| iOS, macOS or visionOS app with UI | `WebAuthenticationSessionUserAgent` |
-| macOS tool or app without a registered scheme | `LoopbackUserAgent` |
-| tvOS, watchOS, headless | Device flow |
-| Linux | Device flow, or your own ``AuthorizationUserAgent`` |
+| iOS, macOS or visionOS app with UI | ``WebAuthenticationSessionUserAgent`` |
+| macOS tool or app without a registered scheme | ``LoopbackUserAgent`` |
+| tvOS, watchOS, headless | Device flow (the two agents above are not available on tvOS and watchOS) |
 
 Never present the authorization page in an embedded web view that your app
 can read: the person's credentials would pass through your code.

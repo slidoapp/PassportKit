@@ -53,8 +53,8 @@ to a terminal unfiltered.
 ## Sign in with the authorization code flow
 
 Interactive apps use the authorization code grant with PKCE. A
-``AuthorizationUserAgent`` shows the authorization page and returns the redirect. On
-Apple platforms `PassportKitApple` provides agents; see
+``AuthorizationUserAgent`` shows the authorization page and returns the redirect.
+``WebAuthenticationSessionUserAgent`` and ``LoopbackUserAgent`` are provided; see
 <doc:NativeAppRedirects>.
 
 ```swift
@@ -86,16 +86,15 @@ try await manager.signIn(with: tokens, requestedScope: ["openid", "offline_acces
 let token = try await manager.accessToken()
 ```
 
-Use ``InMemoryCredentialStore`` in tests only. On Apple platforms store the
-credential in the Keychain with `PassportKitApple`'s
-`KeychainCredentialStore`. On the next launch call
+Use ``InMemoryCredentialStore`` in tests only. Store the credential in the
+Keychain with ``KeychainCredentialStore``. On the next launch call
 ``TokenManager/load()`` instead of signing in again. Subscribe to
 ``TokenManager/events`` to learn when the session ends.
 
 ## See what the library does
 
 PassportKit logs through [swift-log](https://github.com/apple/swift-log). A default
-client, manager and Apple adapter log to a logger labelled `PassportKit`, which uses whatever
+client, manager and user agents log to a logger labelled `PassportKit`, which uses whatever
 `LoggingSystem.bootstrap` your app configured, so you get logs without wiring. Pass a `logger:` to choose a label
 or metadata:
 

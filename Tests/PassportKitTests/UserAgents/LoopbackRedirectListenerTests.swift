@@ -1,11 +1,11 @@
-#if canImport(Network)
+#if os(macOS) || os(iOS) || os(visionOS)
     import Foundation
     import Network
     import PassportKit
     import PassportKitTesting
     import Testing
 
-    @testable import PassportKitApple
+    @testable import PassportKit
 
     /// Talks to the real listener over the loopback interface. No external network is involved.
     @Suite("Loopback redirect listener", .timeLimit(.minutes(1)))

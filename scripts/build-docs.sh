@@ -9,7 +9,7 @@ derived=.build/docbuild
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT
 
-for scheme in PassportKit PassportKitApple PassportKitTesting; do
+for scheme in PassportKit PassportKitTesting; do
     echo "docs: building $scheme"
     if ! xcodebuild docbuild -scheme "$scheme" -destination 'generic/platform=macOS' \
         -derivedDataPath "$derived" >"$log" 2>&1; then

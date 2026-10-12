@@ -24,7 +24,7 @@ test:
 check: lint build test
 	@echo "make check: all checks passed"
 
-# Builds the DocC archives of all three libraries and fails on any documentation warning. Needs Xcode.
+# Builds the DocC archives of both libraries and fails on any documentation warning. Needs Xcode.
 docs:
 	scripts/build-docs.sh
 

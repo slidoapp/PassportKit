@@ -1,10 +1,9 @@
-#if canImport(Network)
+#if os(macOS) || os(iOS) || os(visionOS)
     import Foundation
-    import PassportKit
 
     #if os(macOS)
         import AppKit
-    #elseif os(iOS) || os(visionOS)
+    #else
         import UIKit
     #endif
 
@@ -30,7 +29,7 @@
         ///   - listener: The listener whose ``LoopbackRedirectListener/redirectURI`` the request uses.
         ///   - timeout: How long to wait for the redirect after the browser was opened.
         ///   - openURL: Opens a URL in the user's browser. The default uses `NSWorkspace` on macOS and
-        ///     `UIApplication` on iOS and visionOS; on other platforms supply your own.
+        ///     `UIApplication` on iOS and visionOS.
         public init(
             listener: LoopbackRedirectListener,
             timeout: Duration = .seconds(300),
@@ -79,10 +78,8 @@
         public static func openInSystemBrowser(_ url: URL) async throws {
             #if os(macOS)
                 let opened = await MainActor.run { NSWorkspace.shared.open(url) }
-            #elseif os(iOS) || os(visionOS)
-                let opened = await openOnMainActor(url)
             #else
-                let opened = false
+                let opened = await openOnMainActor(url)
             #endif
             guard opened else {
                 throw PassportError(
@@ -92,7 +89,7 @@
             }
         }
 
-        #if os(iOS) || os(visionOS)
+        #if !os(macOS)
             @MainActor
             private static func openOnMainActor(_ url: URL) async -> Bool {
                 await UIApplication.shared.open(url, options: [:])

@@ -1,5 +1,4 @@
 import Foundation
-import PassportKit
 
 /// The request line and headers of an HTTP/1.x request, as read by the loopback listener.
 ///

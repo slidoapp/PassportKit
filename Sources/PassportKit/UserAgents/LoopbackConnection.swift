@@ -1,8 +1,7 @@
-#if canImport(Network)
+#if os(macOS) || os(iOS) || os(visionOS)
     import Foundation
     import Logging
     import Network
-    import PassportKit
     import os
 
     /// Serves one accepted loopback connection: reads a request head, answers it and closes.

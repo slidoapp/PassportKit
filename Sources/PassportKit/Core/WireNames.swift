@@ -35,13 +35,13 @@ package enum OAuthParameter {
 }
 
 /// Parameters of the authorization response, which arrives as the redirect query (RFC 6749 §4.1.2).
-package enum AuthorizationResponseField {
-    package static let code = "code"
-    package static let state = "state"
-    package static let error = "error"  // RFC 6749 §4.1.2.1
-    package static let errorDescription = "error_description"
-    package static let errorURI = "error_uri"
-    package static let issuer = "iss"  // RFC 9207 §2
+enum AuthorizationResponseField {
+    static let code = "code"
+    static let state = "state"
+    static let error = "error"  // RFC 6749 §4.1.2.1
+    static let errorDescription = "error_description"
+    static let errorURI = "error_uri"
+    static let issuer = "iss"  // RFC 9207 §2
 }
 
 /// Members of an error response (RFC 6749 §5.2) and the same-named `WWW-Authenticate` parameters (RFC 6750 §3).

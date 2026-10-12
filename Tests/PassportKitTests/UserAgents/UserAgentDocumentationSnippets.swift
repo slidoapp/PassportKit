@@ -1,7 +1,6 @@
-#if canImport(Network) && canImport(AuthenticationServices) && os(macOS)
+#if os(macOS)
     import Foundation
     import PassportKit
-    import PassportKitApple
 
     // The code samples of Sources/PassportKit/PassportKit.docc/NativeAppRedirects.md, compiled so that they
     // follow the real API. They are never run. When you change a sample in the article, change it here.

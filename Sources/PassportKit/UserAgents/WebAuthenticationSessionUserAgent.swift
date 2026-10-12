@@ -1,8 +1,7 @@
-#if canImport(AuthenticationServices) && !os(tvOS) && !os(watchOS)
+#if !os(tvOS) && !os(watchOS)
     import AuthenticationServices
     import Foundation
     import Logging
-    import PassportKit
 
     #if os(macOS)
         import AppKit

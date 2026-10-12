@@ -1,8 +1,7 @@
-#if canImport(Network)
+#if os(macOS) || os(iOS) || os(visionOS)
     import Foundation
     import Logging
     import Network
-    import PassportKit
     import os
 
     /// A one-shot HTTP listener on the IPv4 loopback address that receives an authorization response

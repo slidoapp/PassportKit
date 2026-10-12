@@ -1,7 +1,6 @@
-#if canImport(AuthenticationServices) && !os(tvOS) && !os(watchOS)
+#if !os(tvOS) && !os(watchOS)
     import AuthenticationServices
     import Foundation
-    import PassportKit
 
     /// How a session recognises the redirect.
     enum WebAuthenticationCallback: Equatable, Sendable {

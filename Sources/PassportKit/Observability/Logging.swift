@@ -1,17 +1,17 @@
 import Logging
 
-/// Log metadata keys, shared by the library modules.
-package enum LogKey {
-    package static let endpoint = "endpoint"
-    package static let grantType = "grant_type"
-    package static let status = "status"
-    package static let errorCode = "error_code"
-    package static let durationMilliseconds = "duration_ms"
-    package static let reason = "reason"
-    package static let operation = "operation"
-    package static let derivation = "derivation"
-    package static let revoke = "revoke"
-    package static let port = "port"
+/// Log metadata keys.
+enum LogKey {
+    static let endpoint = "endpoint"
+    static let grantType = "grant_type"
+    static let status = "status"
+    static let errorCode = "error_code"
+    static let durationMilliseconds = "duration_ms"
+    static let reason = "reason"
+    static let operation = "operation"
+    static let derivation = "derivation"
+    static let revoke = "revoke"
+    static let port = "port"
 }
 
 extension Duration {

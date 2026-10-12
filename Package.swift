@@ -19,7 +19,6 @@ let package = Package(
     ],
     products: [
         .library(name: "PassportKit", targets: ["PassportKit"]),
-        .library(name: "PassportKitApple", targets: ["PassportKitApple"]),
         .library(name: "PassportKitTesting", targets: ["PassportKitTesting"]),
     ],
     dependencies: [
@@ -35,14 +34,6 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
                 .product(name: "HTTPTypesFoundation", package: "swift-http-types"),
-                .product(name: "Logging", package: "swift-log"),
-            ],
-            swiftSettings: swiftSettings
-        ),
-        .target(
-            name: "PassportKitApple",
-            dependencies: [
-                "PassportKit",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "SwiftKeychain", package: "SwiftKeychain"),
             ],
@@ -80,17 +71,12 @@ let package = Package(
         ),
         .testTarget(
             name: "IntegrationTests",
-            dependencies: ["PassportKit", "PassportKitApple"],
-            swiftSettings: swiftSettings
-        ),
-        .testTarget(
-            name: "PassportKitAppleTests",
-            dependencies: ["PassportKitApple", "PassportKitTesting"],
+            dependencies: ["PassportKit"],
             swiftSettings: swiftSettings
         ),
         .executableTarget(
             name: "passportkit-example",
-            dependencies: ["PassportKit", "PassportKitApple"],
+            dependencies: ["PassportKit"],
             swiftSettings: swiftSettings
         ),
     ]

@@ -1,10 +1,10 @@
-#if canImport(AuthenticationServices) && !os(tvOS) && !os(watchOS)
+#if !os(tvOS) && !os(watchOS)
     import AuthenticationServices
     import Foundation
     import PassportKit
     import Testing
 
-    @testable import PassportKitApple
+    @testable import PassportKit
 
     @Suite("Web authentication session user agent")
     struct WebAuthenticationSessionUserAgentTests {
