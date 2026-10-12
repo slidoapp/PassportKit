@@ -4,6 +4,7 @@
     import PassportKit
     import PassportKitTesting
     import Testing
+    import os
 
     @testable import PassportKit
 
@@ -318,12 +319,11 @@
     }
 
     private final class Flag: Sendable {
-        private let value = NSLock()
-        nonisolated(unsafe) private var set = false  // guarded by `value`
+        private let value = OSAllocatedUnfairLock(initialState: false)
         func setOnce() -> Bool {
-            value.withLock {
-                defer { set = true }
-                return !set
+            value.withLock { isSet in
+                defer { isSet = true }
+                return !isSet
             }
         }
     }

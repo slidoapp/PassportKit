@@ -2,17 +2,16 @@ import Foundation
 import HTTPTypes
 import PassportKit
 import PassportKitTesting
+import os
 
 /// A lock-protected value shared between the test and the transports and observers it hands out.
-final class Locked<Value: Sendable>: @unchecked Sendable {
-    // @unchecked Sendable: `value` is only read or written under `lock`.
-    private let lock = NSLock()
-    private var value: Value
+final class Locked<Value: Sendable>: Sendable {
+    private let value: OSAllocatedUnfairLock<Value>
 
-    init(_ value: Value) { self.value = value }
+    init(_ value: Value) { self.value = OSAllocatedUnfairLock(initialState: value) }
 
-    func read() -> Value { lock.withLock { value } }
-    func update(_ change: (inout Value) -> Void) { lock.withLock { change(&value) } }
+    func read() -> Value { value.withLock { $0 } }
+    func update(_ change: @Sendable (inout Value) -> Void) { value.withLock { change(&$0) } }
 }
 
 /// Every text rendering of every value a scenario produced. A canary in any of them is a leak.
@@ -25,7 +24,8 @@ final class RenderingLog: Sendable {
     func look(_ value: Any) {
         var dumped = ""
         dump(value, to: &dumped)
-        renderings.update { $0 += [String(describing: value), String(reflecting: value), dumped] }
+        let rendered = [String(describing: value), String(reflecting: value), dumped]
+        renderings.update { $0 += rendered }
     }
 
     /// Records an error the way an application would log it.

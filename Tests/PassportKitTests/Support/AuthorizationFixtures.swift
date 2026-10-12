@@ -1,15 +1,14 @@
 import Foundation
+import os
 
 @testable import PassportKit
 
 /// Test-only random source: the n-th call returns 32 bytes of value n, so state and verifier are predictable.
-final class CountingRandomSource: RandomSource, @unchecked Sendable {
-    // @unchecked Sendable: `calls` is only touched under `lock`.
-    private let lock = NSLock()
-    private var calls = 0
+final class CountingRandomSource: RandomSource, Sendable {
+    private let calls = OSAllocatedUnfairLock(initialState: 0)
 
     func bytes(count: Int) -> [UInt8] {
-        let call = lock.withLock {
+        let call = calls.withLock { calls in
             calls += 1
             return calls
         }

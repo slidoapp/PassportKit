@@ -1,31 +1,32 @@
 import Foundation
 import PassportKitTesting
 import Testing
+import os
 
 @testable import PassportKit
 
 @Suite("withTimeLimit", .timeLimit(.minutes(1)))
 struct TimeLimitTests {
-    final class DoneFlag: @unchecked Sendable {
-        // @unchecked Sendable: the value is only touched under `lock`.
-        private let lock = NSLock()
-        private var value = false
-        var isRaised: Bool { lock.withLock { value } }
-        func raise() { lock.withLock { value = true } }
+    final class DoneFlag: Sendable {
+        private let value = OSAllocatedUnfairLock(initialState: false)
+        var isRaised: Bool { value.withLock { $0 } }
+        func raise() { value.withLock { $0 = true } }
     }
 
     /// An operation that ignores cancellation until released, like a transport that cannot be interrupted.
-    final class Stubborn: @unchecked Sendable {
-        // @unchecked Sendable: the continuation is only touched under `lock`.
-        private let lock = NSLock()
-        private var continuation: CheckedContinuation<Void, Never>?
-        private var isReleased = false
+    final class Stubborn: Sendable {
+        private struct State {
+            var continuation: CheckedContinuation<Void, Never>?
+            var isReleased = false
+        }
+
+        private let state = OSAllocatedUnfairLock(initialState: State())
 
         func run() async {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                let proceed = lock.withLock { () -> Bool in
-                    if isReleased { return true }
-                    self.continuation = continuation
+                let proceed = state.withLock { state -> Bool in
+                    if state.isReleased { return true }
+                    state.continuation = continuation
                     return false
                 }
                 if proceed { continuation.resume() }
@@ -33,10 +34,10 @@ struct TimeLimitTests {
         }
 
         func release() {
-            let parked = lock.withLock { () -> CheckedContinuation<Void, Never>? in
-                isReleased = true
-                defer { continuation = nil }
-                return continuation
+            let parked = state.withLock { state -> CheckedContinuation<Void, Never>? in
+                state.isReleased = true
+                defer { state.continuation = nil }
+                return state.continuation
             }
             parked?.resume()
         }

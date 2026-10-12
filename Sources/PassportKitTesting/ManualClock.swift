@@ -1,15 +1,14 @@
 import Foundation
+import os
 
 /// A clock whose `sleep` suspends until a test advances time, so tests never sleep for real.
 ///
 /// Drive it with ``advance(by:)`` or, to avoid racing the code under test, with
 /// ``advanceToNextSleeper()`` which first waits until a task is sleeping. Sleeping honours task
 /// cancellation (it throws `CancellationError`) and sleepers wake in deadline order.
-public final class ManualClock: Clock, @unchecked Sendable {
-    // @unchecked Sendable: all mutable state is guarded by `lock`; continuations are resumed outside it.
-
+public final class ManualClock: Clock, Sendable {
     /// A point on the manual timeline, measured from the clock's creation.
-    public struct Instant: InstantProtocol {
+    public struct Instant: InstantProtocol, Sendable {
         /// The distance from the clock's origin.
         public var offset: Duration
 
@@ -27,43 +26,47 @@ public final class ManualClock: Clock, @unchecked Sendable {
         let continuation: CheckedContinuation<Void, any Error>
     }
 
-    private let lock = NSLock()
-    private var current = Instant(offset: .zero)
-    private var sleepers: [Sleeper] = []
-    private var cancelled: Set<Int> = []
-    private var nextID = 0
+    private struct State {
+        var current = Instant(offset: .zero)
+        var sleepers: [Sleeper] = []
+        var cancelled: Set<Int> = []
+        var nextID = 0
+    }
+
+    // Continuations are resumed outside the lock.
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     /// Creates a clock at its origin.
     public init() {}
 
-    public var now: Instant { lock.withLock { current } }
+    public var now: Instant { state.withLock { $0.current } }
     public var minimumResolution: Duration { .nanoseconds(1) }
 
     /// The number of tasks currently suspended in `sleep`.
-    public var sleeperCount: Int { lock.withLock { sleepers.count } }
+    public var sleeperCount: Int { state.withLock { $0.sleepers.count } }
 
     public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
-        let id = lock.withLock {
-            nextID += 1
-            return nextID
+        let id = state.withLock { state in
+            state.nextID += 1
+            return state.nextID
         }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                let outcome = lock.withLock { () -> Result<Void, CancellationError>? in
-                    if cancelled.remove(id) != nil { return .failure(CancellationError()) }
-                    if deadline <= current { return .success(()) }
-                    sleepers.append(Sleeper(id: id, deadline: deadline, continuation: continuation))
+                let outcome = state.withLock { state -> Result<Void, CancellationError>? in
+                    if state.cancelled.remove(id) != nil { return .failure(CancellationError()) }
+                    if deadline <= state.current { return .success(()) }
+                    state.sleepers.append(Sleeper(id: id, deadline: deadline, continuation: continuation))
                     return nil
                 }
                 if let outcome { continuation.resume(with: outcome.mapError { $0 as any Error }) }
             }
         } onCancel: {
-            let sleeper = lock.withLock { () -> Sleeper? in
-                guard let index = sleepers.firstIndex(where: { $0.id == id }) else {
-                    cancelled.insert(id)
+            let sleeper = state.withLock { state -> Sleeper? in
+                guard let index = state.sleepers.firstIndex(where: { $0.id == id }) else {
+                    state.cancelled.insert(id)
                     return nil
                 }
-                return sleepers.remove(at: index)
+                return state.sleepers.remove(at: index)
             }
             sleeper?.continuation.resume(throwing: CancellationError())
         }
@@ -73,10 +76,11 @@ public final class ManualClock: Clock, @unchecked Sendable {
     ///
     /// A negative `duration` is ignored: the clock never runs backwards.
     public func advance(by duration: Duration) {
-        let due = lock.withLock { () -> [Sleeper] in
-            current = current.advanced(by: max(.zero, duration))
-            let due = sleepers.filter { $0.deadline <= current }.sorted { $0.deadline < $1.deadline }
-            sleepers.removeAll { $0.deadline <= current }
+        let due = state.withLock { state -> [Sleeper] in
+            state.current = state.current.advanced(by: max(.zero, duration))
+            let now = state.current
+            let due = state.sleepers.filter { $0.deadline <= now }.sorted { $0.deadline < $1.deadline }
+            state.sleepers.removeAll { $0.deadline <= now }
             return due
         }
         for sleeper in due { sleeper.continuation.resume() }
@@ -115,9 +119,9 @@ public final class ManualClock: Clock, @unchecked Sendable {
     @discardableResult
     public func advanceToNextSleeper() async -> Duration {
         await waitForSleeper()
-        let step = lock.withLock { () -> Duration in
-            guard let earliest = sleepers.map(\.deadline).min() else { return .zero }
-            return max(.zero, current.duration(to: earliest))
+        let step = state.withLock { state -> Duration in
+            guard let earliest = state.sleepers.map(\.deadline).min() else { return .zero }
+            return max(.zero, state.current.duration(to: earliest))
         }
         advance(by: step)
         return step

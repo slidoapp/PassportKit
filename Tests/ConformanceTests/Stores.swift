@@ -1,6 +1,7 @@
 import Foundation
 import PassportKit
 import Testing
+import os
 
 /// A credential store whose calls suspend until the test lets them continue, so a test can decide in which
 /// order slow store operations take effect.
@@ -82,45 +83,43 @@ func finishes<Value: Sendable, Failure: Error>(
     return await waitUntil(timeout: timeout) { flag.isRaised }
 }
 
-final class Flag: @unchecked Sendable {
-    // @unchecked Sendable: the value is only touched under `lock`.
-    private let lock = NSLock()
-    private var value = false
-    var isRaised: Bool { lock.withLock { value } }
-    func raise() { lock.withLock { value = true } }
+final class Flag: Sendable {
+    private let value = OSAllocatedUnfairLock(initialState: false)
+    var isRaised: Bool { value.withLock { $0 } }
+    func raise() { value.withLock { $0 = true } }
 }
 
 /// Lets a test record the order of things that happen on different tasks and actors.
-final class OrderLog: @unchecked Sendable {
-    // @unchecked Sendable: the entries are only touched under `lock`.
-    private let lock = NSLock()
-    private var recorded: [String] = []
-    var entries: [String] { lock.withLock { recorded } }
-    func append(_ entry: String) { lock.withLock { recorded.append(entry) } }
+final class OrderLog: Sendable {
+    private let recorded = OSAllocatedUnfairLock(initialState: [String]())
+    var entries: [String] { recorded.withLock { $0 } }
+    func append(_ entry: String) { recorded.withLock { $0.append(entry) } }
 }
 
 /// Something to wait for that ignores cancellation until the test opens it, like a hung callback.
-final class Gate: @unchecked Sendable {
-    // @unchecked Sendable: the state is only touched under `lock`.
-    private let lock = NSLock()
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-    private var isOpen = false
+final class Gate: Sendable {
+    private struct State {
+        var waiters: [CheckedContinuation<Void, Never>] = []
+        var isOpen = false
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     func wait() async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            let proceed = lock.withLock { () -> Bool in
-                if !isOpen { waiters.append(continuation) }
-                return isOpen
+            let proceed = state.withLock { state -> Bool in
+                if !state.isOpen { state.waiters.append(continuation) }
+                return state.isOpen
             }
             if proceed { continuation.resume() }
         }
     }
 
     func open() {
-        let parked = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
-            isOpen = true
-            defer { waiters = [] }
-            return waiters
+        let parked = state.withLock { state -> [CheckedContinuation<Void, Never>] in
+            state.isOpen = true
+            defer { state.waiters = [] }
+            return state.waiters
         }
         for waiter in parked { waiter.resume() }
     }

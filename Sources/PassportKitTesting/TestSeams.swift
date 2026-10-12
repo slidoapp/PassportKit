@@ -1,23 +1,24 @@
 import Foundation
 import PassportKit
+import os
 
 /// A `WallClock` that returns a settable date and never moves on its own.
-public final class ManualWallClock: WallClock, @unchecked Sendable {
-    // @unchecked Sendable: the date is only read and written under `lock`.
-    private let lock = NSLock()
-    private var date: Date
+public final class ManualWallClock: WallClock, Sendable {
+    private let date: OSAllocatedUnfairLock<Date>
 
     /// Creates a clock stopped at `date` (default: 2023-11-14T22:13:20Z).
-    public init(_ date: Date = Date(timeIntervalSince1970: 1_700_000_000)) { self.date = date }
+    public init(_ date: Date = Date(timeIntervalSince1970: 1_700_000_000)) {
+        self.date = OSAllocatedUnfairLock(initialState: date)
+    }
 
-    public func now() -> Date { lock.withLock { date } }
+    public func now() -> Date { date.withLock { $0 } }
 
     /// Stops the clock at `date`.
-    public func set(_ date: Date) { lock.withLock { self.date = date } }
+    public func set(_ date: Date) { self.date.withLock { $0 = date } }
 
     /// Moves the clock by `duration` (negative values move it back).
     public func advance(by duration: Duration) {
-        lock.withLock { date = date.addingTimeInterval(duration.timeInterval) }
+        date.withLock { $0 = $0.addingTimeInterval(duration.timeInterval) }
     }
 }
 
@@ -29,11 +30,9 @@ extension Duration {
 }
 
 /// A `RandomSource` that returns a fixed byte pattern, repeated as often as needed.
-public final class SequenceRandomSource: RandomSource, @unchecked Sendable {
-    // @unchecked Sendable: the read position is only touched under `lock`.
-    private let lock = NSLock()
+public final class SequenceRandomSource: RandomSource, Sendable {
     private let pattern: [UInt8]
-    private var position = 0
+    private let position = OSAllocatedUnfairLock(initialState: 0)
 
     /// Creates a source that cycles through `pattern` (default: 0, 1, ... 255). The pattern must not be empty.
     public init(_ pattern: [UInt8] = Array(0...255)) {
@@ -42,7 +41,8 @@ public final class SequenceRandomSource: RandomSource, @unchecked Sendable {
     }
 
     public func bytes(count: Int) -> [UInt8] {
-        lock.withLock {
+        let pattern = pattern
+        return position.withLock { position in
             (0..<count).map { _ in
                 defer { position = (position + 1) % pattern.count }
                 return pattern[position]

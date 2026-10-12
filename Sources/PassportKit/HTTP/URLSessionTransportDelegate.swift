@@ -1,14 +1,10 @@
 import Foundation
 import HTTPTypes
 import HTTPTypesFoundation
-
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
+import os
 
 /// Collects responses for ``URLSessionTransport`` with a streaming body cap and redirect policy.
-// Safe: every mutable member is only touched while holding `lock`.
-final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, Sendable {
     private struct Pending {
         var task: URLSessionTask
         var continuation: CheckedContinuation<(HTTPResponse, Data), any Error>
@@ -19,23 +15,20 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
     }
 
     private let bodyLimit: Int
-    private let lock = NSLock()
-    private var pending: [Int: Pending] = [:]
+    private let pending = OSAllocatedUnfairLock(initialState: [Int: Pending]())
 
     init(bodyLimit: Int) {
         self.bodyLimit = bodyLimit
     }
 
     func register(task: URLSessionTask, continuation: CheckedContinuation<(HTTPResponse, Data), any Error>) {
-        lock.withLock {
-            pending[task.taskIdentifier] = Pending(task: task, continuation: continuation)
-        }
+        pending.withLock { $0[task.taskIdentifier] = Pending(task: task, continuation: continuation) }
     }
 
     func cancel(identifier: Int) {
-        let task = lock.withLock { () -> URLSessionTask? in
-            pending[identifier]?.cancelledByCaller = true
-            return pending[identifier]?.task
+        let task = pending.withLock { entries -> URLSessionTask? in
+            entries[identifier]?.cancelledByCaller = true
+            return entries[identifier]?.task
         }
         task?.cancel()
     }
@@ -57,27 +50,28 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
         completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
     ) {
         let exceeded = response.expectedContentLength > Int64(bodyLimit)
-        lock.withLock {
-            pending[dataTask.taskIdentifier]?.response = response as? HTTPURLResponse
-            if exceeded { pending[dataTask.taskIdentifier]?.exceededLimit = true }
+        pending.withLock { entries in
+            entries[dataTask.taskIdentifier]?.response = response as? HTTPURLResponse
+            if exceeded { entries[dataTask.taskIdentifier]?.exceededLimit = true }
         }
         completionHandler(exceeded ? .cancel : .allow)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        let exceeded = lock.withLock { () -> Bool in
-            guard var entry = pending[dataTask.taskIdentifier] else { return false }
+        let limit = bodyLimit
+        let exceeded = pending.withLock { entries -> Bool in
+            guard var entry = entries[dataTask.taskIdentifier] else { return false }
             entry.body.append(data)
-            entry.exceededLimit = entry.exceededLimit || entry.body.count > bodyLimit
+            entry.exceededLimit = entry.exceededLimit || entry.body.count > limit
             if entry.exceededLimit { entry.body = Data() }
-            pending[dataTask.taskIdentifier] = entry
+            entries[dataTask.taskIdentifier] = entry
             return entry.exceededLimit
         }
         if exceeded { dataTask.cancel() }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
-        guard let entry = lock.withLock({ pending.removeValue(forKey: task.taskIdentifier) }) else { return }
+        guard let entry = pending.withLock({ $0.removeValue(forKey: task.taskIdentifier) }) else { return }
         if entry.exceededLimit {
             entry.continuation.resume(
                 throwing: PassportError(.invalidResponse, detail: "Response body exceeds the size limit.")

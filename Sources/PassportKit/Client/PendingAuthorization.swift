@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// An authorization request that was started and awaits the redirect (RFC 6749 §4.1).
 ///
@@ -62,15 +63,13 @@ public struct PendingAuthorization: Sendable, CustomStringConvertible, CustomDeb
 }
 
 /// A flag shared by all copies of a ``PendingAuthorization``.
-private final class SingleUse: @unchecked Sendable {
-    // @unchecked Sendable: `claimed` is only read or written under `lock`.
-    private let lock = NSLock()
-    private var claimed = false
+private final class SingleUse: Sendable {
+    private let claimed = OSAllocatedUnfairLock(initialState: false)
 
-    var isClaimed: Bool { lock.withLock { claimed } }
+    var isClaimed: Bool { claimed.withLock { $0 } }
 
     func claim() -> Bool {
-        lock.withLock {
+        claimed.withLock { claimed in
             defer { claimed = true }
             return !claimed
         }

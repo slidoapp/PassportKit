@@ -1,18 +1,17 @@
 import Foundation
 import HTTPTypes
+import os
 
 @testable import PassportKit
 
 /// Test-only observer that keeps every event.
-final class RecordingObserver: PassportObserver, @unchecked Sendable {
-    // @unchecked Sendable: `stored` is only touched under `lock`.
-    private let lock = NSLock()
-    private var stored: [PassportEvent] = []
+final class RecordingObserver: PassportObserver, Sendable {
+    private let stored = OSAllocatedUnfairLock(initialState: [PassportEvent]())
 
-    var events: [PassportEvent] { lock.withLock { stored } }
+    var events: [PassportEvent] { stored.withLock { $0 } }
 
     func record(_ event: PassportEvent) {
-        lock.withLock { stored.append(event) }
+        stored.withLock { $0.append(event) }
     }
 }
 

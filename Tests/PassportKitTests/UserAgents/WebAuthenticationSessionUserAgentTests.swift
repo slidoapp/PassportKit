@@ -1,6 +1,7 @@
 #if !os(tvOS) && !os(watchOS)
     import AuthenticationServices
     import Foundation
+    import os
     import PassportKit
     import Testing
 
@@ -111,11 +112,10 @@
     }
 
     private final class RecordedOptions: Sendable {
-        private let lock = NSLock()
-        nonisolated(unsafe) private var stored: (WebAuthenticationCallback, Bool)?  // guarded by `lock`
-        var value: (WebAuthenticationCallback, Bool)? { lock.withLock { stored } }
+        private let stored = OSAllocatedUnfairLock<(WebAuthenticationCallback, Bool)?>(initialState: nil)
+        var value: (WebAuthenticationCallback, Bool)? { stored.withLock { $0 } }
         func set(_ callback: WebAuthenticationCallback, _ ephemeral: Bool) {
-            lock.withLock { stored = (callback, ephemeral) }
+            stored.withLock { $0 = (callback, ephemeral) }
         }
     }
 #endif
