@@ -23,7 +23,7 @@ let package = Package(
         .library(name: "PassportKitTesting", targets: ["PassportKitTesting"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.15.1"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1"..<"6.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
         .package(url: "https://github.com/slidoapp/SwiftKeychain.git", .upToNextMinor(from: "2.1.0")),
     ],

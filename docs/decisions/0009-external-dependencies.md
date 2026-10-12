@@ -34,7 +34,7 @@ Each dependency is linked only into the target that needs it.
 
 | Package | Product | Used by | Why |
 |---|---|---|---|
-| [swift-crypto](https://github.com/apple/swift-crypto) `from: 3.15.1` | `Crypto` | `PassportKit`, `PassportKitTesting` | SHA-256 for PKCE S256 (RFC 7636 §4.2). Re-exports CryptoKit on Apple platforms and uses BoringSSL elsewhere. The fake authorization server calls it directly, not PassportKit's code path, so it still checks the client independently. |
+| [swift-crypto](https://github.com/apple/swift-crypto) `"3.15.1"..<"6.0.0"` | `Crypto` | `PassportKit`, `PassportKitTesting` | SHA-256 for PKCE S256 (RFC 7636 §4.2). Re-exports CryptoKit on Apple platforms and uses BoringSSL elsewhere. The fake authorization server calls it directly, not PassportKit's code path, so it still checks the client independently. |
 | [swift-log](https://github.com/apple/swift-log) `from: 1.6.0` | `Logging` | `PassportKit`, `PassportKitApple` | The `logger:` parameters. A logger labelled `PassportKit` uses whatever `LoggingSystem.bootstrap` the host configured. `PassportObserver` stays the channel for typed events. |
 | [SwiftKeychain](https://github.com/slidoapp/SwiftKeychain) `.upToNextMinor(from: "2.1.0")` | `SwiftKeychain` | `PassportKitApple` | The Keychain wrapper the Slido OAuth stack already uses; `KeychainCredentialStore` is built on it. Adopted with a known issue, below. |
 

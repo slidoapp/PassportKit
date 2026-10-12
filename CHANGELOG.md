@@ -78,7 +78,7 @@ First development cycle; nothing is released yet.
 
 ### Changed
 
-- Dependencies: the core depends on swift-crypto (`Crypto`, `from: 3.15.1`) for SHA-256 and swift-log (`Logging`,
+- Dependencies: the core depends on swift-crypto (`Crypto`, `"3.15.1"..<"6.0.0"`) for SHA-256 and swift-log (`Logging`,
   `from: 1.6.0`); `PassportKitApple` depends on SwiftKeychain (`.upToNextMinor(from: "2.1.0")`). The hand-written
   SHA-256 and the "no third-party runtime dependencies" policy are gone (ADR 0009, which supersedes parts of
   ADR 0002).
