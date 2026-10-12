@@ -66,6 +66,29 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   and its `errorDescription` is the redacted `description`. The sanitized
   server text is `detail`.
 
+## Constants
+
+Protocol wire names are named constants, chosen by what kind of value they are.
+
+| Kind | Construct |
+|---|---|
+| Closed set the code switches over (CLI options) | `enum X: String, CaseIterable` |
+| Open, extensible protocol values (grant types, error codes, token types) | `struct X: RawRepresentable` with `static let` members (`GrantType`, `PassportError.Code`, `TokenTypeIdentifier`, `TokenTypeHint`, `EndpointKind`, `Prompt`) |
+| Names that only appear on the wire (form and query parameters, JSON members) | caseless `enum` namespace with `static let` members and the RFC section in a trailing comment |
+| JSON decoded through `Codable` | `CodingKeys` |
+| HTTP header names | `HTTPField.Name` constants; `rawName` where `URLRequest` needs a string |
+
+The namespaces (`OAuthParameter`, `AuthorizationResponseField`,
+`ErrorResponseField`, `TokenResponseField`, `DeviceAuthorizationResponseField`,
+`ResponseType`, `CodeChallengeMethod`, `AuthenticationScheme`, `MediaType`) live
+together in `Core/WireNames.swift`, because most are used by several files
+and by `PassportKitApple`: a reader checks a name against the RFCs in one place.
+Those the Apple module needs, and `LogKey` (in `Logging.swift`, next to the
+metadata builder), are `package`; the rest are internal. Not constants:
+one-off human-readable text (error details, log messages), and
+`PassportKitTesting` and the tests, which spell the wire format literally
+so that a typo in a library constant fails the conformance tests.
+
 ## Consequences
 
 Callers can rely on source-compatible minor releases when types grow, and
