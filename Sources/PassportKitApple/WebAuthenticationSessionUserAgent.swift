@@ -76,7 +76,7 @@
                     let level: Logger.Level = failure.code == .userCancelled ? .info : .warning
                     logger.log(
                         level: level, "The web authentication session ended without a redirect",
-                        metadata: ["error_code": "\(failure.code.rawValue)"])
+                        metadata: [LogKey.errorCode: "\(failure.code.rawValue)"])
                 }
                 throw mapped
             }

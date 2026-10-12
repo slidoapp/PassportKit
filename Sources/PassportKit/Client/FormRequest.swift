@@ -16,7 +16,7 @@ struct FormRequest {
         endpoint = .token
         self.url = url
         self.grantType = grantType
-        parameters.add("grant_type", grantType.rawValue)
+        parameters.add(OAuthParameter.grantType, grantType.rawValue)
     }
 
     /// A request to a non-token endpoint.
@@ -39,15 +39,16 @@ struct FormRequest {
         var standard = parameters.items
         configuration.authentication.apply(to: &standard, headers: &headers)
         let all = try additionalParameters.appending(to: standard, reserving: ClientAuthentication.parameterNames)
-        headers[.contentType] = "application/x-www-form-urlencoded"
-        headers[.accept] = "application/json"
+        headers[.contentType] = MediaType.formURLEncoded
+        headers[.accept] = MediaType.json
         return (HTTPRequest(method: .post, url: url, headerFields: headers), FormEncoding.encode(all))
     }
 
     /// Parameter names whose values are credentials, in standard and additional parameters.
     private static let secretParameterNames: Set<String> = [
-        "refresh_token", "subject_token", "actor_token", "code", "code_verifier", "device_code", "token",
-        "client_secret", "assertion", "client_assertion", "password",
+        OAuthParameter.refreshToken, OAuthParameter.subjectToken, OAuthParameter.actorToken, OAuthParameter.code,
+        OAuthParameter.codeVerifier, OAuthParameter.deviceCode, OAuthParameter.token, OAuthParameter.clientSecret,
+        OAuthParameter.assertion, OAuthParameter.clientAssertion, OAuthParameter.password,
     ]
 
     /// The credential values of this request and of the client authentication, which a server must not be able

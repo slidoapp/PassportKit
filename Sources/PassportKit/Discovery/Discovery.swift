@@ -50,7 +50,7 @@ public enum Discovery {
         let request = HTTPRequest(
             method: .get,
             url: try metadataURL(for: issuer, style: style),
-            headerFields: [.accept: "application/json"]
+            headerFields: [.accept: MediaType.json]
         )
         let response: HTTPResponse
         let body: Data

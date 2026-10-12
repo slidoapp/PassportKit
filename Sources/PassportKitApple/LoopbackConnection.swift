@@ -2,6 +2,7 @@
     import Foundation
     import Logging
     import Network
+    import PassportKit
     import os
 
     /// Serves one accepted loopback connection: reads a request head, answers it and closes.
@@ -68,7 +69,7 @@
                 case .complete(let head):
                     switch LoopbackRoute.route(head, path: context.path, port: context.port) {
                     case .reject(let status):
-                        context.logger.debug("Rejected a loopback request", metadata: ["status": "\(status)"])
+                        context.logger.debug("Rejected a loopback request", metadata: [LogKey.status: "\(status)"])
                         respond(connection, status: status)
                     case .callback(let target):
                         guard let url = URL(string: "http://127.0.0.1:\(context.port)\(target)"), context.accept(url)

@@ -1,3 +1,5 @@
+// The wire format is spelled out literally here on purpose: a typo in a library wire constant is caught by the conformance tests.
+
 import Foundation
 import HTTPTypes
 import PassportKit

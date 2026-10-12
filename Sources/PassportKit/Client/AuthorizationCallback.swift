@@ -3,7 +3,11 @@ import Foundation
 /// Pure checks on an authorization response delivered to the redirect URI (RFC 6749 §4.1.2).
 enum AuthorizationCallback {
     /// The response parameters that must not repeat (RFC 6749 §3.1).
-    private static let uniqueNames: Set<String> = ["code", "state", "error", "error_description", "error_uri", "iss"]
+    private static let uniqueNames: Set<String> = [
+        AuthorizationResponseField.code, AuthorizationResponseField.state, AuthorizationResponseField.error,
+        AuthorizationResponseField.errorDescription, AuthorizationResponseField.errorURI,
+        AuthorizationResponseField.issuer,
+    ]
 
     /// Whether `callback` is the redirect URI: scheme and host case-insensitively, port (default ports
     /// implied), and path exactly. A callback with userinfo never matches. When the redirect URI has a query,

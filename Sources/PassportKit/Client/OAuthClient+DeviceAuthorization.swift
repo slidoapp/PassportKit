@@ -62,7 +62,7 @@ extension OAuthClient {
             }
 
             var request = FormRequest(tokenEndpoint: configuration.endpoints.token, grantType: .deviceCode)
-            request.add("device_code", authorization.deviceCode.reveal())
+            request.add(OAuthParameter.deviceCode, authorization.deviceCode.reveal())
             request.additionalParameters = additionalParameters
 
             let response: HTTPResponse

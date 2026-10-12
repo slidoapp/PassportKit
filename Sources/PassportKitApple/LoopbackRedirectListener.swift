@@ -111,7 +111,7 @@
                 listener.cancel()
                 throw PassportError(.invalidConfiguration, detail: "The loopback path is not valid.")
             }
-            logger.debug("The loopback listener is ready", metadata: ["port": "\(assignedPort)"])
+            logger.debug("The loopback listener is ready", metadata: [LogKey.port: "\(assignedPort)"])
             return LoopbackRedirectListener(
                 redirectURI: redirectURI,
                 listener: listener,

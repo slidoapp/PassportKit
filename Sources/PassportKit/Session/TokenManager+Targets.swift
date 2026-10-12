@@ -79,7 +79,7 @@ extension TokenManager {
         let session = generation
         logger.trace(
             "Started a token request",
-            metadata: ["derivation": "\(target.derivation == .refreshGrant ? "refresh_grant" : "exchange")"])
+            metadata: [LogKey.derivation: "\(target.derivation == .refreshGrant ? "refresh_grant" : "exchange")"])
         // The lane turn is reserved here, synchronously, so turns follow the order of calls.
         let turn = target.derivation == .refreshGrant ? lane.reserve() : nil
         Task {

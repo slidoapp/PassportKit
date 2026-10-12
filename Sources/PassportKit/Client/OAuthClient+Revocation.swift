@@ -12,8 +12,8 @@ extension OAuthClient {
             endpoint: .revocation,
             url: try requireEndpoint(configuration.endpoints.revocation, name: "revocation")
         )
-        request.add("token", token.reveal())
-        if let typeHint { request.add("token_type_hint", typeHint.rawValue) }
+        request.add(OAuthParameter.token, token.reveal())
+        if let typeHint { request.add(OAuthParameter.tokenTypeHint, typeHint.rawValue) }
         let (response, body) = try await send(request)
         guard (200..<300).contains(response.status.code) else {
             throw failure(response, body: body, to: request, context: .other)

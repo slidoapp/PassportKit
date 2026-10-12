@@ -11,7 +11,7 @@ extension OAuthClient {
         additionalParameters: AdditionalParameters = [:]
     ) async throws -> TokenResponse {
         var request = FormRequest(tokenEndpoint: configuration.endpoints.token, grantType: .refreshToken)
-        request.add("refresh_token", refreshToken.reveal())
+        request.add(OAuthParameter.refreshToken, refreshToken.reveal())
         request.add(scope: scope)
         try request.add(resources: resources)
         request.additionalParameters = additionalParameters
@@ -45,16 +45,16 @@ extension OAuthClient {
             )
         }
         var request = FormRequest(tokenEndpoint: configuration.endpoints.token, grantType: .tokenExchange)
-        request.add("subject_token", exchange.subjectToken.reveal())
-        request.add("subject_token_type", exchange.subjectTokenType.rawValue)
+        request.add(OAuthParameter.subjectToken, exchange.subjectToken.reveal())
+        request.add(OAuthParameter.subjectTokenType, exchange.subjectTokenType.rawValue)
         if let actorToken = exchange.actorToken, let actorTokenType = exchange.actorTokenType {
-            request.add("actor_token", actorToken.reveal())
-            request.add("actor_token_type", actorTokenType.rawValue)
+            request.add(OAuthParameter.actorToken, actorToken.reveal())
+            request.add(OAuthParameter.actorTokenType, actorTokenType.rawValue)
         }
         if let requestedTokenType = exchange.requestedTokenType {
-            request.add("requested_token_type", requestedTokenType.rawValue)
+            request.add(OAuthParameter.requestedTokenType, requestedTokenType.rawValue)
         }
-        for audience in exchange.audiences { request.add("audience", audience) }
+        for audience in exchange.audiences { request.add(OAuthParameter.audience, audience) }
         try request.add(resources: exchange.resources)
         request.add(scope: exchange.scope)
         request.additionalParameters = exchange.additionalParameters

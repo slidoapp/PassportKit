@@ -20,7 +20,9 @@ extension TokenResponse {
             throw PassportError(.invalidResponse, detail: "The token response is not a JSON object.")
         }
         let knownMembers = [
-            "access_token", "token_type", "expires_in", "refresh_token", "id_token", "scope", "issued_token_type",
+            TokenResponseField.accessToken, TokenResponseField.tokenType, TokenResponseField.expiresIn,
+            TokenResponseField.refreshToken, TokenResponseField.idToken, TokenResponseField.scope,
+            TokenResponseField.issuedTokenType,
         ]
         for key in knownMembers where members[key] == .null {
             members[key] = nil
@@ -32,29 +34,29 @@ extension TokenResponse {
             return text
         }
 
-        guard let accessToken = takeString("access_token"), !accessToken.isEmpty else {
+        guard let accessToken = takeString(TokenResponseField.accessToken), !accessToken.isEmpty else {
             throw PassportError(.invalidResponse, detail: "The token response has no access_token.")
         }
-        let issuedTokenType = takeString("issued_token_type").map { TokenTypeIdentifier(rawValue: $0) }
+        let issuedTokenType = takeString(TokenResponseField.issuedTokenType).map { TokenTypeIdentifier(rawValue: $0) }
         if exchange, issuedTokenType == nil || issuedTokenType?.rawValue.isEmpty == true {
             throw PassportError(.invalidResponse, detail: "The exchange response has no issued_token_type.")
         }
-        var tokenType = takeString("token_type") ?? ""
+        var tokenType = takeString(TokenResponseField.tokenType) ?? ""
         if tokenType.isEmpty, exchange, let issuedTokenType, issuedTokenType != .accessToken {
-            tokenType = "N_A"
+            tokenType = TokenTypeValue.notApplicable
         }
         guard !tokenType.isEmpty else {
             throw PassportError(.invalidResponse, detail: "The token response has no token_type.")
         }
 
         var expiresIn: Duration?
-        switch members["expires_in"] {
+        switch members[TokenResponseField.expiresIn] {
         case .number(let seconds)?:
             expiresIn = Self.lifetime(seconds: seconds)
-            members["expires_in"] = nil
+            members[TokenResponseField.expiresIn] = nil
         case .string(let text)?:
             expiresIn = Double(text.trimmingCharacters(in: .whitespaces)).flatMap(Self.lifetime(seconds:))
-            members["expires_in"] = nil
+            members[TokenResponseField.expiresIn] = nil
         default:
             break
         }
@@ -63,9 +65,9 @@ extension TokenResponse {
             accessToken: Secret(accessToken),
             tokenType: tokenType,
             expiresIn: expiresIn,
-            refreshToken: takeString("refresh_token").flatMap { $0.isEmpty ? nil : Secret($0) },
-            idToken: takeString("id_token").flatMap { $0.isEmpty ? nil : Secret($0) },
-            scope: takeString("scope").map { ScopeSet(parsing: $0) },
+            refreshToken: takeString(TokenResponseField.refreshToken).flatMap { $0.isEmpty ? nil : Secret($0) },
+            idToken: takeString(TokenResponseField.idToken).flatMap { $0.isEmpty ? nil : Secret($0) },
+            scope: takeString(TokenResponseField.scope).map { ScopeSet(parsing: $0) },
             issuedTokenType: issuedTokenType,
             additionalFields: members
         )

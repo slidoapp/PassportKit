@@ -16,7 +16,7 @@ extension PassportError {
     ) -> PassportError {
         let retryAfter = retryAfter(in: headers, now: now)
         guard case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: body),
-            case .string(let text)? = members["error"], let code = Code.fromServer(text)
+            case .string(let text)? = members[ErrorResponseField.error], let code = Code.fromServer(text)
         else {
             let isTransient = statusCode == 429 || (500...599).contains(statusCode)
             let code: Code = isTransient ? .temporarilyUnavailable : .invalidResponse
@@ -28,9 +28,9 @@ extension PassportError {
             )
         }
         var description: String?
-        if case .string(let text)? = members["error_description"] { description = text }
+        if case .string(let text)? = members[ErrorResponseField.errorDescription] { description = text }
         var uri: URL?
-        if case .string(let text)? = members["error_uri"] { uri = Self.errorURI(from: text) }
+        if case .string(let text)? = members[ErrorResponseField.errorURI] { uri = Self.errorURI(from: text) }
         return fromServerError(
             code: code,
             detail: description,

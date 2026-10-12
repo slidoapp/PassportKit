@@ -66,11 +66,11 @@
             }
             // Only a redirect that carries this request's `state` may end the wait; the client checks it again.
             let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
-                .first { $0.name == "state" }?.value
+                .first { $0.name == AuthorizationResponseField.state }?.value
             return try await listener.waitForCallback(timeout: timeout) { callback in
                 guard let state else { return true }
                 return URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems?
-                    .contains { $0.name == "state" && $0.value == state } ?? false
+                    .contains { $0.name == AuthorizationResponseField.state && $0.value == state } ?? false
             }
         }
 

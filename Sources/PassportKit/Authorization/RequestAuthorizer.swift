@@ -68,7 +68,9 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         let token = try await manager.accessToken(for: target)
         try Self.requireBearer(token)
         var signed = request
-        signed.setValue("Bearer \(token.value.reveal())", forHTTPHeaderField: "Authorization")
+        signed.setValue(
+            "\(AuthenticationScheme.bearer) \(token.value.reveal())",
+            forHTTPHeaderField: HTTPField.Name.authorization.rawName)
         return (signed, token)
     }
 
@@ -87,7 +89,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         let token = try await manager.accessToken(for: target)
         try Self.requireBearer(token)
         var signed = request
-        signed.headerFields.setSensitive(.authorization, "Bearer \(token.value.reveal())")
+        signed.headerFields.setSensitive(.authorization, "\(AuthenticationScheme.bearer) \(token.value.reveal())")
         return (signed, token)
     }
 
@@ -110,21 +112,25 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     ) async -> RetryDecision {
         guard statusCode == 401 else { return .deliver }
         let challenges = AuthenticationChallenge.parse(headers[values: .wwwAuthenticate])
-        let challenge = challenges.first { $0.scheme == "bearer" && $0.parameters["error"] != nil }
-        let code = challenge?.parameters["error"]
+        let challenge = challenges.first {
+            AuthenticationScheme.isBearer($0.scheme) && $0.parameters[ErrorResponseField.error] != nil
+        }
+        let code = challenge?.parameters[ErrorResponseField.error]
         if code == PassportError.Code.insufficientScope.rawValue {
             manager.client.logger.notice("The resource answered insufficient_scope")
             return .fail(
                 PassportError(
                     .insufficientScope, statusCode: statusCode,
-                    detail: challenge?.parameters["error_description"]
+                    detail: challenge?.parameters[ErrorResponseField.errorDescription]
                 ).redacting([token.value.reveal()]))
         }
         guard attempt == 0 else {
             manager.client.logger.warning("The resource rejected a renewed access token")
             return .fail(PassportError(.unauthorized, recovery: .resourceDenied, statusCode: statusCode))
         }
-        if !challenges.isEmpty, !challenges.contains(where: { $0.scheme == "bearer" }) { return .deliver }
+        if !challenges.isEmpty, !challenges.contains(where: { AuthenticationScheme.isBearer($0.scheme) }) {
+            return .deliver
+        }
         guard code == nil || code == PassportError.Code.invalidToken.rawValue else { return .deliver }
         manager.client.logger.notice("The resource answered 401; retrying once with a new access token")
         await manager.invalidate(token)
@@ -192,7 +198,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     }
 
     private static func requireBearer(_ token: AccessToken) throws {
-        guard token.tokenType.lowercased() == "bearer" else {
+        guard AuthenticationScheme.isBearer(token.tokenType) else {
             throw PassportError(
                 .invalidConfiguration,
                 detail: "Only Bearer tokens can be sent; the server issued another type.")

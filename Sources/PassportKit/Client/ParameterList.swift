@@ -9,7 +9,7 @@ struct ParameterList {
     }
 
     mutating func add(scope: ScopeSet?) {
-        if let scope, !scope.isEmpty { add("scope", scope.rawValue) }
+        if let scope, !scope.isEmpty { add(OAuthParameter.scope, scope.rawValue) }
     }
 
     /// Adds repeated `resource` parameters (RFC 8707 §2): absolute URIs without a fragment. A host is not
@@ -23,7 +23,7 @@ struct ParameterList {
                     detail: "A resource indicator must be an absolute URI without a fragment."
                 )
             }
-            add("resource", text)
+            add(OAuthParameter.resource, text)
         }
     }
 }

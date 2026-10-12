@@ -51,20 +51,21 @@ public struct ClientAuthentication: Sendable, Hashable {
 
     /// The parameter names that carry client authentication. They are reserved in every mode, so an additional
     /// parameter can never add a second authentication method (RFC 6749 §2.3).
-    static let parameterNames: Set<String> = ["client_id", "client_secret"]
+    static let parameterNames: Set<String> = [OAuthParameter.clientID, OAuthParameter.clientSecret]
 
     /// Adds the client credentials to a request being built: body parameters or the `Authorization` header.
     func apply(to parameters: inout [(String, String)], headers: inout HTTPFields) {
         switch storage {
         case .publicClient(let clientID):
-            parameters.append(("client_id", clientID))
+            parameters.append((OAuthParameter.clientID, clientID))
         case .clientSecretPost(let clientID, let secret):
-            parameters.append(("client_id", clientID))
-            parameters.append(("client_secret", secret.reveal()))
+            parameters.append((OAuthParameter.clientID, clientID))
+            parameters.append((OAuthParameter.clientSecret, secret.reveal()))
         case .clientSecretBasic(let clientID, let secret):
             let credentials =
                 FormEncoding.encodeComponent(clientID) + ":" + FormEncoding.encodeComponent(secret.reveal())
-            headers.setSensitive(.authorization, "Basic " + Data(credentials.utf8).base64EncodedString())
+            headers.setSensitive(
+                .authorization, AuthenticationScheme.basic + " " + Data(credentials.utf8).base64EncodedString())
         }
     }
 }

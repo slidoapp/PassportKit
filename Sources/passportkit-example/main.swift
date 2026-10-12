@@ -14,16 +14,21 @@ import PassportKit
     import PassportKitApple
 #endif
 
+enum Flow: String, CaseIterable {
+    case device
+    case code
+}
+
 struct Arguments {
     var issuer: URL
     var clientID: String
     var scope: ScopeSet
-    var flow: String
+    var flow: Flow
     var prompt: [AuthorizationRequest.Prompt]
     var opensBrowser: Bool
 
     static let usage = """
-        usage: passportkit-example --issuer <url> --client-id <id> --scope "<scopes>" [--flow device|code]
+        usage: passportkit-example --issuer <url> --client-id <id> --scope "<scopes>" [--flow \(Flow.allCases.map(\.rawValue).joined(separator: "|"))]
                                    [--prompt <value>] [--no-browser]
         """
 
@@ -43,8 +48,9 @@ struct Arguments {
         guard let issuerText = values["--issuer"], let issuer = URL(string: issuerText),
             let clientID = values["--client-id"], let scope = values["--scope"]
         else { throw ExampleError("--issuer, --client-id and --scope are required.") }
-        let flow = values["--flow"] ?? "device"
-        guard flow == "device" || flow == "code" else { throw ExampleError("--flow must be device or code.") }
+        guard let flow = Flow(rawValue: values["--flow"] ?? Flow.device.rawValue) else {
+            throw ExampleError("--flow must be \(Flow.allCases.map(\.rawValue).joined(separator: " or ")).")
+        }
         self.issuer = issuer
         self.clientID = clientID
         self.scope = ScopeSet(parsing: scope)
@@ -72,13 +78,13 @@ func display(_ text: String) -> String {
 
 func signIn(arguments: Arguments, client: OAuthClient) async throws -> TokenResponse {
     switch arguments.flow {
-    case "device":
+    case .device:
         let authorization = try await client.beginDeviceAuthorization(scope: arguments.scope)
         print("Open \(authorization.verificationURIComplete ?? authorization.verificationURI)")
         print("and enter the code \(display(authorization.userCode)) if asked.")
         print("Waiting for approval (polling every \(authorization.interval))...")
         return try await client.completeDeviceAuthorization(authorization)
-    default:
+    case .code:
         #if canImport(Network)
             let listener = try await LoopbackRedirectListener.start()
             let request = AuthorizationRequest(

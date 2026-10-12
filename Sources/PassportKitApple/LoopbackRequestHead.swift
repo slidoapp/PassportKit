@@ -1,4 +1,5 @@
 import Foundation
+import PassportKit
 
 /// The request line and headers of an HTTP/1.x request, as read by the loopback listener.
 ///
@@ -113,6 +114,7 @@ enum LoopbackRoute: Equatable {
         guard let names = URLComponents(string: "http://127.0.0.1\(target)")?.queryItems?.map(\.name) else {
             return false
         }
-        return names.contains("state") && (names.contains("code") || names.contains("error"))
+        return names.contains(AuthorizationResponseField.state)
+            && (names.contains(AuthorizationResponseField.code) || names.contains(AuthorizationResponseField.error))
     }
 }

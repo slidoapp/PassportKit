@@ -109,7 +109,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     static func errorCode(statusCode: Int, body: Data) -> String? {
         guard !(200..<300).contains(statusCode),
             case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: body),
-            case .string(let code)? = members["error"],
+            case .string(let code)? = members[ErrorResponseField.error],
             (1...64).contains(code.count),
             code.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" || $0 == ".") })
         else { return nil }

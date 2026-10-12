@@ -23,7 +23,4 @@ enum PKCE {
     static func challenge(for verifier: Secret) -> String {
         Base64URL.encode(Array(SHA256.hash(data: Array(verifier.reveal().utf8))))
     }
-
-    /// The only supported `code_challenge_method` (RFC 7636 §4.3).
-    static let challengeMethod = "S256"
 }

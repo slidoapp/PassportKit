@@ -211,7 +211,7 @@
             let level: Logger.Level = status == errSecInteractionNotAllowed ? .notice : .warning
             logger.log(
                 level: level, "A Keychain operation failed",
-                metadata: ["operation": "\(operation)", "status": "\(status)"])
+                metadata: [LogKey.operation: "\(operation)", LogKey.status: "\(status)"])
             return Self.failure(status)
         }
 

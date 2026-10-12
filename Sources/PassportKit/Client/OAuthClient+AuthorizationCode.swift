@@ -30,16 +30,18 @@ extension OAuthClient {
         let verifier = try PKCE.makeVerifier(random: random)
 
         var builder = ParameterList()
-        builder.add("response_type", "code")
-        builder.add("client_id", configuration.authentication.clientID)
-        builder.add("redirect_uri", request.redirectURI.absoluteString)
-        builder.add("state", state.reveal())
-        builder.add("code_challenge", PKCE.challenge(for: verifier))
-        builder.add("code_challenge_method", PKCE.challengeMethod)
+        builder.add(OAuthParameter.responseType, ResponseType.code)
+        builder.add(OAuthParameter.clientID, configuration.authentication.clientID)
+        builder.add(OAuthParameter.redirectURI, request.redirectURI.absoluteString)
+        builder.add(OAuthParameter.state, state.reveal())
+        builder.add(OAuthParameter.codeChallenge, PKCE.challenge(for: verifier))
+        builder.add(OAuthParameter.codeChallengeMethod, CodeChallengeMethod.s256)
         builder.add(scope: request.scope)
         try builder.add(resources: request.resources)
-        if let loginHint = request.loginHint { builder.add("login_hint", loginHint) }
-        if !request.prompt.isEmpty { builder.add("prompt", request.prompt.map(\.rawValue).joined(separator: " ")) }
+        if let loginHint = request.loginHint { builder.add(OAuthParameter.loginHint, loginHint) }
+        if !request.prompt.isEmpty {
+            builder.add(OAuthParameter.prompt, request.prompt.map(\.rawValue).joined(separator: " "))
+        }
         let parameters = try request.additionalParameters.appending(
             to: builder.items, reserving: ClientAuthentication.parameterNames)
 
@@ -93,9 +95,9 @@ extension OAuthClient {
     ) async throws -> TokenResponse {
         let code = try validate(callbackURL, for: pending)
         var request = FormRequest(tokenEndpoint: configuration.endpoints.token, grantType: .authorizationCode)
-        request.add("code", code.reveal())
-        request.add("redirect_uri", pending.redirectURI.absoluteString)
-        request.add("code_verifier", pending.codeVerifier.reveal())
+        request.add(OAuthParameter.code, code.reveal())
+        request.add(OAuthParameter.redirectURI, pending.redirectURI.absoluteString)
+        request.add(OAuthParameter.codeVerifier, pending.codeVerifier.reveal())
         try request.add(resources: pending.resources)
         request.additionalParameters = additionalParameters
         return try await performTokenRequest(request, context: .other)
@@ -132,7 +134,8 @@ extension OAuthClient {
         guard let values = AuthorizationCallback.parameters(of: callbackURL) else {
             throw PassportError(.invalidResponse, detail: "The callback parameters are malformed.")
         }
-        guard let state = values["state"], AuthorizationCallback.constantTimeEquals(state, pending.state.reveal())
+        guard let state = values[AuthorizationResponseField.state],
+            AuthorizationCallback.constantTimeEquals(state, pending.state.reveal())
         else {
             throw PassportError(.stateMismatch, detail: "The authorization response state did not match.")
         }
@@ -142,19 +145,21 @@ extension OAuthClient {
                 detail: "This authorization was already completed; start a new one."
             )
         }
-        try validateIssuer(values["iss"])
-        if let error = values["error"], !error.isEmpty {
+        try validateIssuer(values[AuthorizationResponseField.issuer])
+        if let error = values[AuthorizationResponseField.error], !error.isEmpty {
             guard let code = PassportError.Code.fromServer(error) else {
                 throw PassportError(.invalidResponse, detail: "The authorization error code is malformed.")
             }
             throw PassportError.fromServerError(
                 code: code,
-                detail: values["error_description"],
-                errorURI: values["error_uri"].flatMap(PassportError.errorURI(from:)),
+                detail: values[AuthorizationResponseField.errorDescription],
+                errorURI: values[AuthorizationResponseField.errorURI].flatMap(PassportError.errorURI(from:)),
                 context: .authorizationResponse
-            ).redacting([pending.state.reveal(), pending.codeVerifier.reveal(), values["code"] ?? ""])
+            ).redacting([
+                pending.state.reveal(), pending.codeVerifier.reveal(), values[AuthorizationResponseField.code] ?? "",
+            ])
         }
-        guard let code = values["code"], !code.isEmpty else {
+        guard let code = values[AuthorizationResponseField.code], !code.isEmpty else {
             throw PassportError(.invalidResponse, detail: "The authorization response has no code.")
         }
         return Secret(code)

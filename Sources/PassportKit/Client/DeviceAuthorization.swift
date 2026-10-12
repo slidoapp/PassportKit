@@ -117,10 +117,13 @@ extension DeviceAuthorization {
             else { return nil }
             return url
         }
-        guard let deviceCode = text("device_code"), let userCode = text("user_code"),
+        guard let deviceCode = text(DeviceAuthorizationResponseField.deviceCode),
+            let userCode = text(DeviceAuthorizationResponseField.userCode),
             // `verification_url` is an interoperability alias: some providers shipped it before RFC 8628 settled on `_uri`.
-            let verificationURI = url(text("verification_uri", "verification_url")),
-            let lifetime = seconds("expires_in"), lifetime.isFinite, lifetime > 0
+            let verificationURI = url(
+                text(DeviceAuthorizationResponseField.verificationURI, DeviceAuthorizationResponseField.verificationURL)
+            ),
+            let lifetime = seconds(DeviceAuthorizationResponseField.expiresIn), lifetime.isFinite, lifetime > 0
         else {
             throw PassportError(
                 .invalidResponse,
@@ -136,7 +139,9 @@ extension DeviceAuthorization {
             throw PassportError(
                 .invalidResponse, detail: "The device authorization response has an unusable user code.")
         }
-        let pollInterval = seconds("interval").flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        let pollInterval = seconds(DeviceAuthorizationResponseField.interval).flatMap {
+            $0.isFinite && $0 > 0 ? $0 : nil
+        }
         if let pollInterval, pollInterval > Double(Self.maximumInterval.components.seconds) {
             throw PassportError(
                 .invalidResponse,
@@ -148,7 +153,7 @@ extension DeviceAuthorization {
             deviceCode: Secret(deviceCode),
             userCode: userCode,
             verificationURI: verificationURI,
-            verificationURIComplete: url(text("verification_uri_complete")),
+            verificationURIComplete: url(text(DeviceAuthorizationResponseField.verificationURIComplete)),
             expiresIn: expiresIn,
             expiresAt: wallClock.now().addingTimeInterval(Double(expiresIn.components.seconds)),
             interval: pollInterval.map { Duration.seconds($0) } ?? Self.defaultInterval,

@@ -118,7 +118,7 @@ public actor TokenManager {
         } catch {
             logger.warning(
                 "Loading the credential failed",
-                metadata: ["error_code": "\(PassportError.Code.storageFailure.rawValue)"])
+                metadata: [LogKey.errorCode: "\(PassportError.Code.storageFailure.rawValue)"])
             throw Self.storageError(error)
         }
         // A sign-in or sign-out that ran while the store was reading wins.
@@ -131,7 +131,7 @@ public actor TokenManager {
         }
         current = stored
         eventHub.emit(.signedIn)
-        logger.info("Signed in", metadata: ["reason": "restored"])
+        logger.info("Signed in", metadata: [LogKey.reason: "restored"])
         return stored
     }
 
@@ -159,7 +159,7 @@ public actor TokenManager {
         let token = makeToken(from: response, target: .default, requestedScope: requestedScope)
         current = credential
         eventHub.emit(.signedIn)
-        logger.info("Signed in", metadata: ["reason": "grant"])
+        logger.info("Signed in", metadata: [LogKey.reason: "grant"])
         // The token is not cached until it was saved with its credential and judged, which takes a while. Until
         // then this flight stands in for it: a caller asking for the default token in that time waits here
         // instead of refreshing, which would spend the grant's first refresh token and then be overwritten by
@@ -207,7 +207,8 @@ public actor TokenManager {
         // that follows.
         eventHub.emit(.signedOut(reason: .userInitiated))
         logger.info(
-            "Signed out", metadata: ["reason": "\(SignOutReason.userInitiated.logValue)", "revoke": "\(revoke)"])
+            "Signed out",
+            metadata: [LogKey.reason: "\(SignOutReason.userInitiated.logValue)", LogKey.revoke: "\(revoke)"])
         // Reserved now, before any suspension, so the revocation queues behind operations that are
         // already sending the old refresh token.
         let revocation =
@@ -225,7 +226,7 @@ public actor TokenManager {
         }
         switch outcome {
         case .failed(let error):
-            logger.warning("Revoking the refresh token failed", metadata: ["error_code": "\(error.code.rawValue)"])
+            logger.warning("Revoking the refresh token failed", metadata: [LogKey.errorCode: "\(error.code.rawValue)"])
         case .timedOut: logger.warning("Revoking the refresh token timed out")
         case .revoked: logger.debug("Revoked the refresh token")
         default: break
@@ -258,7 +259,7 @@ public actor TokenManager {
                 return true
             } catch {
                 eventHub.emit(.storageFailed)
-                logger.notice("The credential store failed", metadata: ["operation": "\(operation)"])
+                logger.notice("The credential store failed", metadata: [LogKey.operation: "\(operation)"])
                 return false
             }
         }

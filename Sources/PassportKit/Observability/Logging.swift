@@ -1,5 +1,19 @@
 import Logging
 
+/// Log metadata keys, shared by the library modules.
+package enum LogKey {
+    package static let endpoint = "endpoint"
+    package static let grantType = "grant_type"
+    package static let status = "status"
+    package static let errorCode = "error_code"
+    package static let durationMilliseconds = "duration_ms"
+    package static let reason = "reason"
+    package static let operation = "operation"
+    package static let derivation = "derivation"
+    package static let revoke = "revoke"
+    package static let port = "port"
+}
+
 extension Duration {
     /// Whole milliseconds, for log metadata.
     var wholeMilliseconds: Int {
@@ -14,11 +28,11 @@ extension Logger.Metadata {
         endpoint: EndpointKind, grantType: GrantType? = nil, status: Int? = nil, errorCode: String? = nil,
         duration: Duration? = nil
     ) -> Logger.Metadata {
-        var metadata: Logger.Metadata = ["endpoint": "\(endpoint.rawValue)"]
-        if let grantType { metadata["grant_type"] = "\(grantType.rawValue)" }
-        if let status { metadata["status"] = "\(status)" }
-        if let errorCode { metadata["error_code"] = "\(errorCode)" }
-        if let duration { metadata["duration_ms"] = "\(duration.wholeMilliseconds)" }
+        var metadata: Logger.Metadata = [LogKey.endpoint: "\(endpoint.rawValue)"]
+        if let grantType { metadata[LogKey.grantType] = "\(grantType.rawValue)" }
+        if let status { metadata[LogKey.status] = "\(status)" }
+        if let errorCode { metadata[LogKey.errorCode] = "\(errorCode)" }
+        if let duration { metadata[LogKey.durationMilliseconds] = "\(duration.wholeMilliseconds)" }
         return metadata
     }
 }

@@ -130,7 +130,7 @@ extension TokenManager {
         startNewSession()
         current = nil
         eventHub.emit(.signedOut(reason: reason))
-        logger.info("Session ended", metadata: ["reason": "\(reason.logValue)"])
+        logger.info("Session ended", metadata: [LogKey.reason: "\(reason.logValue)"])
         await deleteStoredCredential()
     }
 

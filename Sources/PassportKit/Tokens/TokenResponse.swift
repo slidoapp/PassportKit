@@ -47,7 +47,7 @@ public struct TokenResponse: Sendable, Hashable, CustomStringConvertible, Custom
 
     /// Whether ``tokenType`` is `Bearer`, compared case-insensitively (RFC 6749 §7.1, RFC 9110 §11.1).
     var isBearer: Bool {
-        tokenType.lowercased() == "bearer"
+        AuthenticationScheme.isBearer(tokenType)
     }
 
     /// The scope this token is valid for: the response `scope` when present, otherwise `requested`
