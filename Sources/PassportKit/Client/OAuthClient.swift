@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import Logging
 
 /// Stateless OAuth 2.0 protocol operations against one authorization server (specification §8).
@@ -49,7 +50,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
 
     /// A summary naming the client ID and the token endpoint.
     public var description: String {
-        "OAuthClient(clientID: \(configuration.authentication.clientID), token: \(HTTPRequest.redactedTarget(of: configuration.endpoints.token)))"
+        "OAuthClient(clientID: \(configuration.authentication.clientID), token: \(configuration.endpoints.token.redactedTarget))"
     }
 
     /// Same as ``description``.
@@ -63,13 +64,14 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     /// Transport failures become ``PassportError/Code-swift.struct/transportFailure`` and are reported to the
     /// observer as ``PassportEvent/transportFailure(endpoint:grantType:duration:)``; `CancellationError`
     /// propagates unchanged, also when the transport reports cancellation as another error.
-    func send(_ request: FormRequest) async throws -> HTTPResponse {
-        let httpRequest = try request.build(configuration: configuration)
+    func send(_ request: FormRequest) async throws -> (response: HTTPResponse, body: Data) {
+        let (httpRequest, requestBody) = try request.build(configuration: configuration)
         observer?.record(.request(endpoint: request.endpoint, grantType: request.grantType))
         let stopwatch = Stopwatch(clock: clock)
         let response: HTTPResponse
+        let body: Data
         do {
-            response = try await transport.send(httpRequest)
+            (response, body) = try await transport.send(httpRequest, body: requestBody)
         } catch {
             observer?.record(
                 .transportFailure(endpoint: request.endpoint, grantType: request.grantType, duration: stopwatch.elapsed)
@@ -90,23 +92,23 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
         observer?.record(
             .response(
                 endpoint: request.endpoint,
-                statusCode: response.statusCode,
-                errorCode: Self.errorCode(in: response),
+                statusCode: response.status.code,
+                errorCode: Self.errorCode(statusCode: response.status.code, body: body),
                 duration: stopwatch.elapsed
             )
         )
         logger.debug(
             "Request completed",
             metadata: .request(
-                endpoint: request.endpoint, grantType: request.grantType, status: response.statusCode,
-                errorCode: Self.errorCode(in: response), duration: stopwatch.elapsed))
-        return response
+                endpoint: request.endpoint, grantType: request.grantType, status: response.status.code,
+                errorCode: Self.errorCode(statusCode: response.status.code, body: body), duration: stopwatch.elapsed))
+        return (response, body)
     }
 
     /// The OAuth `error` member of a non-2xx response, only when it is a short plain token.
-    static func errorCode(in response: HTTPResponse) -> String? {
-        guard !(200..<300).contains(response.statusCode),
-            case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: response.body),
+    static func errorCode(statusCode: Int, body: Data) -> String? {
+        guard !(200..<300).contains(statusCode),
+            case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: body),
             case .string(let code)? = members["error"],
             (1...64).contains(code.count),
             code.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" || $0 == ".") })
@@ -122,19 +124,21 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
         context: ErrorResponseContext,
         exchange: Bool = false
     ) async throws -> TokenResponse {
-        let response = try await send(request)
-        guard (200..<300).contains(response.statusCode) else {
-            throw failure(response, to: request, context: context)
+        let (response, body) = try await send(request)
+        guard (200..<300).contains(response.status.code) else {
+            throw failure(response, body: body, to: request, context: context)
         }
-        return try TokenResponse(parsing: response.body, exchange: exchange)
+        return try TokenResponse(parsing: body, exchange: exchange)
     }
 
     /// The error for a non-2xx response to `request`, without any credential `request` carried.
-    func failure(_ response: HTTPResponse, to request: FormRequest, context: ErrorResponseContext) -> PassportError {
+    func failure(
+        _ response: HTTPResponse, body: Data, to request: FormRequest, context: ErrorResponseContext
+    ) -> PassportError {
         PassportError.fromErrorResponse(
-            statusCode: response.statusCode,
-            headers: response.headers,
-            body: response.body,
+            statusCode: response.status.code,
+            headers: response.headerFields,
+            body: body,
             context: context,
             now: wallClock.now()
         ).redacting(request.secretValues(configuration: configuration))

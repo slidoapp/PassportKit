@@ -107,10 +107,6 @@ appear in descriptions, errors or events.
 
 - ``HTTPTransport``
 - ``URLSessionTransport``
-- ``HTTPRequest``
-- ``HTTPResponse``
-- ``HTTPHeaders``
-- ``HTTPMethod``
 
 ### Time and randomness
 

@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 import PassportKitTesting
 import Testing
@@ -8,9 +9,8 @@ struct AuthorizationGrantTests {
     @Test("metadata advertises the endpoints at the issuer")
     func metadata() async throws {
         let fixture = Fixture()
-        let response = try await fixture.get(
+        let reply = try await fixture.get(
             URL(string: "https://as.example.com/.well-known/oauth-authorization-server")!)
-        let reply = Reply(response: response)
         #expect(reply.status == 200)
         #expect(reply["issuer"] == "https://as.example.com")
         #expect(reply["token_endpoint"] == "https://as.example.com/token")
@@ -19,8 +19,7 @@ struct AuthorizationGrantTests {
         #expect(reply.json["authorization_response_iss_parameter_supported"] as? Bool == true)
 
         await fixture.server.configure { $0.advertisedIssuer = "https://other.example.com" }
-        let changed = Reply(
-            response: try await fixture.get(URL(string: "https://as.example.com/.well-known/openid-configuration")!))
+        let changed = try await fixture.get(URL(string: "https://as.example.com/.well-known/openid-configuration")!)
         #expect(changed["issuer"] == "https://other.example.com")
     }
 
@@ -142,7 +141,7 @@ struct AuthorizationGrantTests {
         let unknown = try await fixture.token(form, as: .basic("nobody", "x"))
         #expect(unknown.status == 401)
         #expect(unknown.error == "invalid_client")
-        #expect(unknown.response.headers["WWW-Authenticate"]?.hasPrefix("Basic") == true)
+        #expect(unknown.response.headerFields[.wwwAuthenticate]?.hasPrefix("Basic") == true)
         #expect(try await fixture.token(form, as: .post("service", "wrong")).status == 401)
         #expect(try await fixture.token(form, as: .publicClient("service")).error == "invalid_client")
     }

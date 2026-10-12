@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKitTesting
 import Testing
 
@@ -75,8 +76,8 @@ struct RequestAuthorizerTests {
 
     @Test("RFC 6750 §3.1: the decision table", arguments: table)
     func decisionTable(_ row: Case) async throws {
-        var headers = HTTPHeaders()
-        for line in row.challenges { headers.append("WWW-Authenticate", line) }
+        var headers = HTTPFields()
+        for line in row.challenges { headers.append(HTTPField(name: .wwwAuthenticate, value: line)) }
         let decision = try await authorizer().evaluate(
             statusCode: row.status, headers: headers, token: token, attempt: row.attempt)
         #expect(decision == row.expected)
@@ -132,7 +133,7 @@ struct RequestAuthorizerTests {
         let authorizer = try await signedIn()
         let url = try #require(URL(string: "https://evil.example/"))
         let (signed, _) = try await authorizer.sign(HTTPRequest(method: .get, url: url))
-        #expect(signed.headers["Authorization"] == "Bearer opaque")
+        #expect(signed.headerFields[.authorization] == "Bearer opaque")
     }
 
     @Test(

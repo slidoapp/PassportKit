@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import Testing
 
 @testable import PassportKit
@@ -189,11 +190,11 @@ struct AuthenticationChallengeTests {
         #expect(AuthenticationChallenge.parse(["", " , "]).isEmpty)
     }
 
-    @Test func parsesHeaderLinesStraightFromHTTPHeaders() {
-        var headers = HTTPHeaders()
-        headers.append("WWW-Authenticate", #"Basic realm="simple""#)
-        headers.append("www-authenticate", #"Bearer error="invalid_token""#)
-        let parsed = AuthenticationChallenge.parse(headers.values(for: "WWW-Authenticate"))
+    @Test func parsesHeaderLinesStraightFromHTTPFields() {
+        var headers = HTTPFields()
+        headers.append(HTTPField(name: .wwwAuthenticate, value: #"Basic realm="simple""#))
+        headers.append(HTTPField(name: .wwwAuthenticate, value: #"Bearer error="invalid_token""#))
+        let parsed = AuthenticationChallenge.parse(headers[values: .wwwAuthenticate])
         #expect(parsed.map(\.scheme) == ["basic", "bearer"])
     }
 

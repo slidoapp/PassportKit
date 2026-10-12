@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 
 struct TokenRecord {
@@ -27,7 +28,7 @@ struct Issuance {
 }
 
 extension FakeAuthorizationServer {
-    func handleToken(_ request: RecordedRequest) throws -> HTTPResponse {
+    func handleToken(_ request: RecordedRequest) throws -> Reply {
         let client = try authenticate(request)
         guard let name = request.value("grant_type") else {
             throw Failure.oauth("invalid_request", "The grant_type parameter is required.")
@@ -63,7 +64,7 @@ extension FakeAuthorizationServer {
     func tokenResponse(
         accessToken: String, scope: ScopeSet, client: ClientRegistration, refreshToken: String? = nil,
         issuedTokenType: TokenTypeIdentifier? = nil, tokenType: String = "Bearer"
-    ) -> HTTPResponse {
+    ) -> Reply {
         var body: [String: Any] = [
             "access_token": accessToken, "token_type": tokenType,
             "expires_in": Int(client.accessTokenLifetime.timeInterval),
@@ -71,13 +72,13 @@ extension FakeAuthorizationServer {
         if !controls.omitsScope { body["scope"] = scope.rawValue }
         body["refresh_token"] = refreshToken
         body["issued_token_type"] = issuedTokenType?.rawValue
-        return jsonResponse(200, body, headers: ["Cache-Control": "no-store", "Pragma": "no-cache"])
+        return jsonResponse(200, body, headers: [.cacheControl: "no-store", HTTPField.Name("Pragma")!: "no-cache"])
     }
 
     /// Issues an access token and, when the client may refresh, a refresh token for a new grant.
     func issueNewGrant(
         client: ClientRegistration, subject: String, scope: ScopeSet, resources: [URL], withRefreshToken: Bool
-    ) -> HTTPResponse {
+    ) -> Reply {
         let issuance = Issuance(client: client, grantID: nextGrantID(), subject: subject, resources: resources)
         let granted = narrow(scope, subject: subject, resources: resources)
         let refreshToken =
@@ -89,7 +90,7 @@ extension FakeAuthorizationServer {
 
     private func clientCredentials(
         _ request: RecordedRequest, client: ClientRegistration, resources: [URL]
-    ) throws -> HTTPResponse {
+    ) throws -> Reply {
         let scope = try requestedScope(request.value("scope"), client: client)
         return issueNewGrant(
             client: client, subject: client.id, scope: scope, resources: resources, withRefreshToken: false)
@@ -97,7 +98,7 @@ extension FakeAuthorizationServer {
 
     private func redeemCode(
         _ request: RecordedRequest, client: ClientRegistration, resources: [URL]
-    ) throws -> HTTPResponse {
+    ) throws -> Reply {
         guard let name = request.value("code"), let code = codes[name], code.clientID == client.id else {
             throw Failure.oauth("invalid_grant", "The authorization code is unknown.")
         }
@@ -128,7 +129,7 @@ extension FakeAuthorizationServer {
 
     private func refresh(
         _ request: RecordedRequest, client: ClientRegistration, resources: [URL]
-    ) throws -> HTTPResponse {
+    ) throws -> Reply {
         guard let name = request.value("refresh_token"),
             var record = liveRecord(name, kind: .refresh), record.clientID == client.id
         else { throw Failure.oauth("invalid_grant", "The refresh token is invalid, expired or revoked.") }
@@ -192,12 +193,12 @@ extension FakeAuthorizationServer {
         return successor
     }
 
-    func handleRevocation(_ request: RecordedRequest) throws -> HTTPResponse {
+    func handleRevocation(_ request: RecordedRequest) throws -> Reply {
         let client = try authenticate(request)
         if let name = request.value("token"), let record = tokens[name] {
             guard record.clientID == client.id else { throw Failure.oauth("unauthorized_client") }
             revoke(token: name)
         }
-        return HTTPResponse(statusCode: 200)  // RFC 7009 §2.2: unknown tokens are not an error.
+        return Reply(status: 200)  // RFC 7009 §2.2: unknown tokens are not an error.
     }
 }

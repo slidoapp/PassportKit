@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 import PassportKitTesting
 import Testing
@@ -8,14 +9,14 @@ struct RequestAuthorizerConformanceTests {
     private let resource = HTTPRequest(method: .get, url: URL(string: "https://api.example.com/items")!)
 
     private func resourceRequests(_ harness: Harness) async -> [RecordedRequest] {
-        await harness.server.requests.filter { $0.url.host == "api.example.com" }
+        await harness.server.requests.filter { $0.url?.host == "api.example.com" }
     }
 
     private func rejectAtResource(_ harness: Harness, challenge: String) async {
         await harness.server.configure {
             $0.override = { request in
-                request.url.host == "api.example.com"
-                    ? .init(status: 401, headers: ["WWW-Authenticate": challenge]) : nil
+                request.url?.host == "api.example.com"
+                    ? .init(status: 401, headers: [.wwwAuthenticate: challenge]) : nil
             }
         }
     }
@@ -27,15 +28,15 @@ struct RequestAuthorizerConformanceTests {
         let stale = try await harness.manager.accessToken()
         await harness.server.expire(token: stale.value.reveal())
 
-        let response = try await authorizer.send(resource)
-        #expect(response.statusCode == 200)
+        let (response, _) = try await authorizer.send(resource)
+        #expect(response.status == .ok)
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
         let sent = await resourceRequests(harness)
         #expect(sent.count == 2)
-        #expect(sent[0].headers["Authorization"] == "Bearer \(stale.value.reveal())")
+        #expect(sent[0].headerFields[.authorization] == "Bearer \(stale.value.reveal())")
         let fresh = try await harness.manager.accessToken()
         #expect(fresh.value != stale.value)
-        #expect(sent[1].headers["Authorization"] == "Bearer \(fresh.value.reveal())")
+        #expect(sent[1].headerFields[.authorization] == "Bearer \(fresh.value.reveal())")
     }
 
     @Test("RFC 6750 §3.1: concurrent 401s for one token cause one refresh and each request retries once")
@@ -47,13 +48,13 @@ struct RequestAuthorizerConformanceTests {
         let request = resource
 
         let statuses = try await withThrowingTaskGroup(of: Int.self) { group in
-            for _ in 0..<8 { group.addTask { try await authorizer.send(request).statusCode } }
+            for _ in 0..<8 { group.addTask { try await authorizer.send(request).0.status.code } }
             return try await group.reduce(into: []) { $0.append($1) }
         }
         #expect(statuses == Array(repeating: 200, count: 8))
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
         let sent = await resourceRequests(harness)
-        let withStale = sent.filter { $0.headers["Authorization"] == "Bearer \(stale.value.reveal())" }
+        let withStale = sent.filter { $0.headerFields[.authorization] == "Bearer \(stale.value.reveal())" }
         #expect(sent.count - withStale.count == 8, "each request succeeds exactly once with the new token")
     }
 
@@ -63,8 +64,8 @@ struct RequestAuthorizerConformanceTests {
         let authorizer = RequestAuthorizer(manager: harness.manager)
         let (signed, stale) = try await authorizer.sign(resource)
         await harness.server.expire(token: stale.value.reveal())
-        let rejection = try await harness.server.send(signed)
-        #expect(rejection.statusCode == 401)
+        let (rejection, _) = try await harness.server.send(signed, body: nil)
+        #expect(rejection.status == .unauthorized)
 
         // Another caller notices first and refreshes.
         await harness.manager.invalidate(stale)
@@ -72,11 +73,11 @@ struct RequestAuthorizerConformanceTests {
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
 
         let decision = await authorizer.evaluate(
-            statusCode: rejection.statusCode, headers: rejection.headers, token: stale, attempt: 0)
+            statusCode: rejection.status.code, headers: rejection.headerFields, token: stale, attempt: 0)
         #expect(decision == .retry)
         let (retried, token) = try await authorizer.sign(resource)
         #expect(token.value == fresh.value)
-        #expect(try await harness.server.send(retried).statusCode == 200)
+        #expect(try await harness.server.send(retried, body: nil).0.status == .ok)
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
     }
 
@@ -86,9 +87,9 @@ struct RequestAuthorizerConformanceTests {
         await harness.server.configure { $0.requiredScope = ["admin"] }
         let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
 
-        let response = try await authorizer.send(resource)
-        #expect(response.statusCode == 403)
-        #expect(response.headers["WWW-Authenticate"]?.contains("insufficient_scope") == true)
+        let (response, _) = try await authorizer.send(resource)
+        #expect(response.status == .forbidden)
+        #expect(response.headerFields[.wwwAuthenticate]?.contains("insufficient_scope") == true)
         #expect(await harness.tokenRequests(.refreshToken).isEmpty)
         #expect(await resourceRequests(harness).count == 1)
     }
@@ -154,7 +155,7 @@ struct RequestAuthorizerConformanceTests {
                 refreshToken: Secret("refresh")),
             requestedScope: ["read"])
         let (signed, _) = try await authorizer.sign(resource)
-        #expect(signed.headers["Authorization"] == "Bearer plain")
+        #expect(signed.headerFields[.authorization] == "Bearer plain")
     }
 
     @Test("RFC 6750 §5.3: a plain http URL fails before any token is requested")

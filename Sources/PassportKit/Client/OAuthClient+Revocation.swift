@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 
 extension OAuthClient {
     /// Revokes a token (RFC 7009 §2).
@@ -13,9 +14,9 @@ extension OAuthClient {
         )
         request.add("token", token.reveal())
         if let typeHint { request.add("token_type_hint", typeHint.rawValue) }
-        let response = try await send(request)
-        guard (200..<300).contains(response.statusCode) else {
-            throw failure(response, to: request, context: .other)
+        let (response, body) = try await send(request)
+        guard (200..<300).contains(response.status.code) else {
+            throw failure(response, body: body, to: request, context: .other)
         }
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 import PassportKitTesting
 
@@ -88,10 +89,10 @@ final class SecretHarvest: Sendable {
     /// While on, the resource answers 401 `insufficient_scope` and repeats the bearer token in the challenge.
     func challenging(_ on: Bool) { challenges.update { $0 = on } }
 
-    func harvest(request: HTTPRequest) {
-        let recorded = RecordedRequest(request)
+    func harvest(request: HTTPRequest, body: Data?) {
+        let recorded = RecordedRequest(request, body: body)
         for (name, value) in recorded.form where Self.secretMembers.contains(name) { add(value) }
-        if let header = request.headers["Authorization"] {
+        if let header = request.headerFields[.authorization] {
             add(header)
             if header.hasPrefix("Bearer ") { add(String(header.dropFirst(7))) }
             if let secret = Self.basicSecret(in: recorded) { add(secret) }
@@ -100,15 +101,15 @@ final class SecretHarvest: Sendable {
 
     /// The client secret of an HTTP Basic `Authorization` header.
     static func basicSecret(in request: RecordedRequest) -> String? {
-        guard let header = request.headers["Authorization"], header.hasPrefix("Basic "),
+        guard let header = request.headerFields[.authorization], header.hasPrefix("Basic "),
             let data = Data(base64Encoded: String(header.dropFirst(6))),
             let text = String(data: data, encoding: .utf8)
         else { return nil }
         return text.split(separator: ":", maxSplits: 1).last.map(String.init)
     }
 
-    func harvest(response: HTTPResponse) {
-        guard let object = try? JSONSerialization.jsonObject(with: response.body) as? [String: Any] else { return }
+    func harvest(body: Data) {
+        guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return }
         for (name, value) in object where Self.secretMembers.contains(name) {
             if let text = value as? String { add(text) }
         }
@@ -116,11 +117,11 @@ final class SecretHarvest: Sendable {
 
     /// The scripted answer for `request`, or `nil` to let the server answer.
     func override(for request: RecordedRequest) -> FakeAuthorizationServer.ResponseOverride? {
-        if challenges.read(), request.url.host == "api.example.com",
-            let token = request.headers["Authorization"]?.dropFirst(7)
+        if challenges.read(), request.url?.host == "api.example.com",
+            let token = request.headerFields[.authorization]?.dropFirst(7)
         {
             let challenge = #"Bearer error="insufficient_scope", error_description="the token \#(token) lacks scope""#
-            return .init(status: 401, headers: ["WWW-Authenticate": challenge])
+            return .init(status: 401, headers: [.wwwAuthenticate: challenge])
         }
         guard let echo = echo.read(), request.path == echo.path else { return nil }
         let values = echo.parameters.compactMap {
@@ -138,10 +139,10 @@ struct HarvestingTransport: HTTPTransport {
     let server: FakeAuthorizationServer
     let harvest: SecretHarvest
 
-    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
-        harvest.harvest(request: request)
-        let response = try await server.send(request)
-        harvest.harvest(response: response)
-        return response
+    func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data) {
+        harvest.harvest(request: request, body: body)
+        let (response, responseBody) = try await server.send(request, body: body)
+        harvest.harvest(body: responseBody)
+        return (response, responseBody)
     }
 }

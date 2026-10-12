@@ -23,7 +23,7 @@ public struct AuthenticationChallenge: Sendable, Hashable {
     /// Parses the values of every `WWW-Authenticate` (or `Proxy-Authenticate`) header line, in order.
     ///
     /// Each value is a comma-separated list of challenges (RFC 9110 §11.6.1) and several lines are allowed;
-    /// commas and escaped quotes inside a quoted string do not split. See ``HTTPHeaders/values(for:)``.
+    /// commas and escaped quotes inside a quoted string do not split. Get the values from `HTTPFields` with `fields[values: .wwwAuthenticate]` (swift-http-types).
     public static func parse(_ headerValues: [String]) -> [AuthenticationChallenge] {
         headerValues.flatMap { value in
             var scanner = Scanner(bytes: Array(value.utf8))

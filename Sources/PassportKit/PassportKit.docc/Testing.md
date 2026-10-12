@@ -10,7 +10,9 @@ parameters, a test can replace all of them. `FakeAuthorizationServer` is an
 in-process authorization server and protected resource that plugs in as the
 ``HTTPTransport``. It serves discovery, authorization, token, device
 authorization and revocation endpoints and a bearer-protected resource, and
-records every request.
+records every request as a `RecordedRequest`, whose description shows header
+names only. A custom transport receives the `HTTPRequest` and `HTTPResponse`
+types of swift-http-types (`import HTTPTypes`).
 
 Add the library to your test target only:
 

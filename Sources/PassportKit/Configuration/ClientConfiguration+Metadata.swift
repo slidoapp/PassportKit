@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 
 extension ClientConfiguration {
     /// Creates a configuration from discovered metadata (RFC 8414 §2, RFC 9207 §3).
@@ -12,7 +13,7 @@ extension ClientConfiguration {
     public init(
         metadata: AuthorizationServerMetadata,
         authentication: ClientAuthentication,
-        additionalHeaders: HTTPHeaders = [:],
+        additionalHeaders: HTTPFields = [:],
         minimumTokenLifetime: Duration = .seconds(60),
         defaultTokenLifetime: Duration? = nil
     ) throws {

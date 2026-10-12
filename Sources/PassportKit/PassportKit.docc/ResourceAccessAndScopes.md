@@ -126,5 +126,24 @@ written into a header. `data(for:target:session:)` never lets a redirect take
 the token to another origin or from HTTPS to HTTP, whatever the session's own
 delegate does.
 
+Besides `URLRequest`, the authorizer signs and sends the request types of
+[swift-http-types](https://github.com/apple/swift-http-types), the same ones
+an ``HTTPTransport`` receives. The body travels beside the request:
+
+```swift
+import HTTPTypes
+
+let request = HTTPRequest(
+    method: .post, url: URL(string: "https://api.example.com/items")!,
+    headerFields: [.contentType: "application/json"])
+let (response, body) = try await authorizer.send(request, body: Data(#"{"name":"a"}"#.utf8))
+```
+
+A signed `HTTPRequest` carries the token in its `Authorization` field, and
+`HTTPFields` and `HTTPRequest` print their header fields and the URL with its
+query. Treat a signed request as a credential: do not log it, dump it or attach
+it to a crash report. The library sets the field so that HTTP/2 and HTTP/3
+never index it (RFC 7541 §7.1.3).
+
 Resource-level failures never end the session. Only an invalid refresh token
 does.

@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKitTesting
 import Testing
 
@@ -115,10 +116,10 @@ private struct SlowTransport: HTTPTransport {
     let delay: Duration
     let response: RecordingTransport.Step
 
-    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+    func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data) {
         try await clock.sleep(for: delay)
         switch response {
-        case .respond(let response): return response
+        case .respond(let response, let body): return (response, body)
         case .fail(let error): throw error
         }
     }

@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKitTesting
 import Testing
 
@@ -57,7 +58,7 @@ struct AuthorizationCompletionTests {
             authentication: .clientSecretBasic(clientID: "app", secret: Secret("s3")))
         _ = try await client.completeAuthorization(pending, callbackURL: code(for: pending))
         let sent = try #require(await transport.requests.first)
-        #expect(sent.request.headers["Authorization"]?.hasPrefix("Basic ") == true)
+        #expect(sent.headerFields[.authorization]?.hasPrefix("Basic ") == true)
         #expect(sent.value("client_id") == nil)
         #expect(sent.value("code_verifier") != nil)
     }

@@ -51,7 +51,7 @@ public struct PendingAuthorization: Sendable, CustomStringConvertible, CustomDeb
 
     /// A summary without `state`, verifier or the authorization URL.
     public var description: String {
-        "PendingAuthorization(redirectURI: \(HTTPRequest.redactedTarget(of: redirectURI)), age: \(stopwatch.elapsed))"
+        "PendingAuthorization(redirectURI: \(redirectURI.redactedTarget), age: \(stopwatch.elapsed))"
     }
 
     /// A summary without `state`, verifier or the authorization URL.

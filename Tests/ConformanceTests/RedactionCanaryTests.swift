@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import Logging
 import PassportKit
 import PassportKitTesting
@@ -14,6 +15,8 @@ import Testing
 @Suite("Redaction canary: no secret in any description", .timeLimit(.minutes(1)))
 struct RedactionCanaryTests {
     private static let clientSecret = "canary-client-secret-0123456789abcdefghij"
+    /// The value of an additional header that is a credential, such as an API key the server requires.
+    private static let headerSecret = "canary-header-5d2e8b1f"
     private static let longRefreshToken = "canary-long-refresh-token-0123456789abcdefghijklmnop"
     private static let longAccessToken = "canary-long-access-token-0123456789abcdefghijklmnopq"
 
@@ -38,6 +41,7 @@ struct RedactionCanaryTests {
             let harvest = harvest
             await server.configure { $0.override = { harvest.override(for: $0) } }
             harvest.add(RedactionCanaryTests.clientSecret)
+            harvest.add(RedactionCanaryTests.headerSecret)
             client = try OAuthClient(
                 configuration: ClientConfiguration(
                     endpoints: Endpoints(
@@ -46,7 +50,8 @@ struct RedactionCanaryTests {
                         deviceAuthorization: FakeAuthorizationServer.deviceAuthorizationEndpoint,
                         revocation: FakeAuthorizationServer.revocationEndpoint),
                     authentication: authentication(Secret(RedactionCanaryTests.clientSecret)),
-                    issuer: FakeAuthorizationServer.issuer),
+                    issuer: FakeAuthorizationServer.issuer,
+                    additionalHeaders: [HTTPField.Name("X-Api-Key")!: RedactionCanaryTests.headerSecret]),
                 transport: HarvestingTransport(server: server, harvest: harvest), wallClock: wallClock,
                 clock: clock, random: SequenceRandomSource(), observer: events,
                 logger: logs.logger)
@@ -223,11 +228,10 @@ struct RedactionCanaryTests {
             try await manager.accessToken(for: TokenTarget.exchange(audiences: ["service"]))
         }
         await rig.renderings.observe { try await manager.exchangeRefreshToken(audiences: ["service"]) }
-        // The signed `URLRequest` of the other overload is Foundation's own type and prints its headers; the
-        // token that came with it is ours.
-        rig.renderings.look(try await authorizer.sign(URLRequest(url: resource.url)).1)
-        let (signed, token) = try await authorizer.sign(resource)
-        rig.renderings.look(signed)
+        // A signed request is the caller's value in Foundation's or swift-http-types' own type, which print their
+        // headers under `dump`; the token that came with it is ours.
+        rig.renderings.look(try await authorizer.sign(URLRequest(url: try #require(resource.url))).1)
+        let (_, token) = try await authorizer.sign(resource)
         rig.renderings.look(token)
         await rig.renderings.observe { try await authorizer.send(resource) }
         await manager.invalidate(root)

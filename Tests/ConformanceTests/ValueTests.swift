@@ -83,14 +83,9 @@ struct ValueTests {
         #expect(await verdict(.default, ["none"]).isAccepted, "the default target is not selected")
     }
 
-    @Test("requests, responses and events are Hashable by value")
+    @Test("events and requests are Hashable by value")
     func hashableValues() {
         let url = URL(string: "https://as.example.com/token")!
-        let request = HTTPRequest(method: .post, url: url, body: Data("a".utf8))
-        #expect(Set([request, request]).count == 1)
-        #expect(request != HTTPRequest(method: .post, url: url, body: Data("b".utf8)))
-        let response = HTTPResponse(statusCode: 200, body: Data("a".utf8))
-        #expect(Set([response, HTTPResponse(statusCode: 200, body: Data("a".utf8))]).count == 1)
         let tokens = TokenResponse(accessToken: Secret("a"), tokenType: "Bearer", scope: ["read"])
         #expect(tokens == TokenResponse(accessToken: Secret("a"), tokenType: "Bearer", scope: ["read"]))
         #expect(tokens != TokenResponse(accessToken: Secret("b"), tokenType: "Bearer", scope: ["read"]))

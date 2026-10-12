@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import Logging
 
 /// How the metadata `issuer` is checked against the issuer that was requested (RFC 8414 §3.3).
@@ -49,13 +50,14 @@ public enum Discovery {
         let request = HTTPRequest(
             method: .get,
             url: try metadataURL(for: issuer, style: style),
-            headers: ["Accept": "application/json"]
+            headerFields: [.accept: "application/json"]
         )
         let response: HTTPResponse
+        let body: Data
         observer?.record(.request(endpoint: .metadata, grantType: nil))
         let stopwatch = Stopwatch(clock: clock)
         do {
-            response = try await transport.send(request)
+            (response, body) = try await transport.send(request, body: nil)
         } catch {
             observer?.record(.transportFailure(endpoint: .metadata, grantType: nil, duration: stopwatch.elapsed))
             if !(error is CancellationError || Task.isCancelled) {
@@ -73,27 +75,28 @@ public enum Discovery {
         observer?.record(
             .response(
                 endpoint: .metadata,
-                statusCode: response.statusCode,
-                errorCode: OAuthClient.errorCode(in: response),
+                statusCode: response.status.code,
+                errorCode: OAuthClient.errorCode(statusCode: response.status.code, body: body),
                 duration: stopwatch.elapsed
             )
         )
         logger.debug(
             "Request completed",
             metadata: .request(
-                endpoint: .metadata, status: response.statusCode, errorCode: OAuthClient.errorCode(in: response),
+                endpoint: .metadata, status: response.status.code,
+                errorCode: OAuthClient.errorCode(statusCode: response.status.code, body: body),
                 duration: stopwatch.elapsed))
-        guard (200..<300).contains(response.statusCode) else {
+        guard (200..<300).contains(response.status.code) else {
             throw PassportError.fromErrorResponse(
-                statusCode: response.statusCode,
-                headers: response.headers,
-                body: response.body,
+                statusCode: response.status.code,
+                headers: response.headerFields,
+                body: body,
                 context: .other
             )
         }
         let metadata: AuthorizationServerMetadata
         do {
-            metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: response.body)
+            metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: body)
         } catch {
             throw PassportError(.invalidResponse, detail: "The metadata response is not valid metadata.")
         }

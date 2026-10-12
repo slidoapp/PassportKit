@@ -3,6 +3,7 @@
 // both entry points apply them inside a real URLSession.
 #if !canImport(FoundationNetworking)
     import Foundation
+    import HTTPTypes
     import PassportKitTesting
     import Testing
 
@@ -53,12 +54,15 @@
         ])
         func transportAppliesThePolicy(target: String, headerNames: String) async throws {
             let transport = URLSessionTransport(configuration: Self.configuration())
-            let response = try await transport.send(
+            let (response, body) = try await transport.send(
                 HTTPRequest(
                     method: .get, url: Self.redirect(to: target),
-                    headers: ["Authorization": "Bearer x", "X-Api-Key": "k", "Accept": "application/json"]))
-            #expect(response.statusCode == 200)
-            #expect(String(decoding: response.body, as: UTF8.self) == headerNames)
+                    headerFields: [
+                        .authorization: "Bearer x", HTTPField.Name("X-Api-Key")!: "k", .accept: "application/json",
+                    ]),
+                body: nil)
+            #expect(response.status == .ok)
+            #expect(String(decoding: body, as: UTF8.self) == headerNames)
         }
 
         @Test("data(for:session:) does not let the token follow a cross-origin redirect")

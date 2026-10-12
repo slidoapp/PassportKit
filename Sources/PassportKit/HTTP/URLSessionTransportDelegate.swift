@@ -1,4 +1,6 @@
 import Foundation
+import HTTPTypes
+import HTTPTypesFoundation
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking
@@ -9,7 +11,7 @@ import Foundation
 final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private struct Pending {
         var task: URLSessionTask
-        var continuation: CheckedContinuation<HTTPResponse, any Error>
+        var continuation: CheckedContinuation<(HTTPResponse, Data), any Error>
         var response: HTTPURLResponse?
         var body = Data()
         var exceededLimit = false
@@ -24,7 +26,7 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
         self.bodyLimit = bodyLimit
     }
 
-    func register(task: URLSessionTask, continuation: CheckedContinuation<HTTPResponse, any Error>) {
+    func register(task: URLSessionTask, continuation: CheckedContinuation<(HTTPResponse, Data), any Error>) {
         lock.withLock {
             pending[task.taskIdentifier] = Pending(task: task, continuation: continuation)
         }
@@ -80,15 +82,9 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
             entry.continuation.resume(
                 throwing: PassportError(.invalidResponse, detail: "Response body exceeds the size limit.")
             )
-        } else if error == nil, let response = entry.response {
+        } else if error == nil, let response = entry.response?.httpResponse {
             // A complete response wins over a late cancellation: a rotated refresh token must not be lost.
-            entry.continuation.resume(
-                returning: HTTPResponse(
-                    statusCode: response.statusCode,
-                    headers: Self.headers(from: response),
-                    body: entry.body
-                )
-            )
+            entry.continuation.resume(returning: (response, entry.body))
         } else if entry.cancelledByCaller {
             entry.continuation.resume(throwing: CancellationError())
         } else if let error {
@@ -100,18 +96,5 @@ final class URLSessionTransportDelegate: NSObject, URLSessionDataDelegate, @unch
                 throwing: PassportError(.invalidResponse, detail: "The response was not an HTTP response.")
             )
         }
-    }
-
-    // `allHeaderFields` is unordered and merges repeated lines with ", ", so sort for determinism.
-    private static func headers(from response: HTTPURLResponse) -> HTTPHeaders {
-        var headers = HTTPHeaders()
-        let fields = response.allHeaderFields.compactMap { key, value -> (String, String)? in
-            guard let name = key as? String, let text = value as? String else { return nil }
-            return (name, text)
-        }
-        for (name, value) in fields.sorted(by: { $0.0 < $1.0 }) {
-            headers.append(name, value)
-        }
-        return headers
     }
 }

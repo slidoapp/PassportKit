@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 
 extension OAuthClient {
     /// The longest wait between polls after transport errors, 429 and 5xx responses (RFC 8628 §3.5).
@@ -23,11 +24,11 @@ extension OAuthClient {
         request.add(scope: scope)
         try request.add(resources: resources)
         request.additionalParameters = additionalParameters
-        let response = try await send(request)
-        guard (200..<300).contains(response.statusCode) else {
-            throw failure(response, to: request, context: .other)
+        let (response, body) = try await send(request)
+        guard (200..<300).contains(response.status.code) else {
+            throw failure(response, body: body, to: request, context: .other)
         }
-        return try DeviceAuthorization(parsing: response.body, wallClock: wallClock, clock: clock)
+        return try DeviceAuthorization(parsing: body, wallClock: wallClock, clock: clock)
     }
 
     /// Polls the token endpoint until the user approves, declines or the authorization expires (RFC 8628 §3.4, §3.5).
@@ -65,17 +66,18 @@ extension OAuthClient {
             request.additionalParameters = additionalParameters
 
             let response: HTTPResponse
+            let body: Data
             do {
-                response = try await send(request)
+                (response, body) = try await send(request)
             } catch let error as PassportError where error.code == .transportFailure {
                 backoff = nextBackoff(after: backoff, interval: interval)
                 wait = backoff ?? interval
                 continue
             }
-            if (200..<300).contains(response.statusCode) {
-                return try TokenResponse(parsing: response.body)
+            if (200..<300).contains(response.status.code) {
+                return try TokenResponse(parsing: body)
             }
-            let error = failure(response, to: request, context: .deviceAuthorizationPoll)
+            let error = failure(response, body: body, to: request, context: .deviceAuthorizationPoll)
             switch error.code {
             case .authorizationPending:
                 backoff = nil
@@ -91,12 +93,13 @@ extension OAuthClient {
                 if case .retryLater = error.recovery {
                     isTransient = true
                 } else {
-                    isTransient = response.statusCode == 429 || (500...599).contains(response.statusCode)
+                    isTransient = response.status.code == 429 || (500...599).contains(response.status.code)
                 }
                 guard isTransient else { throw error }
                 backoff = nextBackoff(after: backoff, interval: interval)
                 wait = max(
-                    backoff ?? interval, PassportError.retryAfter(in: response.headers, now: wallClock.now()) ?? .zero)
+                    backoff ?? interval,
+                    PassportError.retryAfter(in: response.headerFields, now: wallClock.now()) ?? .zero)
             }
         }
     }

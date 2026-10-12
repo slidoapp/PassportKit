@@ -3,7 +3,7 @@ import PassportKit
 
 extension FakeAuthorizationServer {
     /// RFC 8693 token exchange for access token and refresh token subjects.
-    func exchange(_ request: RecordedRequest, client: ClientRegistration, resources: [URL]) throws -> HTTPResponse {
+    func exchange(_ request: RecordedRequest, client: ClientRegistration, resources: [URL]) throws -> Reply {
         guard let subjectToken = request.value("subject_token"), let typeName = request.value("subject_token_type")
         else {
             throw Failure.oauth("invalid_request", "subject_token and subject_token_type are required.")

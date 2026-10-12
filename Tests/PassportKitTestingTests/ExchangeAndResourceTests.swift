@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 import PassportKitTesting
 import Testing
@@ -158,16 +159,16 @@ struct ExchangeAndResourceTests {
 
         let missing = try await fixture.api(nil)
         #expect(missing.statusCode == 401)
-        #expect(missing.headers["WWW-Authenticate"] == "Bearer")
+        #expect(missing.headerFields[.wwwAuthenticate] == "Bearer")
 
         let unknown = try await fixture.api("nope")
         #expect(unknown.statusCode == 401)
-        #expect(unknown.headers["WWW-Authenticate"] == #"Bearer error="invalid_token""#)
+        #expect(unknown.headerFields[.wwwAuthenticate] == #"Bearer error="invalid_token""#)
 
         await fixture.server.configure { $0.requiredScope = ["write"] }
         let insufficient = try await fixture.api(signedIn.accessToken)
         #expect(insufficient.statusCode == 403)
-        #expect(insufficient.headers["WWW-Authenticate"]?.contains(#"error="insufficient_scope""#) == true)
+        #expect(insufficient.headerFields[.wwwAuthenticate]?.contains(#"error="insufficient_scope""#) == true)
 
         await fixture.server.configure { $0.requiredScope = ["read"] }
         #expect(try await fixture.api(signedIn.accessToken).statusCode == 200)

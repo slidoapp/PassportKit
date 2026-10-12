@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKitTesting
 import Testing
 
@@ -22,7 +23,7 @@ struct OAuthClientTests {
         let transport = RecordingTransport([.tokens()])
         let client = try ClientFixtures.client(
             transport,
-            additionalHeaders: ["X-Trace": "t1"]
+            additionalHeaders: [HTTPField.Name("X-Trace")!: "t1"]
         )
         _ = try await client.refresh(
             Secret("rt-1"),
@@ -33,9 +34,9 @@ struct OAuthClientTests {
         let sent = try #require(await transport.requests.first)
         #expect(sent.request.method == .post)
         #expect(sent.request.url == ClientFixtures.tokenURL)
-        #expect(sent.request.headers["Content-Type"] == "application/x-www-form-urlencoded")
-        #expect(sent.request.headers["Accept"] == "application/json")
-        #expect(sent.request.headers["X-Trace"] == "t1")
+        #expect(sent.headerFields[.contentType] == "application/x-www-form-urlencoded")
+        #expect(sent.headerFields[.accept] == "application/json")
+        #expect(sent.headerFields[HTTPField.Name("X-Trace")!] == "t1")
         #expect(
             pairs(sent) == [
                 "grant_type=refresh_token", "refresh_token=rt-1", "scope=a b",
@@ -51,8 +52,8 @@ struct OAuthClientTests {
         _ = try await client.clientCredentials(scope: ["read"])
         let sent = try #require(await transport.requests.first)
         #expect(pairs(sent) == ["grant_type=client_credentials", "scope=read"])
-        #expect(sent.request.headers["Authorization"]?.hasPrefix("Basic ") == true)
-        #expect(!(String(data: sent.request.body ?? Data(), encoding: .utf8) ?? "").contains("s3cret"))
+        #expect(sent.headerFields[.authorization]?.hasPrefix("Basic ") == true)
+        #expect(!(String(data: sent.body ?? Data(), encoding: .utf8) ?? "").contains("s3cret"))
     }
 
     @Test func secretPostPutsCredentialsInBody() async throws {
@@ -62,7 +63,7 @@ struct OAuthClientTests {
         _ = try await client.clientCredentials()
         let sent = try #require(await transport.requests.first)
         #expect(pairs(sent) == ["grant_type=client_credentials", "client_id=app", "client_secret=s3cret"])
-        #expect(sent.request.headers["Authorization"] == nil)
+        #expect(sent.headerFields[.authorization] == nil)
     }
 
     @Test func exchangeResponseWithoutIssuedTokenTypeIsInvalid() async throws {
@@ -210,7 +211,7 @@ struct OAuthClientTests {
     }
 
     @Test func serviceUnavailableHonoursRetryAfter() async throws {
-        let transport = RecordingTransport([.json(503, "<html>", headers: ["Retry-After": "7"])])
+        let transport = RecordingTransport([.json(503, "<html>", headers: [.retryAfter: "7"])])
         let client = try ClientFixtures.client(transport)
         let error = await #expect(throws: PassportError.self) { try await client.clientCredentials() }
         #expect(error?.code == .temporarilyUnavailable)
@@ -239,7 +240,7 @@ struct OAuthClientTests {
         let sent = try #require(await transport.requests.first)
         #expect(sent.request.url == ClientFixtures.revocationURL)
         #expect(pairs(sent) == ["token=rt", "token_type_hint=refresh_token", "client_id=app"])
-        #expect(sent.request.headers["Accept"] == "application/json")
+        #expect(sent.headerFields[.accept] == "application/json")
     }
 
     @Test("RFC 7009 §2.1: a confidential client authenticates the revocation request")
@@ -252,7 +253,7 @@ struct OAuthClientTests {
         let sentPost = try #require(await post.requests.first)
         #expect(
             pairs(sentPost) == ["token=rt", "token_type_hint=refresh_token", "client_id=app", "client_secret=s3cret"])
-        #expect(sentPost.request.headers["Authorization"] == nil)
+        #expect(sentPost.headerFields[.authorization] == nil)
 
         let basic = RecordingTransport([.json(200, "")])
         try await ClientFixtures.client(
@@ -261,7 +262,7 @@ struct OAuthClientTests {
         .revoke(Secret("rt"))
         let sentBasic = try #require(await basic.requests.first)
         #expect(pairs(sentBasic) == ["token=rt"])
-        #expect(sentBasic.request.headers["Authorization"] == "Basic YXBwOnMzY3JldA==")
+        #expect(sentBasic.headerFields[.authorization] == "Basic YXBwOnMzY3JldA==")
     }
 
     @Test func revokeOmitsMissingHint() async throws {
@@ -278,7 +279,7 @@ struct OAuthClientTests {
     }
 
     @Test func revoke503IsRetryLater() async throws {
-        let client = try ClientFixtures.client(RecordingTransport([.json(503, "", headers: ["Retry-After": "3"])]))
+        let client = try ClientFixtures.client(RecordingTransport([.json(503, "", headers: [.retryAfter: "3"])]))
         let error = await #expect(throws: PassportError.self) { try await client.revoke(Secret("a")) }
         #expect(error?.recovery == .retryLater(after: .seconds(3)))
     }

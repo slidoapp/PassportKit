@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 
 /// A form-encoded POST to an authorization server endpoint, built from standard parameters, client
 /// authentication and additional parameters (in that order).
@@ -33,15 +34,14 @@ struct FormRequest {
     /// Applies client authentication and additional parameters and encodes the request.
     ///
     /// Library-owned headers win over `additionalHeaders` with the same name.
-    func build(configuration: ClientConfiguration) throws -> HTTPRequest {
-        var headers = HTTPHeaders()
-        for (name, value) in configuration.additionalHeaders { headers.append(name, value) }
+    func build(configuration: ClientConfiguration) throws -> (request: HTTPRequest, body: Data) {
+        var headers = configuration.additionalHeaders
         var standard = parameters.items
         configuration.authentication.apply(to: &standard, headers: &headers)
         let all = try additionalParameters.appending(to: standard, reserving: ClientAuthentication.parameterNames)
-        headers["Content-Type"] = "application/x-www-form-urlencoded"
-        headers["Accept"] = "application/json"
-        return HTTPRequest(method: .post, url: url, headers: headers, body: FormEncoding.encode(all))
+        headers[.contentType] = "application/x-www-form-urlencoded"
+        headers[.accept] = "application/json"
+        return (HTTPRequest(method: .post, url: url, headerFields: headers), FormEncoding.encode(all))
     }
 
     /// Parameter names whose values are credentials, in standard and additional parameters.

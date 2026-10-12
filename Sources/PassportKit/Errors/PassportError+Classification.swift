@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 
 extension PassportError {
     /// Builds the error for a non-2xx authorization server response (specification §6, rules 1 and 2).
@@ -8,7 +9,7 @@ extension PassportError {
     /// with ``Recovery-swift.enum/retryLater(after:)``, anything else to ``Code-swift.struct/invalidResponse``.
     static func fromErrorResponse(
         statusCode: Int,
-        headers: HTTPHeaders,
+        headers: HTTPFields,
         body: Data,
         context: ErrorResponseContext,
         now: Date? = nil
@@ -112,8 +113,8 @@ extension PassportError {
 
     /// Parses `Retry-After` (RFC 9110 §10.2.3): delta-seconds, or an HTTP-date relative to `now`. A date in the
     /// past means zero. Without `now`, HTTP-date values are ignored.
-    static func retryAfter(in headers: HTTPHeaders, now: Date? = nil) -> Duration? {
-        guard let text = headers["Retry-After"]?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
+    static func retryAfter(in headers: HTTPFields, now: Date? = nil) -> Duration? {
+        guard let text = headers[.retryAfter]?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
             text.allSatisfy(\.isASCII)
         else { return nil }
         if text.allSatisfy(\.isNumber) { return Int(text).map { .seconds($0) } }

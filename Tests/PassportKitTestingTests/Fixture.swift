@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 import PassportKitTesting
 
@@ -9,15 +10,28 @@ let pkceChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 /// A parsed JSON response.
 struct Reply {
     let response: HTTPResponse
-    var status: Int { response.statusCode }
+    let body: Data
+
+    init(_ exchange: (HTTPResponse, Data)) { (response, body) = exchange }
+
+    var status: Int { response.status.code }
+    var statusCode: Int { status }
+    var headerFields: HTTPFields { response.headerFields }
     var json: [String: Any] {
-        (try? JSONSerialization.jsonObject(with: response.body)) as? [String: Any] ?? [:]
+        (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] ?? [:]
     }
     subscript(name: String) -> String? { json[name] as? String }
     var error: String? { self["error"] }
     var scope: ScopeSet? { self["scope"].map { ScopeSet(parsing: $0) } }
     var accessToken: String { self["access_token"] ?? "" }
     var refreshToken: String { self["refresh_token"] ?? "" }
+}
+
+extension HTTPTransport {
+    /// Sends and keeps the response with its body.
+    func exchange(_ request: HTTPRequest, body: Data? = nil) async throws -> Reply {
+        Reply(try await send(request, body: body))
+    }
 }
 
 enum Authentication {
@@ -59,15 +73,15 @@ struct Fixture {
         -> Reply
     {
         var form = form
-        var headers: HTTPHeaders = ["Content-Type": "application/x-www-form-urlencoded"]
+        var headers: HTTPFields = [.contentType: "application/x-www-form-urlencoded"]
         switch auth {
         case .publicClient(let id): form.append(("client_id", id))
         case .post(let id, let secret): form += [("client_id", id), ("client_secret", secret)]
         case .basic(let id, let secret):
-            headers["Authorization"] = "Basic " + Data("\(id):\(secret)".utf8).base64EncodedString()
+            headers[.authorization] = "Basic " + Data("\(id):\(secret)".utf8).base64EncodedString()
         }
-        let request = HTTPRequest(method: .post, url: url, headers: headers, body: FormEncoding.encode(form))
-        return Reply(response: try await server.send(request))
+        let request = HTTPRequest(method: .post, url: url, headerFields: headers)
+        return Reply(try await server.send(request, body: FormEncoding.encode(form)))
     }
 
     func token(_ form: [(String, String)], as auth: Authentication = .publicClient("app")) async throws -> Reply {
@@ -78,13 +92,13 @@ struct Fixture {
         try await token([("grant_type", "refresh_token"), ("refresh_token", refreshToken)] + extra)
     }
 
-    func get(_ url: URL, headers: HTTPHeaders = [:]) async throws -> HTTPResponse {
-        try await server.send(HTTPRequest(method: .get, url: url, headers: headers))
+    func get(_ url: URL, headers: HTTPFields = [:]) async throws -> Reply {
+        Reply(try await server.send(HTTPRequest(method: .get, url: url, headerFields: headers), body: nil))
     }
 
     /// Calls the protected resource with an optional Bearer token.
-    func api(_ token: String?, path: String = "/v1/things") async throws -> HTTPResponse {
-        let headers: HTTPHeaders = token.map { ["Authorization": "Bearer \($0)"] } ?? [:]
+    func api(_ token: String?, path: String = "/v1/things") async throws -> Reply {
+        let headers: HTTPFields = token.map { [.authorization: "Bearer \($0)"] } ?? [:]
         return try await get(URL(string: "https://api.example.com" + path)!, headers: headers)
     }
 

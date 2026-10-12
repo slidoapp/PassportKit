@@ -67,7 +67,7 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
 
     /// A summary without the device code.
     public var description: String {
-        "DeviceAuthorization(userCode: \(userCode), verificationURI: \(HTTPRequest.redactedTarget(of: verificationURI)), expiresIn: \(expiresIn), interval: \(interval))"
+        "DeviceAuthorization(userCode: \(userCode), verificationURI: \(verificationURI.redactedTarget), expiresIn: \(expiresIn), interval: \(interval))"
     }
 
     /// A summary without the device code.

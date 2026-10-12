@@ -1,9 +1,10 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 
 extension FakeAuthorizationServer {
     /// The authorization server metadata document (RFC 8414 §2).
-    func metadata() -> HTTPResponse {
+    func metadata() -> Reply {
         let base = Self.issuer.absoluteString
         let grants = Set(clients.values.flatMap(\.allowedGrants)).map(\.rawValue).sorted()
         return jsonResponse(
@@ -17,8 +18,8 @@ extension FakeAuthorizationServer {
     }
 
     /// The protected resource: accepts any path for a live Bearer token (RFC 6750 §3).
-    func handleResource(_ request: RecordedRequest) throws -> HTTPResponse {
-        let header = request.headers["Authorization"] ?? ""
+    func handleResource(_ request: RecordedRequest) throws -> Reply {
+        let header = request.headerFields[.authorization] ?? ""
         guard header.lowercased().hasPrefix("bearer ") else {
             throw challenge(401, "Bearer")  // RFC 6750 §3.1: no error code when no credentials were sent.
         }
@@ -32,6 +33,6 @@ extension FakeAuthorizationServer {
     }
 
     private func challenge(_ status: Int, _ value: String) -> Failure {
-        Failure(response: HTTPResponse(statusCode: status, headers: ["WWW-Authenticate": value]))
+        Failure(response: Reply(status: status, headers: [.wwwAuthenticate: value]))
     }
 }

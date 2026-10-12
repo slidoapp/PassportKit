@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import Testing
 
 @testable import PassportKit
@@ -98,7 +99,7 @@ struct ErrorClassificationTests {
         for body in ["", "<html>oops</html>", "[1]", #"{"error":5}"#, #"{"error":""}"#, #"{"message":"x"}"#] {
             let error = PassportError.fromErrorResponse(
                 statusCode: status,
-                headers: ["Retry-After": "12"],
+                headers: [.retryAfter: "12"],
                 body: Data(body.utf8),
                 context: .refreshGrant
             )
@@ -131,7 +132,7 @@ struct ErrorClassificationTests {
         ("١٢", nil),
     ])
     func retryAfterSeconds(header: String, expected: Duration?) {
-        #expect(PassportError.retryAfter(in: ["Retry-After": header]) == expected)
+        #expect(PassportError.retryAfter(in: [.retryAfter: header]) == expected)
     }
 
     @Test(arguments: [
@@ -143,15 +144,15 @@ struct ErrorClassificationTests {
     ])
     func retryAfterHTTPDate(header: String, expected: Duration?) {
         let now = Date(timeIntervalSince1970: 1_792_567_680)  // Wed, 21 Oct 2026 07:28:00 GMT
-        #expect(PassportError.retryAfter(in: ["Retry-After": header], now: now) == expected)
-        #expect(PassportError.retryAfter(in: ["Retry-After": header]) == nil)  // dates need a clock
+        #expect(PassportError.retryAfter(in: [.retryAfter: header], now: now) == expected)
+        #expect(PassportError.retryAfter(in: [.retryAfter: header]) == nil)  // dates need a clock
     }
 
     @Test func retryAfterIsHonouredForTemporaryJSONErrors() {
         let body = Data(#"{"error":"temporarily_unavailable"}"#.utf8)
         let error = PassportError.fromErrorResponse(
             statusCode: 503,
-            headers: ["retry-after": "30"],
+            headers: [.retryAfter: "30"],
             body: body,
             context: .refreshGrant
         )

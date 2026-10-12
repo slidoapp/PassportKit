@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 import PassportKitTesting
 import Testing
@@ -17,8 +18,8 @@ actor RequestGauge {
 
     func leave() { current -= 1 }
 
-    func record(_ response: HTTPResponse) {
-        let object = try? JSONSerialization.jsonObject(with: response.body) as? [String: Any]
+    func record(body: Data) {
+        let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any]
         if let token = object?["refresh_token"] as? String { issuedRefreshTokens.append(token) }
     }
 }
@@ -27,13 +28,13 @@ struct GaugedTransport: HTTPTransport {
     let server: FakeAuthorizationServer
     let gauge: RequestGauge
 
-    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+    func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data) {
         await gauge.enter()
         do {
-            let response = try await server.send(request)
+            let (response, responseBody) = try await server.send(request, body: body)
             await gauge.leave()
-            await gauge.record(response)
-            return response
+            await gauge.record(body: responseBody)
+            return (response, responseBody)
         } catch {
             await gauge.leave()
             throw error

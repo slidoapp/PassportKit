@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 
 struct DeviceRecord {
@@ -36,7 +37,7 @@ extension FakeAuthorizationServer {
         update(&devices[name]!)
     }
 
-    func handleDeviceAuthorization(_ request: RecordedRequest) throws -> HTTPResponse {
+    func handleDeviceAuthorization(_ request: RecordedRequest) throws -> Reply {
         let client = try authenticate(request)
         guard client.allowedGrants.contains(.deviceCode) else { throw Failure.oauth("unauthorized_client") }
         let scope = try requestedScope(request.value("scope"), client: client)
@@ -53,11 +54,11 @@ extension FakeAuthorizationServer {
                 "verification_uri_complete": "https://as.example.com/device?user_code=\(userCode)",
                 "expires_in": Int(controls.deviceCodeLifetime.timeInterval),
                 "interval": Int(controls.deviceInterval.timeInterval),
-            ], headers: ["Cache-Control": "no-store"])
+            ], headers: [.cacheControl: "no-store"])
     }
 
     /// The device code grant at the token endpoint (RFC 8628 §3.4, §3.5).
-    func pollDevice(_ request: RecordedRequest, client: ClientRegistration) throws -> HTTPResponse {
+    func pollDevice(_ request: RecordedRequest, client: ClientRegistration) throws -> Reply {
         guard let name = request.value("device_code"), let device = devices[name], device.clientID == client.id else {
             throw Failure.oauth("invalid_grant", "The device code is unknown or already used.")
         }

@@ -1,4 +1,6 @@
 import Foundation
+import HTTPTypes
+import HTTPTypesFoundation
 import Logging
 
 #if canImport(FoundationNetworking)
@@ -18,12 +20,12 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     private let transport: any HTTPTransport
     private let allowedOrigins: Set<OriginKey>?
 
-    /// Creates an authorizer that obtains tokens from `manager` and sends ``send(_:for:)`` requests on
+    /// Creates an authorizer that obtains tokens from `manager` and sends ``send(_:body:for:)`` requests on
     /// `transport`.
     ///
     /// - Parameters:
     ///   - manager: Supplies the access tokens.
-    ///   - transport: Sends the requests of ``send(_:for:)``.
+    ///   - transport: Sends the requests of ``send(_:body:for:)``.
     ///   - allowedOrigins: When not `nil`, the only origins a request may name. An origin is a URL whose
     ///     scheme, host and port count and whose path is ignored, such as `https://api.example.com`; a default
     ///     port equals an explicit one. Any other request fails with
@@ -72,7 +74,11 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
 
     /// Adds `Authorization: Bearer <token>` (RFC 6750 §2.1) and returns the token that was used.
     ///
-    /// Same rules as the `URLRequest` overload.
+    /// Same rules as the `URLRequest` overload. The `Authorization` field is marked never-indexed (RFC 7541
+    /// §7.1.3).
+    ///
+    /// The signed request is your value: `HTTPTypes.HTTPRequest` prints its method, URL with query and, under
+    /// `dump`, every header field including `Authorization`. Never log a signed request.
     public func sign(
         _ request: HTTPRequest,
         for target: TokenTarget = .default
@@ -81,7 +87,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         let token = try await manager.accessToken(for: target)
         try Self.requireBearer(token)
         var signed = request
-        signed.headers["Authorization"] = "Bearer \(token.value.reveal())"
+        signed.headerFields.setSensitive(.authorization, "Bearer \(token.value.reveal())")
         return (signed, token)
     }
 
@@ -98,12 +104,12 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     /// - Everything else, including every 403, is delivered.
     public func evaluate(
         statusCode: Int,
-        headers: HTTPHeaders,
+        headers: HTTPFields,
         token: AccessToken,
         attempt: Int
     ) async -> RetryDecision {
         guard statusCode == 401 else { return .deliver }
-        let challenges = AuthenticationChallenge.parse(headers.values(for: "WWW-Authenticate"))
+        let challenges = AuthenticationChallenge.parse(headers[values: .wwwAuthenticate])
         let challenge = challenges.first { $0.scheme == "bearer" && $0.parameters["error"] != nil }
         let code = challenge?.parameters["error"]
         if code == PassportError.Code.insufficientScope.rawValue {
@@ -127,26 +133,27 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
 
     /// Signs, sends on the transport given at creation, evaluates and, after a rejected token, retries once with a fresh one.
     ///
-    /// Returns the response for every status the decision table delivers, including 403.
+    /// Returns the response and its body for every status the decision table delivers, including 403.
     public func send(
         _ request: HTTPRequest,
+        body: Data? = nil,
         for target: TokenTarget = .default
-    ) async throws -> HTTPResponse {
+    ) async throws -> (HTTPResponse, Data) {
         var attempt = 0
         while true {
             let (signed, token) = try await sign(request, for: target)
-            let response = try await transport.send(signed)
+            let (response, responseBody) = try await transport.send(signed, body: body)
             switch await evaluate(
-                statusCode: response.statusCode, headers: response.headers, token: token, attempt: attempt)
+                statusCode: response.status.code, headers: response.headerFields, token: token, attempt: attempt)
             {
-            case .deliver: return response
+            case .deliver: return (response, responseBody)
             case .retry: attempt += 1
             case .fail(let error): throw error
             }
         }
     }
 
-    /// Like ``send(_:for:)`` for `URLSession`, with the session supplied by the caller: the library
+    /// Like ``send(_:body:for:)`` for `URLSession`, with the session supplied by the caller: the library
     /// never reaches for `URLSession.shared`.
     ///
     /// Redirects follow the same rules as ``URLSessionTransport``: never from HTTPS to HTTP, and a redirect to
@@ -175,10 +182,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
             guard let http = response as? HTTPURLResponse else {
                 throw PassportError(.invalidResponse, detail: "The response was not an HTTP response.")
             }
-            var headers = HTTPHeaders()
-            for (name, value) in http.allHeaderFields {
-                if let name = name as? String, let value = value as? String { headers.append(name, value) }
-            }
+            let headers = http.httpResponse?.headerFields ?? [:]
             switch await evaluate(statusCode: http.statusCode, headers: headers, token: token, attempt: attempt) {
             case .deliver: return (data, http)
             case .retry: attempt += 1

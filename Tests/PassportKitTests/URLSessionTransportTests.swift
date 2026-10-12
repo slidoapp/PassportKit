@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import Testing
 
 @testable import PassportKit
@@ -55,29 +56,31 @@ struct URLSessionTransportTests {
         transport = URLSessionTransport(configuration: configuration)
     }
 
-    private func request(_ path: String, method: HTTPMethod = .post, headers: HTTPHeaders = [:]) -> HTTPRequest {
-        HTTPRequest(
-            method: method, url: URL(string: "https://as.example.com\(path)")!, headers: headers, body: Data("a=b".utf8)
-        )
+    private func request(_ path: String, method: HTTPRequest.Method = .post, headers: HTTPFields = [:]) -> HTTPRequest {
+        HTTPRequest(method: method, url: URL(string: "https://as.example.com\(path)")!, headerFields: headers)
+    }
+
+    private func send(_ request: HTTPRequest) async throws -> (HTTPResponse, Data) {
+        try await transport.send(request, body: Data("a=b".utf8))
     }
 
     @Test func returnsStatusHeadersAndBody() async throws {
-        let response = try await transport.send(request("/ok"))
-        #expect(response.statusCode == 200)
-        #expect(response.headers["content-type"] == "application/json")
-        #expect(response.headers["X-Echo-Method"] == "POST")
-        #expect(String(data: response.body, encoding: .utf8) == #"{"ok":true}"#)
+        let (response, body) = try await send(request("/ok"))
+        #expect(response.status == .ok)
+        #expect(response.headerFields[.contentType] == "application/json")
+        #expect(response.headerFields[HTTPField.Name("X-Echo-Method")!] == "POST")
+        #expect(String(data: body, encoding: .utf8) == #"{"ok":true}"#)
     }
 
     @Test func acceptsBodyAtTheLimit() async throws {
-        let response = try await transport.send(request("/exact"))
-        #expect(response.body.count == URLSessionTransport.maximumBodySize)
+        let (_, body) = try await send(request("/exact"))
+        #expect(body.count == URLSessionTransport.maximumBodySize)
     }
 
     @Test(arguments: ["/big", "/declared"])
     func rejectsBodiesOverOneMebibyte(path: String) async {
         await #expect {
-            try await transport.send(request(path))
+            try await send(request(path))
         } throws: { error in
             (error as? PassportError)?.code == .invalidResponse
         }
@@ -98,7 +101,7 @@ struct URLSessionTransportTests {
         let url = URL(string: "https://as.example.com/ok")!
         let task = session.dataTask(with: URLRequest(url: url))
         let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
-        let result = await withCheckedContinuation { (outer: CheckedContinuation<HTTPResponse?, Never>) in
+        let result = await withCheckedContinuation { (outer: CheckedContinuation<(HTTPResponse, Data)?, Never>) in
             Task {
                 do {
                     let value = try await withCheckedThrowingContinuation { continuation in
@@ -114,12 +117,12 @@ struct URLSessionTransportTests {
                 }
             }
         }
-        #expect(String(data: try #require(result).body, encoding: .utf8) == "rotated")
+        #expect(String(data: try #require(result).1, encoding: .utf8) == "rotated")
     }
 
     @Test func mapsTransportErrorsKeepingTheUnderlyingError() async {
         await #expect {
-            try await transport.send(request("/fail"))
+            try await send(request("/fail"))
         } throws: { error in
             guard let error = error as? PassportError else { return false }
             return error.code == .transportFailure && error.recovery == .retryLater(after: nil)
@@ -130,7 +133,7 @@ struct URLSessionTransportTests {
     @Test func cancellationPropagatesUnwrapped() async {
         let transport = transport
         let request = request("/hang")
-        let task = Task { try await transport.send(request) }
+        let task = Task { try await transport.send(request, body: Data("a=b".utf8)) }
         task.cancel()
         await #expect(throws: CancellationError.self) {
             try await task.value

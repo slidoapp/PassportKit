@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 import PassportKitTesting
 import Testing
@@ -70,8 +71,8 @@ struct SeamsAndHooksTests {
         await server.expire(token: tokens.accessToken)
         let probe = HTTPRequest(
             method: .get, url: URL(string: "https://api.example.com/v1/things")!,
-            headers: ["Authorization": "Bearer \(tokens.accessToken.reveal())"])
-        #expect(try await server.send(probe).statusCode == 401)
+            headerFields: [.authorization: "Bearer \(tokens.accessToken.reveal())"])
+        #expect(try await server.exchange(probe).statusCode == 401)
 
         let denied = await #expect(throws: PassportError.self) {
             try await client.authorize(request, using: server.userAgent(decision: .deny))
@@ -101,12 +102,14 @@ struct SeamsAndHooksTests {
     func recordingTransport() async throws {
         let transport = RecordingTransport([.tokens("a"), .oauthError("invalid_grant")])
         let body = FormEncoding.encode([("grant_type", "refresh_token"), ("resource", "a b"), ("resource", "c+d")])
-        let request = HTTPRequest(method: .post, url: URL(string: "https://as.example.com/token")!, body: body)
-        #expect(try await transport.send(request).statusCode == 200)
-        #expect(try await transport.send(request).statusCode == 400)
-        await #expect(throws: RecordingTransport.ScriptExhausted.self) { try await transport.send(request) }
+        let request = HTTPRequest(method: .post, url: URL(string: "https://as.example.com/token")!)
+        #expect(try await transport.exchange(request, body: body).statusCode == 200)
+        #expect(try await transport.exchange(request, body: body).statusCode == 400)
+        await #expect(throws: RecordingTransport.ScriptExhausted.self) {
+            try await transport.exchange(request, body: body)
+        }
         await transport.enqueue(.json(201, "{}"))
-        #expect(try await transport.send(request).statusCode == 201)
+        #expect(try await transport.exchange(request, body: body).statusCode == 201)
 
         let recorded = try #require(await transport.requests.first)
         #expect(recorded.value("grant_type") == "refresh_token")
@@ -120,25 +123,28 @@ struct SeamsAndHooksTests {
         let clock = ManualClock()
         let server = FakeAuthorizationServer(clients: [.app()], clock: clock)
         let url = FakeAuthorizationServer.tokenEndpoint
-        let request = HTTPRequest(method: .post, url: url, body: FormEncoding.encode([("grant_type", "refresh_token")]))
+        let request = HTTPRequest(method: .post, url: url)
+        let requestBody = FormEncoding.encode([("grant_type", "refresh_token")])
         await server.configure {
             $0.override = { recorded in
                 switch recorded.value("grant_type") {
                 case "refresh_token":
-                    .init(status: 503, body: "busy", headers: ["Retry-After": "7"], delay: .seconds(2))
+                    .init(status: 503, body: "busy", headers: [.retryAfter: "7"], delay: .seconds(2))
                 default: .init(failure: URLError(.notConnectedToInternet))
                 }
             }
         }
-        let pending = Task { try await server.send(request) }
+        let pending = Task { try await server.exchange(request, body: requestBody) }
         await clock.advanceToNextSleeper()
         let response = try await pending.value
         #expect(response.statusCode == 503)
-        #expect(response.headers["Retry-After"] == "7")
+        #expect(response.headerFields[.retryAfter] == "7")
         #expect(String(data: response.body, encoding: .utf8) == "busy")
 
-        let other = HTTPRequest(method: .post, url: url, body: FormEncoding.encode([("grant_type", "password")]))
-        await #expect(throws: URLError.self) { try await server.send(other) }
+        let other = HTTPRequest(method: .post, url: url)
+        await #expect(throws: URLError.self) {
+            try await server.exchange(other, body: FormEncoding.encode([("grant_type", "password")]))
+        }
         #expect(await server.requestCount(for: .refreshToken) == 1)
         #expect(await server.requests(to: "/token").count == 2)
     }
@@ -166,11 +172,11 @@ struct ResponseDelayTests {
         await server.configure { $0.responseDelay = { $0.value("grant_type") == "refresh_token" ? .seconds(5) : nil } }
         let request = HTTPRequest(
             method: .post, url: FakeAuthorizationServer.tokenEndpoint,
-            headers: ["Content-Type": "application/x-www-form-urlencoded"],
-            body: FormEncoding.encode([
-                ("grant_type", "refresh_token"), ("refresh_token", "nope"), ("client_id", "app"),
-            ]))
-        let pending = Task { try await server.send(request) }
+            headerFields: [.contentType: "application/x-www-form-urlencoded"])
+        let requestBody = FormEncoding.encode([
+            ("grant_type", "refresh_token"), ("refresh_token", "nope"), ("client_id", "app"),
+        ])
+        let pending = Task { try await server.exchange(request, body: requestBody) }
         await clock.waitForSleeper()
         #expect(await server.requests.count == 1)
         clock.advance(by: .seconds(5))

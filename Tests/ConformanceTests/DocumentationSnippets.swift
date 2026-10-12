@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 import PassportKitTesting
 
@@ -60,6 +61,15 @@ enum DocumentationSnippets {
         let authorizer = RequestAuthorizer(
             manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
         _ = authorizer
+    }
+
+    // ResourceAccessAndScopes.md
+    static func httpTypes(authorizer: RequestAuthorizer) async throws {
+        let request = HTTPRequest(
+            method: .post, url: URL(string: "https://api.example.com/items")!,
+            headerFields: [.contentType: "application/json"])
+        let (response, body) = try await authorizer.send(request, body: Data(#"{"name":"a"}"#.utf8))
+        _ = (response, body)
     }
 
     // ResourceAccessAndScopes.md

@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 
 @testable import PassportKit
 
@@ -23,7 +24,7 @@ enum ClientFixtures {
 
     static func configuration(
         authentication: ClientAuthentication = .publicClient(clientID: "app"),
-        additionalHeaders: HTTPHeaders = [:],
+        additionalHeaders: HTTPFields = [:],
         revocation: Bool = true,
         authorization: URL? = authorizationURL,
         issuer: URL? = nil,
@@ -46,7 +47,7 @@ enum ClientFixtures {
     static func client(
         _ transport: any HTTPTransport,
         authentication: ClientAuthentication = .publicClient(clientID: "app"),
-        additionalHeaders: HTTPHeaders = [:],
+        additionalHeaders: HTTPFields = [:],
         revocation: Bool = true,
         authorization: URL? = authorizationURL,
         issuer: URL? = nil,

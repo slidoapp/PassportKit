@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKit
 
 /// An in-process authorization server and protected resource, used as an `HTTPTransport`.
@@ -114,23 +115,40 @@ public actor FakeAuthorizationServer: HTTPTransport {
     }
 
     /// Replaces the server's answer to one request.
-    public struct ResponseOverride: Sendable {
+    ///
+    /// Descriptions and reflection show the status and the header names only, never header values or the body.
+    public struct ResponseOverride: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
         /// The response to send.
         public var response: HTTPResponse
+        /// The response body.
+        public var body: Data
         /// A transport failure to throw instead of answering.
         public var failure: (any Error)?
         /// How long to wait on the server's clock before answering.
         public var delay: Duration?
 
         /// Answers with a JSON `body` and `status`.
-        public init(status: Int, body: String = "", headers: HTTPHeaders = [:], delay: Duration? = nil) {
-            response = HTTPResponse(statusCode: status, headers: headers, body: Data(body.utf8))
+        public init(status: Int, body: String = "", headers: HTTPFields = [:], delay: Duration? = nil) {
+            response = HTTPResponse(status: .init(code: status), headerFields: headers)
+            self.body = Data(body.utf8)
             self.delay = delay
         }
 
+        /// A summary without header values or body.
+        public var description: String {
+            "ResponseOverride(status: \(response.status.code), headers: \(response.headerFields.names), body: \(body.count) bytes)"
+        }
+
+        /// Same as ``description``.
+        public var debugDescription: String { description }
+
+        /// A mirror exposing the summary only.
+        public var customMirror: Mirror { Mirror(self, children: ["summary": description], displayStyle: .struct) }
+
         /// Fails the request with `failure`.
         public init(failure: any Error, delay: Duration? = nil) {
-            response = HTTPResponse(statusCode: 500)
+            response = HTTPResponse(status: .internalServerError)
+            body = Data()
             self.failure = failure
             self.delay = delay
         }
@@ -256,8 +274,8 @@ public actor FakeAuthorizationServer: HTTPTransport {
         }
     }
 
-    public func send(_ request: HTTPRequest) async throws -> HTTPResponse {
-        let recorded = RecordedRequest(request)
+    public func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data) {
+        let recorded = RecordedRequest(request, body: body)
         requests.append(recorded)
         if recorded.path == "/token", let name = recorded.value("grant_type") {
             grantCounts[GrantType(rawValue: name), default: 0] += 1
@@ -265,11 +283,11 @@ public actor FakeAuthorizationServer: HTTPTransport {
         if let override = controls.override?(recorded) {
             if let delay = override.delay { try await clock.sleep(for: delay) }
             if let failure = override.failure { throw failure }
-            return override.response
+            return (override.response, override.body)
         }
-        let response: HTTPResponse
+        let response: Reply
         do {
-            switch request.url.host {
+            switch request.url?.host {
             case "as.example.com": response = try routeAuthorizationServer(recorded)
             case "api.example.com": response = try handleResource(recorded)
             default: throw URLError(.cannotFindHost)
@@ -278,10 +296,10 @@ public actor FakeAuthorizationServer: HTTPTransport {
             response = failure.response
         }
         if let delay = controls.responseDelay?(recorded) { try await clock.sleep(for: delay) }
-        return response
+        return (response.response, response.body)
     }
 
-    private func routeAuthorizationServer(_ request: RecordedRequest) throws -> HTTPResponse {
+    private func routeAuthorizationServer(_ request: RecordedRequest) throws -> Reply {
         switch (request.method, request.path) {
         case (.get, "/.well-known/oauth-authorization-server"), (.get, "/.well-known/openid-configuration"):
             return metadata()
@@ -290,8 +308,8 @@ public actor FakeAuthorizationServer: HTTPTransport {
         case (.post, "/revoke"): return try handleRevocation(request)
         case (_, "/token"), (_, "/device_authorization"), (_, "/revoke"),
             (_, "/.well-known/oauth-authorization-server"):
-            throw Failure(response: HTTPResponse(statusCode: 405, headers: ["Allow": "POST"]))
-        default: throw Failure(response: HTTPResponse(statusCode: 404))
+            throw Failure(response: Reply(status: 405, headers: [.allow: "POST"]))
+        default: throw Failure(response: Reply(status: 404))
         }
     }
 
@@ -324,9 +342,9 @@ public actor FakeAuthorizationServer: HTTPTransport {
     func authenticate(_ request: RecordedRequest) throws -> ClientRegistration {
         var identifier = request.value("client_id")
         var secret = request.value("client_secret")
-        var challenge: HTTPHeaders = [:]
-        if let header = request.headers["Authorization"], header.lowercased().hasPrefix("basic ") {
-            challenge = ["WWW-Authenticate": #"Basic realm="as""#]
+        var challenge: HTTPFields = [:]
+        if let header = request.headerFields[.authorization], header.lowercased().hasPrefix("basic ") {
+            challenge = [.wwwAuthenticate: #"Basic realm="as""#]
             let decoded = Data(base64Encoded: String(header.dropFirst(6))).flatMap { String(data: $0, encoding: .utf8) }
             let parts = decoded?.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
             guard let parts, parts.count == 2 else {
@@ -369,11 +387,11 @@ public actor FakeAuthorizationServer: HTTPTransport {
 
 /// A response that ends request handling early.
 struct Failure: Error {
-    let response: HTTPResponse
+    let response: Reply
 
     /// An RFC 6749 §5.2 error response.
     static func oauth(
-        _ code: String, _ description: String? = nil, status: Int = 400, headers: HTTPHeaders = [:]
+        _ code: String, _ description: String? = nil, status: Int = 400, headers: HTTPFields = [:]
     ) -> Failure {
         var body = ["error": code]
         body["error_description"] = description
@@ -381,9 +399,20 @@ struct Failure: Error {
     }
 }
 
-func jsonResponse(_ status: Int, _ object: [String: Any], headers: HTTPHeaders = [:]) -> HTTPResponse {
+func jsonResponse(_ status: Int, _ object: [String: Any], headers: HTTPFields = [:]) -> Reply {
     var headers = headers
-    headers["Content-Type"] = "application/json"
+    headers[.contentType] = "application/json"
     let body = (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
-    return HTTPResponse(statusCode: status, headers: headers, body: body)
+    return Reply(status: status, headers: headers, body: body)
+}
+
+/// A response and its body, as the route handlers produce them.
+struct Reply {
+    var response: HTTPResponse
+    var body: Data
+
+    init(status: Int, headers: HTTPFields = [:], body: Data = Data()) {
+        response = HTTPResponse(status: .init(code: status), headerFields: headers)
+        self.body = body
+    }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKitTesting
 import Testing
 
@@ -50,7 +51,7 @@ struct DeviceAuthorizationTests {
             scope: ["b", "a"], resources: [URL(string: "https://api.example.com")!], additionalParameters: ["k": "v"])
         let sent = try #require(await transport.requests.first)
         #expect(sent.request.url == ClientFixtures.deviceURL)
-        #expect(sent.request.headers["Accept"] == "application/json")
+        #expect(sent.headerFields[.accept] == "application/json")
         #expect(
             sent.form.map { "\($0.0)=\($0.1)" } == [
                 "scope=a b", "resource=https://api.example.com", "client_id=app", "k=v",
@@ -71,7 +72,7 @@ struct DeviceAuthorizationTests {
         let requests = await transport.requests
         #expect(requests.count == 3)
         for sent in requests {
-            #expect(sent.request.headers["Authorization"] == "Basic YXBwOnMzY3JldA==")
+            #expect(sent.headerFields[.authorization] == "Basic YXBwOnMzY3JldA==")
             #expect(sent.value("client_secret") == nil)
         }
         #expect(requests[1].value("grant_type") == GrantType.deviceCode.rawValue)
@@ -270,8 +271,8 @@ struct DeviceAuthorizationTests {
 
     @Test func retryAfterLongerThanBackoffWins() async throws {
         let (client, _, clock, authorization) = try await start([
-            .oauthError("temporarily_unavailable", status: 429, headers: ["Retry-After": "60"]),
-            .json(503, "", headers: ["Retry-After": "1"]), .tokens(),
+            .oauthError("temporarily_unavailable", status: 429, headers: [.retryAfter: "60"]),
+            .json(503, "", headers: [.retryAfter: "1"]), .tokens(),
         ])
         let outcome = await poll(client, authorization, clock: clock, sleeps: 3)
         #expect(outcome.waits == [.seconds(7), .seconds(60), .seconds(28)])

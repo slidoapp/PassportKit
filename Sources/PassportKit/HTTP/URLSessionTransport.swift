@@ -1,4 +1,6 @@
 import Foundation
+import HTTPTypes
+import HTTPTypesFoundation
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking
@@ -45,14 +47,13 @@ public struct URLSessionTransport: HTTPTransport {
 
     /// Sends `request`. Cancelling the calling task cancels the request and throws `CancellationError`, unless the
     /// complete response had already arrived: it is returned then, so a rotated refresh token is never lost.
-    public func send(_ request: HTTPRequest) async throws -> HTTPResponse {
-        var urlRequest = URLRequest(url: request.url)
-        urlRequest.httpMethod = request.method.rawValue
-        urlRequest.httpBody = request.body
-        urlRequest.httpShouldHandleCookies = false
-        for (name, value) in request.headers {
-            urlRequest.addValue(value, forHTTPHeaderField: name)
+    public func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data) {
+        // Conversion fails without scheme, authority and path, so the request has no absolute URL.
+        guard var urlRequest = URLRequest(httpRequest: request) else {
+            throw PassportError(.invalidConfiguration, detail: "The request has no absolute URL.")
         }
+        urlRequest.httpBody = body
+        urlRequest.httpShouldHandleCookies = false
         let task = session.session.dataTask(with: urlRequest)
         let identifier = task.taskIdentifier
         let delegate = session.delegate

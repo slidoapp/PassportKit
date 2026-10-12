@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 
 /// How the client authenticates at the token, device authorization and revocation endpoints.
 ///
@@ -53,7 +54,7 @@ public struct ClientAuthentication: Sendable, Hashable {
     static let parameterNames: Set<String> = ["client_id", "client_secret"]
 
     /// Adds the client credentials to a request being built: body parameters or the `Authorization` header.
-    func apply(to parameters: inout [(String, String)], headers: inout HTTPHeaders) {
+    func apply(to parameters: inout [(String, String)], headers: inout HTTPFields) {
         switch storage {
         case .publicClient(let clientID):
             parameters.append(("client_id", clientID))
@@ -63,7 +64,7 @@ public struct ClientAuthentication: Sendable, Hashable {
         case .clientSecretBasic(let clientID, let secret):
             let credentials =
                 FormEncoding.encodeComponent(clientID) + ":" + FormEncoding.encodeComponent(secret.reveal())
-            headers["Authorization"] = "Basic " + Data(credentials.utf8).base64EncodedString()
+            headers.setSensitive(.authorization, "Basic " + Data(credentials.utf8).base64EncodedString())
         }
     }
 }

@@ -1,15 +1,20 @@
 import Foundation
+import HTTPTypes
 
 /// Everything the client needs to know about itself and its authorization server.
-public struct ClientConfiguration: Sendable {
+///
+/// Header values can carry credentials, so descriptions and reflection show the names of
+/// ``additionalHeaders`` and never their values.
+public struct ClientConfiguration: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// The authorization server endpoints.
     public var endpoints: Endpoints
     /// How the client authenticates.
     public var authentication: ClientAuthentication
     /// The expected issuer, used for RFC 9207 `iss` checks.
     public var issuer: URL?
-    /// Headers sent on every request to the authorization server.
-    public var additionalHeaders: HTTPHeaders
+    /// Header fields sent on every request to the authorization server. Library-owned fields (`Content-Type`,
+    /// `Accept`, `Authorization` for Basic client authentication) replace fields of the same name.
+    public var additionalHeaders: HTTPFields
     /// Tokens are refreshed when less than this remains before expiry.
     public var minimumTokenLifetime: Duration
     /// The lifetime assumed when `expires_in` is missing; `nil` treats such tokens as expired.
@@ -23,7 +28,7 @@ public struct ClientConfiguration: Sendable {
         endpoints: Endpoints,
         authentication: ClientAuthentication,
         issuer: URL? = nil,
-        additionalHeaders: HTTPHeaders = [:],
+        additionalHeaders: HTTPFields = [:],
         minimumTokenLifetime: Duration = .seconds(60),
         defaultTokenLifetime: Duration? = nil,
         requiresIssuerInAuthorizationResponse: Bool = false
@@ -35,6 +40,31 @@ public struct ClientConfiguration: Sendable {
         self.minimumTokenLifetime = minimumTokenLifetime
         self.defaultTokenLifetime = defaultTokenLifetime
         self.requiresIssuerInAuthorizationResponse = requiresIssuerInAuthorizationResponse
+    }
+
+    /// A summary that shows the token endpoint and the names of the additional headers, never their values.
+    public var description: String {
+        "ClientConfiguration(token: \(endpoints.token.redactedTarget), additionalHeaders: \(additionalHeaders.names))"
+    }
+
+    /// Same as ``description``.
+    public var debugDescription: String { description }
+
+    /// A mirror that lists the members but shows the names of ``additionalHeaders`` instead of its values.
+    public var customMirror: Mirror {
+        Mirror(
+            self,
+            children: [
+                "endpoints": endpoints,
+                "authentication": authentication,
+                "issuer": issuer as Any,
+                "additionalHeaders": additionalHeaders.names,
+                "minimumTokenLifetime": minimumTokenLifetime,
+                "defaultTokenLifetime": defaultTokenLifetime as Any,
+                "requiresIssuerInAuthorizationResponse": requiresIssuerInAuthorizationResponse,
+            ],
+            displayStyle: .struct
+        )
     }
 
     /// Checks the endpoints and issuer: `https`, or `http` with a loopback host only, and that

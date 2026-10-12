@@ -1,4 +1,5 @@
 import Foundation
+import HTTPTypes
 import PassportKitTesting
 import Testing
 
@@ -78,9 +79,9 @@ struct DiscoveryTests {
             issuer: URL(string: "https://as.example.com")!, transport: transport)
         let sent = try #require(await transport.requests.first)
         #expect(sent.request.method == .get)
-        #expect(sent.request.body == nil)
-        #expect(sent.request.headers["Accept"] == "application/json")
-        #expect(sent.request.url.absoluteString == "https://as.example.com/.well-known/oauth-authorization-server")
+        #expect(sent.body == nil)
+        #expect(sent.headerFields[.accept] == "application/json")
+        #expect(sent.request.url?.absoluteString == "https://as.example.com/.well-known/oauth-authorization-server")
         #expect(metadata.issuer.absoluteString == "https://as.example.com")
         #expect(metadata.authorizationEndpoint?.path == "/authorize")
         #expect(metadata.tokenEndpoint?.path == "/token")
@@ -116,7 +117,7 @@ struct DiscoveryTests {
             issuer: URL(string: "https://as.example.com/tenant")!, transport: transport)
         let sent = try #require(await transport.requests.first)
         #expect(
-            sent.request.url.absoluteString == "https://as.example.com/.well-known/oauth-authorization-server/tenant")
+            sent.request.url?.absoluteString == "https://as.example.com/.well-known/oauth-authorization-server/tenant")
     }
 
     @Test func openIDConnectStyleUsesItsOwnPath() async throws {
@@ -124,7 +125,7 @@ struct DiscoveryTests {
         _ = try await Discovery.fetchMetadata(
             issuer: URL(string: "https://as.example.com/tenant")!, style: .openIDConnect, transport: transport)
         let sent = try #require(await transport.requests.first)
-        #expect(sent.request.url.absoluteString == "https://as.example.com/tenant/.well-known/openid-configuration")
+        #expect(sent.request.url?.absoluteString == "https://as.example.com/tenant/.well-known/openid-configuration")
     }
 
     // MARK: Issuer validation
@@ -184,7 +185,7 @@ struct DiscoveryTests {
         #expect(missing.code == .invalidResponse)
         #expect(missing.statusCode == 404)
 
-        let busy = RecordingTransport([.json(503, "", headers: ["Retry-After": "7"])])
+        let busy = RecordingTransport([.json(503, "", headers: [.retryAfter: "7"])])
         let unavailable = try await #require(throws: PassportError.self) {
             try await Discovery.fetchMetadata(issuer: URL(string: "https://as.example.com")!, transport: busy)
         }
