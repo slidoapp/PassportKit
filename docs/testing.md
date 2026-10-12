@@ -7,7 +7,14 @@
 | Unit | `Tests/PassportKitTests` | Request building, response and error parsing, PKCE, form encoding, `WWW-Authenticate` parsing, metadata parsing |
 | Conformance | `Tests/ConformanceTests` | End-to-end flows against the fake authorization server: rotation, coalesced refresh, device polling, token exchange, resource indicators, error handling, and the redaction canary |
 | Integration | `Tests/IntegrationTests` | The real flows against a local `oidc-provider` server (`Tools/integration-server`): discovery, authorization code with PKCE and `iss`, device flow, refresh rotation and reuse rejection, token exchange, the underscoped-200 case, client credentials, revocation, Keychain; macOS |
-| Apple integrations | `Tests/PassportKitTests/Storage`, `Tests/PassportKitTests/UserAgents` | Keychain storage, redirect handling; part of the unit target, macOS only |
+| Apple integrations | `Tests/PassportKitTests/Storage`, `Tests/PassportKitTests/UserAgents` | Keychain storage, redirect handling; part of the unit target |
+
+## iOS
+
+`make test-ios` runs the offline suites on the newest available iPhone
+simulator; CI runs it in the `ios` job. A package test bundle on the
+simulator has no host app and so no Keychain access group, so the
+Keychain suite skips itself there and runs on macOS only.
 
 ## Integration tests
 

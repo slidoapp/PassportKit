@@ -26,6 +26,12 @@ jobs:
       - run: make build
       - run: make test
 
+  ios:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - run: make test-ios
+
   docs:
     runs-on: macos-26
     steps:
@@ -46,7 +52,7 @@ jobs:
 
   ci-success:
     if: always()
-    needs: [lint, macos, docs, integration]
+    needs: [lint, macos, ios, docs, integration]
     runs-on: ubuntu-latest
     steps:
       - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false"

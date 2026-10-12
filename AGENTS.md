@@ -47,6 +47,7 @@ make test      # run all tests in parallel
 make check     # lint + build + test — the definition of done
 make docs      # DocC archives of all libraries; fails on any warning (needs Xcode)
 make integration  # real flows against Tools/integration-server (needs Node.js)
+make test-ios  # the offline suites on an iPhone simulator (needs Xcode)
 swift test --filter <Suite>/<test>   # a single test
 ```
 
@@ -76,8 +77,9 @@ swift test --filter <Suite>/<test>   # a single test
   Keychain store and the sign-in user agents (formerly `PassportKitApple`).
 - `Tools/integration-server` — the local authorization server that
   `make integration` runs the `IntegrationTests` against (Node.js).
-- `scripts/` — `check-determinism.sh` (run by `make lint`) and
-  `build-docs.sh` (run by `make docs`).
+- `scripts/` — `check-determinism.sh` (run by `make lint`),
+  `build-docs.sh` (run by `make docs`) and `test-ios.sh` (run by
+  `make test-ios`).
 - `docs/decisions/` — ADRs. Check them before proposing a design change;
   do not re-propose rejected designs without new information.
 

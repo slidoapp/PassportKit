@@ -3,7 +3,7 @@
 INTEGRATION_SERVER := Tools/integration-server
 SWIFT_FORMAT_PATHS := $(wildcard Sources Tests Package.swift)
 
-.PHONY: setup format lint build test check integration docs
+.PHONY: setup format lint build test test-ios check integration docs
 
 setup:
 	git config core.hooksPath .githooks
@@ -20,6 +20,10 @@ build:
 
 test:
 	swift test --parallel
+
+# Runs the tests on an iPhone simulator. Needs Xcode with an iOS runtime. Not part of `check`.
+test-ios:
+	scripts/test-ios.sh
 
 check: lint build test
 	@echo "make check: all checks passed"

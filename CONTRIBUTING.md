@@ -67,6 +67,7 @@ Two more targets are not part of `make check`:
 ```sh
 make integration   # real flows against a local authorization server
 make docs          # builds the DocC archives; fails on any warning
+make test-ios      # the offline suites on an iPhone simulator
 ```
 
 `make integration` needs [Node.js](https://nodejs.org) (24 is what CI uses):
