@@ -35,6 +35,7 @@ Each dependency is linked only into the target that needs it.
 | Package | Product | Used by | Why |
 |---|---|---|---|
 | [swift-crypto](https://github.com/apple/swift-crypto) `"3.15.1"..<"6.0.0"` | `Crypto` | `PassportKit`, `PassportKitTesting` | SHA-256 for PKCE S256 (RFC 7636 §4.2). Re-exports CryptoKit on Apple platforms and uses BoringSSL elsewhere. The fake authorization server calls it directly, not PassportKit's code path, so it still checks the client independently. |
+| [swift-http-types](https://github.com/apple/swift-http-types) `from: "1.5.0"` | `HTTPTypes`, `HTTPTypesFoundation` | `PassportKit` (both), `PassportKitTesting` (`HTTPTypes`) | The HTTP currency types of `HTTPTransport` and `RequestAuthorizer` (`HTTPRequest`, `HTTPResponse`, `HTTPFields`) and the `URLSession` conversions, in place of hand-written ones. It prints header values, so no public type that stores them may print them (ADR 0010). |
 | [swift-log](https://github.com/apple/swift-log) `from: 1.6.0` | `Logging` | `PassportKit`, `PassportKitApple` | The `logger:` parameters. A logger labelled `PassportKit` uses whatever `LoggingSystem.bootstrap` the host configured. `PassportObserver` stays the channel for typed events. |
 | [SwiftKeychain](https://github.com/slidoapp/SwiftKeychain) `.upToNextMinor(from: "2.1.0")` | `SwiftKeychain` | `PassportKitApple` | The Keychain wrapper the Slido OAuth stack already uses; `KeychainCredentialStore` is built on it. Adopted with a known issue, below. |
 
@@ -66,6 +67,9 @@ the issue is listed under Known limits in the security model.
 
 - **pointfree swift-clocks:** its `TestClock` lacks the equivalent of
   `ManualClock.advanceToNextSleeper`, which the race tests rely on.
+- **swift-nio or AsyncHTTPClient as the default transport:** the default
+  stays `URLSession`; a transport on AsyncHTTPClient is possible now that the
+  currency types match (ADR 0010).
 - **swift-async-algorithms:** no stable multicast, which `TokenManager.events`
   needs.
 - **`Synchronization.Mutex`:** needs macOS 15; the floor is macOS 14
@@ -75,8 +79,8 @@ the issue is listed under Known limits in the security model.
 
 ## Consequences
 
-Consumers resolve swift-crypto, swift-log and, on Apple platforms,
-SwiftKeychain even when they use a small part of the package; the host
+Consumers resolve swift-crypto, swift-http-types, swift-log and, on Apple
+platforms, SwiftKeychain even when they use a small part of the package; the host
 app already resolves swift-log. Hand-written SHA-256 and its tests are
 gone. Logging is an additional channel that must follow the redaction
 rules in `docs/security-model.md`; the redaction canary test captures log

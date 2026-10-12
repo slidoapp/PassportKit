@@ -41,3 +41,7 @@ ADR before work starts.
 - **A `Dependencies` struct for the seams.** Bundle the transport, clocks,
   random source and observer that `OAuthClient` takes as separate
   parameters, so they can be passed around and extended as one value.
+- **An AsyncHTTPClient transport.** Now that `HTTPTransport` speaks
+  swift-http-types (ADR 0010), a transport on AsyncHTTPClient for server-side
+  Swift is a small adapter. It would live in its own target so the core does
+  not link swift-nio, and it needs an ADR 0009 review.
