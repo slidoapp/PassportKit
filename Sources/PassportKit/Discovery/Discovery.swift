@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 /// How the metadata `issuer` is checked against the issuer that was requested (RFC 8414 §3.3).
 public enum IssuerValidation: Sendable {
@@ -34,14 +35,16 @@ public enum Discovery {
     ///
     /// With an `observer`, the request is reported as ``PassportEvent`` values with
     /// ``EndpointKind/metadata``; durations are measured on `clock`. `Retry-After` dates are not interpreted
-    /// here (no calendar clock): only delta-seconds are honoured.
+    /// here (no calendar clock): only delta-seconds are honoured. Requests are logged to `logger` the way
+    /// ``OAuthClient`` logs its own.
     public static func fetchMetadata(
         issuer: URL,
         style: Style = .oauth,
         validation: IssuerValidation = .strict,
         transport: any HTTPTransport = URLSessionTransport(),
         observer: (any PassportObserver)? = nil,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        logger: Logger = Logger(label: "PassportKit")
     ) async throws -> AuthorizationServerMetadata {
         let request = HTTPRequest(
             method: .get,
@@ -55,6 +58,11 @@ public enum Discovery {
             response = try await transport.send(request)
         } catch {
             observer?.record(.transportFailure(endpoint: .metadata, grantType: nil, duration: stopwatch.elapsed))
+            if !(error is CancellationError || Task.isCancelled) {
+                logger.warning(
+                    "Request to the authorization server failed",
+                    metadata: .request(endpoint: .metadata, duration: stopwatch.elapsed))
+            }
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
             throw PassportError(
                 .transportFailure,
@@ -70,6 +78,11 @@ public enum Discovery {
                 duration: stopwatch.elapsed
             )
         )
+        logger.debug(
+            "Request completed",
+            metadata: .request(
+                endpoint: .metadata, status: response.statusCode, errorCode: OAuthClient.errorCode(in: response),
+                duration: stopwatch.elapsed))
         guard (200..<300).contains(response.statusCode) else {
             throw PassportError.fromErrorResponse(
                 statusCode: response.statusCode,

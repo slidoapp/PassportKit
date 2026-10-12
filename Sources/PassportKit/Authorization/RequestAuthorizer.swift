@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking
@@ -106,6 +107,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         let challenge = challenges.first { $0.scheme == "bearer" && $0.parameters["error"] != nil }
         let code = challenge?.parameters["error"]
         if code == PassportError.Code.insufficientScope.rawValue {
+            manager.client.logger.notice("The resource answered insufficient_scope")
             return .fail(
                 PassportError(
                     .insufficientScope, statusCode: statusCode,
@@ -113,10 +115,12 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
                 ).redacting([token.value.reveal()]))
         }
         guard attempt == 0 else {
+            manager.client.logger.warning("The resource rejected a renewed access token")
             return .fail(PassportError(.unauthorized, recovery: .resourceDenied, statusCode: statusCode))
         }
         if !challenges.isEmpty, !challenges.contains(where: { $0.scheme == "bearer" }) { return .deliver }
         guard code == nil || code == PassportError.Code.invalidToken.rawValue else { return .deliver }
+        manager.client.logger.notice("The resource answered 401; retrying once with a new access token")
         await manager.invalidate(token)
         return .retry
     }

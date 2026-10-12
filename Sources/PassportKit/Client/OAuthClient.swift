@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 /// Stateless OAuth 2.0 protocol operations against one authorization server (specification §8).
 ///
@@ -16,18 +17,25 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     let clock: any Clock<Duration>
     let random: any RandomSource
     let observer: (any PassportObserver)?
+    /// The logger of the client, which a ``TokenManager`` created with it uses unless given another.
+    public let logger: Logger
 
     /// Creates a client.
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when the
     /// configuration is invalid (an endpoint or the issuer is neither `https` nor loopback `http`), so a misconfigured client never exists.
+    ///
+    /// `logger` receives the library's log lines (see <doc:GettingStarted>). The default is labelled `PassportKit`,
+    /// so it uses the `LoggingSystem` the app bootstrapped. Logs never contain tokens, codes, verifiers, URLs or
+    /// bodies; ``PassportObserver`` stays the channel for typed events.
     public init(
         configuration: ClientConfiguration,
         transport: any HTTPTransport = URLSessionTransport(),
         wallClock: any WallClock = SystemWallClock(),
         clock: any Clock<Duration> = ContinuousClock(),
         random: any RandomSource = SystemRandomSource(),
-        observer: (any PassportObserver)? = nil
+        observer: (any PassportObserver)? = nil,
+        logger: Logger = Logger(label: "PassportKit")
     ) throws {
         try configuration.validate()
         self.configuration = configuration
@@ -36,6 +44,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
         self.clock = clock
         self.random = random
         self.observer = observer
+        self.logger = logger
     }
 
     /// A summary naming the client ID and the token endpoint.
@@ -65,6 +74,12 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
             observer?.record(
                 .transportFailure(endpoint: request.endpoint, grantType: request.grantType, duration: stopwatch.elapsed)
             )
+            if !(error is CancellationError || Task.isCancelled) {
+                logger.warning(
+                    "Request to the authorization server failed",
+                    metadata: .request(
+                        endpoint: request.endpoint, grantType: request.grantType, duration: stopwatch.elapsed))
+            }
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
             throw PassportError(
                 .transportFailure,
@@ -80,6 +95,11 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
                 duration: stopwatch.elapsed
             )
         )
+        logger.debug(
+            "Request completed",
+            metadata: .request(
+                endpoint: request.endpoint, grantType: request.grantType, status: response.statusCode,
+                errorCode: Self.errorCode(in: response), duration: stopwatch.elapsed))
         return response
     }
 

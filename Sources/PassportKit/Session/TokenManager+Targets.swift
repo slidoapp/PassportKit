@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 // Access tokens per target: cache lookup, coalescing, and the two ways of issuing a token.
 extension TokenManager {
@@ -44,11 +45,16 @@ extension TokenManager {
         }
         let minimumLifetime = client.configuration.minimumTokenLifetime.seconds
         if let token = cache.usableToken(for: target, now: client.wallClock.now(), minimumLifetime: minimumLifetime) {
+            logger.trace("Served an access token from the cache")
             return token
         }
         // A token that was just rejected is not asked for again: every attempt would rotate the refresh token.
         let now = client.wallClock.now()
-        if let rejection = cache.rejection(for: target, now: now) { throw rejection }
+        if let rejection = cache.rejection(for: target, now: now) {
+            logger.debug("Repeated a remembered token rejection")
+            throw rejection
+        }
+        if flights[target] != nil { logger.trace("Joined an in-flight token request") }
         let flight = flights[target] ?? startFlight(for: target)
         return try await flight.completion.wait()
     }
@@ -71,6 +77,9 @@ extension TokenManager {
     private func startFlight(for target: TokenTarget) -> Flight {
         let flight = registerFlight(for: target)
         let session = generation
+        logger.trace(
+            "Started a token request",
+            metadata: ["derivation": "\(target.derivation == .refreshGrant ? "refresh_grant" : "exchange")"])
         // The lane turn is reserved here, synchronously, so turns follow the order of calls.
         let turn = target.derivation == .refreshGrant ? lane.reserve() : nil
         Task {
@@ -182,6 +191,7 @@ extension TokenManager {
             until: client.wallClock.now().addingTimeInterval(rejectedTokenCacheDuration.seconds),
             now: client.wallClock.now())
         eventHub.emit(.tokenRejected(target: token.target, grantedScope: token.grantedScope))
+        logger.notice("The acceptance policy rejected an access token")
         throw error
     }
 

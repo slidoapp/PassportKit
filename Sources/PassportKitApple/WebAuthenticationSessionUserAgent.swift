@@ -1,6 +1,7 @@
 #if canImport(AuthenticationServices) && !os(tvOS) && !os(watchOS)
     import AuthenticationServices
     import Foundation
+    import Logging
     import PassportKit
 
     #if os(macOS)
@@ -19,6 +20,7 @@
         private let prefersEphemeralWebBrowserSession: Bool
         private let presentationAnchor: @MainActor @Sendable () -> ASPresentationAnchor
         private let launcher: any WebAuthenticationSessionLauncher
+        private let logger: Logger
 
         /// Creates an agent.
         ///
@@ -29,23 +31,27 @@
         ///     the application's key window.
         public init(
             prefersEphemeralWebBrowserSession: Bool = false,
-            presentationAnchor: (@MainActor @Sendable () -> ASPresentationAnchor)? = nil
+            presentationAnchor: (@MainActor @Sendable () -> ASPresentationAnchor)? = nil,
+            logger: Logger = Logger(label: "PassportKit")
         ) {
             self.init(
                 prefersEphemeralWebBrowserSession: prefersEphemeralWebBrowserSession,
                 presentationAnchor: presentationAnchor ?? { Self.keyWindow() },
-                launcher: SystemWebAuthenticationSessionLauncher()
+                launcher: SystemWebAuthenticationSessionLauncher(),
+                logger: logger
             )
         }
 
         init(
             prefersEphemeralWebBrowserSession: Bool,
             presentationAnchor: @escaping @MainActor @Sendable () -> ASPresentationAnchor,
-            launcher: any WebAuthenticationSessionLauncher
+            launcher: any WebAuthenticationSessionLauncher,
+            logger: Logger = Logger(label: "PassportKit")
         ) {
             self.prefersEphemeralWebBrowserSession = prefersEphemeralWebBrowserSession
             self.presentationAnchor = presentationAnchor
             self.launcher = launcher
+            self.logger = logger
         }
 
         /// Presents `url` and returns the callback URL for `redirectURI`.
@@ -54,6 +60,7 @@
         /// ``LoopbackUserAgent``.
         public func present(_ url: URL, redirectURI: URL) async throws -> URL {
             let callback = try Self.callback(for: redirectURI)
+            logger.debug("Presenting the web authentication session")
             do {
                 return try await launcher.authenticate(
                     url: url,
@@ -63,7 +70,14 @@
                 )
             } catch {
                 if Task.isCancelled { throw CancellationError() }
-                throw Self.map(error)
+                let mapped = Self.map(error)
+                if let failure = mapped as? PassportError {
+                    let level: Logger.Level = failure.code == .userCancelled ? .info : .warning
+                    logger.log(
+                        level: level, "The web authentication session ended without a redirect",
+                        metadata: ["error_code": "\(failure.code.rawValue)"])
+                }
+                throw mapped
             }
         }
 

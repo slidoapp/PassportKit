@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 // Operations that send the refresh token. They are the only code that reads `current.refreshToken` to send it,
 // and they only run inside a lane turn (ADR 0005).
@@ -56,9 +57,16 @@ extension TokenManager {
         adoptsScope: Bool = false,
         send: (Secret) async throws -> TokenResponse
     ) async throws -> TokenResponse {
+        logger.trace("Waiting for a refresh lane turn")
         await turn.start()
-        defer { turn.finish() }
-        guard session == generation else { throw SessionSuperseded() }
+        defer {
+            turn.finish()
+            logger.trace("Refresh lane turn finished")
+        }
+        guard session == generation else {
+            logger.trace("Skipped a lane turn of a superseded session")
+            throw SessionSuperseded()
+        }
         guard let refreshToken = current?.refreshToken else {
             // A grant that issued no refresh token cannot be renewed: its session ends with its access token.
             await endSession(reason: .expiredWithoutRefreshToken)
@@ -68,7 +76,10 @@ extension TokenManager {
         do {
             response = try await send(refreshToken)
         } catch {
-            guard session == generation else { throw SessionSuperseded() }
+            guard session == generation else {
+                logger.trace("Discarded a failure of a superseded session")
+                throw SessionSuperseded()
+            }
             // Only a rejected refresh token ends the session; resource-level failures never do. A refresh
             // narrowed to resources or a scope that fails with `invalid_grant` counts: RFC 6749 §5.2 defines it
             // as a problem with the grant, while scope and resource problems are `invalid_scope` and
@@ -79,6 +90,7 @@ extension TokenManager {
             throw error
         }
         guard session == generation else {
+            logger.trace("Discarded the result of a superseded session")
             handOverRotation(of: response, session: session)
             throw SessionSuperseded()
         }
@@ -93,7 +105,10 @@ extension TokenManager {
     private func persistRotation(from response: TokenResponse, adoptsIDToken: Bool, adoptsScope: Bool) async {
         guard var credential = current, response.refreshToken != nil || (adoptsScope && response.scope != nil)
         else { return }
-        if let rotated = response.refreshToken { credential.refreshToken = rotated }
+        if let rotated = response.refreshToken {
+            credential.refreshToken = rotated
+            logger.info("Refresh token rotated")
+        }
         if adoptsIDToken, response.refreshToken != nil, let idToken = response.idToken { credential.idToken = idToken }
         if adoptsScope, let scope = response.scope { credential.grantedScope = scope }
         credential.updatedAt = client.wallClock.now()
@@ -115,6 +130,7 @@ extension TokenManager {
         startNewSession()
         current = nil
         eventHub.emit(.signedOut(reason: reason))
+        logger.info("Session ended", metadata: ["reason": "\(reason.logValue)"])
         await deleteStoredCredential()
     }
 

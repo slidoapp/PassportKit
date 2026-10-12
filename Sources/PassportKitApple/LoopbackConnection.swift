@@ -1,5 +1,6 @@
 #if canImport(Network)
     import Foundation
+    import Logging
     import Network
     import os
 
@@ -18,6 +19,7 @@
             var path: String
             var port: UInt16
             var clock: any Clock<Duration>
+            var logger: Logging.Logger
             var connections: LoopbackConnections
             /// Decides whether a well-formed redirect belongs to the flow in progress.
             var accept: @Sendable (URL) -> Bool
@@ -58,17 +60,24 @@
                     guard !isComplete, data != nil else { return connection.cancel() }
                     receive(connection, buffer: received, context: context)
                 case .tooLarge:
+                    context.logger.debug("Rejected an oversized loopback request")
                     respond(connection, status: 431)
                 case .malformed:
+                    context.logger.debug("Rejected a malformed loopback request")
                     respond(connection, status: 400)
                 case .complete(let head):
                     switch LoopbackRoute.route(head, path: context.path, port: context.port) {
                     case .reject(let status):
+                        context.logger.debug("Rejected a loopback request", metadata: ["status": "\(status)"])
                         respond(connection, status: status)
                     case .callback(let target):
                         guard let url = URL(string: "http://127.0.0.1:\(context.port)\(target)"), context.accept(url)
-                        else { return respond(connection, status: 400) }
+                        else {
+                            context.logger.notice("Ignored a loopback redirect that failed validation")
+                            return respond(connection, status: 400)
+                        }
                         guard context.claim() else { return connection.cancel() }
+                        context.logger.debug("Received the loopback redirect")
                         respond(connection, status: 200) { context.deliver(url) }
                     }
                 }

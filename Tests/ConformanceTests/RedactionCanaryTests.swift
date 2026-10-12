@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 import PassportKit
 import PassportKitTesting
 import Testing
@@ -7,8 +8,8 @@ import Testing
     import FoundationNetworking
 #endif
 
-/// Specification §15: a run of every flow with canary secrets must leave no canary in any error, event or
-/// rendering of a public value. The canaries are the client secret and every token, code, verifier and device
+/// Specification §15: a run of every flow with canary secrets must leave no canary in any error, event, log
+/// line or rendering of a public value. The canaries are the client secret and every token, code, verifier and device
 /// code that crossed the wire, including the ones the fake server issued.
 @Suite("Redaction canary: no secret in any description", .timeLimit(.minutes(1)))
 struct RedactionCanaryTests {
@@ -22,6 +23,7 @@ struct RedactionCanaryTests {
         let harvest = SecretHarvest()
         let renderings = RenderingLog()
         let events = EventLog()
+        let logs = LogCapture()
         let clock = ManualClock()
         let wallClock = ManualWallClock()
         let client: OAuthClient
@@ -46,7 +48,8 @@ struct RedactionCanaryTests {
                     authentication: authentication(Secret(RedactionCanaryTests.clientSecret)),
                     issuer: FakeAuthorizationServer.issuer),
                 transport: HarvestingTransport(server: server, harvest: harvest), wallClock: wallClock,
-                clock: clock, random: SequenceRandomSource(), observer: events)
+                clock: clock, random: SequenceRandomSource(), observer: events,
+                logger: logs.logger)
         }
 
         func authorize() async throws -> TokenResponse {
@@ -61,7 +64,7 @@ struct RedactionCanaryTests {
     }
 
     private static func assertNoCanary(
-        _ rig: Rig, minimumSecrets: Int = 12, minimumRenderings: Int = 100,
+        _ rig: Rig, minimumSecrets: Int = 12, minimumRenderings: Int = 100, minimumLogLines: Int = 20,
         sourceLocation: SourceLocation = #_sourceLocation
     ) {
         let secrets = rig.harvest.all
@@ -69,7 +72,9 @@ struct RedactionCanaryTests {
             secrets.count >= minimumSecrets, "the scenarios must have produced secrets to look for",
             sourceLocation: sourceLocation)
         let events = rig.events.all.flatMap { [String(describing: $0), String(reflecting: $0)] }
-        let renderings = rig.renderings.all + events
+        let logs = rig.logs.renderings
+        #expect(logs.count >= minimumLogLines, "the scenarios must have logged", sourceLocation: sourceLocation)
+        let renderings = rig.renderings.all + events + logs
         #expect(
             renderings.count >= minimumRenderings, "the scenarios must have rendered values",
             sourceLocation: sourceLocation)
@@ -267,6 +272,35 @@ struct RedactionCanaryTests {
         rig.echo("invalid_grant", of: ["refresh_token", "basic_secret"])
         await rig.renderings.observe { try await manager.accessToken() }
         for event in await events.value { rig.renderings.look(event) }
-        Self.assertNoCanary(rig, minimumSecrets: 3, minimumRenderings: 10)
+        Self.assertNoCanary(rig, minimumSecrets: 3, minimumRenderings: 10, minimumLogLines: 5)
+    }
+
+    @Test("The lifecycle is logged with structured metadata and no secrets")
+    func lifecycleLogLines() async throws {
+        let rig = try await Rig { .clientSecretPost(clientID: "app", secret: $0) }
+        let manager = TokenManager(
+            client: rig.client, store: InMemoryCredentialStore(),
+            account: CredentialAccount(service: "canary", account: "lines"))
+        try await manager.signIn(with: try await rig.authorize(), requestedScope: ["read", "write"])
+        rig.wallClock.advance(by: .seconds(100_000))
+        _ = try await manager.accessToken()
+        rig.echo("invalid_grant", of: ["refresh_token"])
+        rig.wallClock.advance(by: .seconds(100_000))
+        _ = try? await manager.accessToken()
+        rig.harvest.echoing(nil)
+
+        let logs = rig.logs
+        #expect(logs.contains("Signed in", level: .info))
+        #expect(logs.contains("Refresh token rotated", level: .info))
+        #expect(logs.contains("Session ended", level: .info))
+        let request = try #require(
+            logs.lines.first { $0.message == "Request completed" && $0.metadata["grant_type"] == "refresh_token" })
+        #expect(request.level == .debug)
+        #expect(request.metadata["endpoint"] == "token")
+        #expect(request.metadata["status"] == "200")
+        #expect(request.metadata["duration_ms"] != nil)
+        let ended = try #require(logs.lines.first { $0.message == "Session ended" })
+        #expect(ended.metadata["reason"] == "refresh_token_rejected")
+        #expect(logs.contains("Started a token request", level: .trace))
     }
 }

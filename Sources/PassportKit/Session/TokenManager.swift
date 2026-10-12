@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 /// The session: one signed-in root grant and every access token derived from it (specification §9).
 ///
@@ -36,6 +37,7 @@ public actor TokenManager {
     let acceptancePolicyTimeLimit: Duration
     let rejectedTokenCacheDuration: Duration
     let eventHub = EventHub()
+    let logger: Logger
 
     /// The root credential; the single source of truth for the refresh token.
     var current: Credential?
@@ -61,6 +63,9 @@ public actor TokenManager {
     /// the server narrowed below what the app needs (RFC 6749 §3.3). An app that depends on a scope or a
     /// resource should pass a policy such as ``RequireAnyScope``.
     ///
+    /// `logger` receives session lifecycle and storage log lines; by default the manager uses the logger of
+    /// `client`. Logs never contain tokens or credentials (see <doc:GettingStarted>).
+    ///
     /// A policy that has not answered after `acceptancePolicyTimeLimit` rejects the token.
     /// A rejected token is remembered for `rejectedTokenCacheDuration`: asking for the same target again within
     /// that time throws the same rejection without a request, so a caller that retries in a loop cannot make the
@@ -71,7 +76,8 @@ public actor TokenManager {
         account: CredentialAccount,
         acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
         acceptancePolicyTimeLimit: Duration = .seconds(10),
-        rejectedTokenCacheDuration: Duration = .seconds(30)
+        rejectedTokenCacheDuration: Duration = .seconds(30),
+        logger: Logger? = nil
     ) {
         self.client = client
         self.store = store
@@ -79,6 +85,7 @@ public actor TokenManager {
         self.acceptancePolicy = acceptancePolicy
         self.acceptancePolicyTimeLimit = acceptancePolicyTimeLimit
         self.rejectedTokenCacheDuration = rejectedTokenCacheDuration
+        self.logger = logger ?? client.logger
     }
 
     deinit {
@@ -109,15 +116,22 @@ public actor TokenManager {
         do {
             stored = try await store.load(account)
         } catch {
+            logger.warning(
+                "Loading the credential failed",
+                metadata: ["error_code": "\(PassportError.Code.storageFailure.rawValue)"])
             throw Self.storageError(error)
         }
         // A sign-in or sign-out that ran while the store was reading wins.
         guard session == generation, current == nil else { return current }
         guard let stored, stored.clientID == client.configuration.authentication.clientID,
             stored.issuer == client.configuration.issuer
-        else { return nil }
+        else {
+            logger.debug("Ignored a stored credential of another client or issuer")
+            return nil
+        }
         current = stored
         eventHub.emit(.signedIn)
+        logger.info("Signed in", metadata: ["reason": "restored"])
         return stored
     }
 
@@ -145,6 +159,7 @@ public actor TokenManager {
         let token = makeToken(from: response, target: .default, requestedScope: requestedScope)
         current = credential
         eventHub.emit(.signedIn)
+        logger.info("Signed in", metadata: ["reason": "grant"])
         // The token is not cached until it was saved with its credential and judged, which takes a while. Until
         // then this flight stands in for it: a caller asking for the default token in that time waits here
         // instead of refreshing, which would spend the grant's first refresh token and then be overwritten by
@@ -191,6 +206,8 @@ public actor TokenManager {
         // Reported before the first suspension, so a slow store cannot order it after the events of a sign-in
         // that follows.
         eventHub.emit(.signedOut(reason: .userInitiated))
+        logger.info(
+            "Signed out", metadata: ["reason": "\(SignOutReason.userInitiated.logValue)", "revoke": "\(revoke)"])
         // Reserved now, before any suspension, so the revocation queues behind operations that are
         // already sending the old refresh token.
         let revocation =
@@ -205,6 +222,13 @@ public actor TokenManager {
         } catch {
             // Only the caller's cancellation can end the wait early; the revocation itself carries on.
             outcome = .cancelled
+        }
+        switch outcome {
+        case .failed(let error):
+            logger.warning("Revoking the refresh token failed", metadata: ["error_code": "\(error.code.rawValue)"])
+        case .timedOut: logger.warning("Revoking the refresh token timed out")
+        case .revoked: logger.debug("Revoked the refresh token")
+        default: break
         }
         return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: outcome)
     }
@@ -225,7 +249,7 @@ public actor TokenManager {
     /// by a save that was still on its way. The change is registered before this returns and runs in a task of
     /// its own, so cancelling the caller neither skips it nor interrupts it. A failure is reported as
     /// ``SessionEvent/storageFailed``.
-    func changeStore(_ change: @escaping @Sendable () async throws -> Void) -> Task<Bool, Never> {
+    func changeStore(_ operation: String, _ change: @escaping @Sendable () async throws -> Void) -> Task<Bool, Never> {
         let previous = lastStoreChange
         let task = Task {
             _ = await previous?.value
@@ -234,6 +258,7 @@ public actor TokenManager {
                 return true
             } catch {
                 eventHub.emit(.storageFailed)
+                logger.notice("The credential store failed", metadata: ["operation": "\(operation)"])
                 return false
             }
         }
@@ -245,14 +270,14 @@ public actor TokenManager {
     func save(_ credential: Credential) async -> Bool {
         let store = self.store
         let account = self.account
-        return await changeStore { try await store.save(credential, for: account) }.value
+        return await changeStore("save") { try await store.save(credential, for: account) }.value
     }
 
     @discardableResult
     func deleteStoredCredential() async -> Bool {
         let store = self.store
         let account = self.account
-        return await changeStore { try await store.delete(account) }.value
+        return await changeStore("delete") { try await store.delete(account) }.value
     }
 
     static func storageError(_ error: any Error) -> PassportError {
@@ -276,5 +301,16 @@ public actor TokenManager {
 
     static var signedOut: PassportError {
         PassportError(.notAuthenticated, recovery: .reauthenticate, detail: "There is no signed-in session.")
+    }
+}
+
+extension SignOutReason {
+    /// The `reason` metadata value of a sign-out log line.
+    var logValue: String {
+        switch self {
+        case .userInitiated: "user_initiated"
+        case .refreshTokenRejected: "refresh_token_rejected"
+        case .expiredWithoutRefreshToken: "expired_without_refresh_token"
+        }
     }
 }

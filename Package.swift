@@ -23,15 +23,23 @@ let package = Package(
         .library(name: "PassportKitTesting", targets: ["PassportKitTesting"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.15.1")
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.15.1"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.0"),
     ],
     targets: [
         .target(
             name: "PassportKit",
-            dependencies: [.product(name: "Crypto", package: "swift-crypto")],
+            dependencies: [
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "Logging", package: "swift-log"),
+            ],
             swiftSettings: swiftSettings
         ),
-        .target(name: "PassportKitApple", dependencies: ["PassportKit"], swiftSettings: swiftSettings),
+        .target(
+            name: "PassportKitApple",
+            dependencies: ["PassportKit", .product(name: "Logging", package: "swift-log")],
+            swiftSettings: swiftSettings
+        ),
         .target(
             name: "PassportKitTesting",
             dependencies: ["PassportKit", .product(name: "Crypto", package: "swift-crypto")],
@@ -45,7 +53,10 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
         .testTarget(
-            name: "ConformanceTests", dependencies: ["PassportKit", "PassportKitTesting"], swiftSettings: swiftSettings),
+            name: "ConformanceTests",
+            dependencies: ["PassportKit", "PassportKitTesting", .product(name: "Logging", package: "swift-log")],
+            swiftSettings: swiftSettings
+        ),
         .testTarget(
             name: "IntegrationTests",
             dependencies: ["PassportKit", "PassportKitApple"],

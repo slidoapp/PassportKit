@@ -1,5 +1,6 @@
 #if canImport(Network)
     import Foundation
+    import Logging
     import Network
     import PassportKit
     import os
@@ -28,6 +29,7 @@
 
         private let listener: NWListener
         private let clock: any Clock<Duration>
+        private let logger: Logging.Logger
         private let callbacks: AsyncStream<URL>
         private let callbackContinuation: AsyncStream<URL>.Continuation
         private let connections: LoopbackConnections
@@ -42,7 +44,8 @@
         ///   `.transportFailure` when the socket cannot be opened.
         public static func start(
             path: String = "/callback",
-            clock: any Clock<Duration> = ContinuousClock()
+            clock: any Clock<Duration> = ContinuousClock(),
+            logger: Logging.Logger = Logging.Logger(label: "PassportKit")
         ) async throws -> LoopbackRedirectListener {
             guard path.hasPrefix("/"), path.utf8.allSatisfy({ $0 > 0x20 && $0 < 0x7F && $0 != 0x3F && $0 != 0x23 })
             else {
@@ -77,6 +80,7 @@
                         path: path,
                         port: port.withLock { $0 },
                         clock: clock,
+                        logger: logger,
                         connections: connections,
                         accept: { url in acceptor.withLock { $0 }(url) },
                         // Only the first matching request is the callback; later ones are dropped.
@@ -95,16 +99,23 @@
                     )
                 )
             }
-            try await ListenerStartup.run(listener) { assigned in port.withLock { $0 = assigned } }
+            do {
+                try await ListenerStartup.run(listener) { assigned in port.withLock { $0 = assigned } }
+            } catch {
+                if !(error is CancellationError) { logger.warning("The loopback listener failed to start") }
+                throw error
+            }
             let assignedPort = port.withLock { $0 }
             guard let redirectURI = URL(string: "http://127.0.0.1:\(assignedPort)\(path)") else {
                 listener.cancel()
                 throw PassportError(.invalidConfiguration, detail: "The loopback path is not valid.")
             }
+            logger.debug("The loopback listener is ready", metadata: ["port": "\(assignedPort)"])
             return LoopbackRedirectListener(
                 redirectURI: redirectURI,
                 listener: listener,
                 clock: clock,
+                logger: logger,
                 callbacks: callbacks,
                 callbackContinuation: continuation,
                 connections: connections,
@@ -116,6 +127,7 @@
             redirectURI: URL,
             listener: NWListener,
             clock: any Clock<Duration>,
+            logger: Logging.Logger,
             callbacks: AsyncStream<URL>,
             callbackContinuation: AsyncStream<URL>.Continuation,
             connections: LoopbackConnections,
@@ -124,6 +136,7 @@
             self.redirectURI = redirectURI
             self.listener = listener
             self.clock = clock
+            self.logger = logger
             self.callbacks = callbacks
             self.callbackContinuation = callbackContinuation
             self.connections = connections
@@ -153,12 +166,14 @@
                 try await withThrowingTaskGroup(of: URL.self) { group in
                     let callbacks = callbacks
                     let clock = clock
+                    let logger = logger
                     group.addTask {
                         for await url in callbacks { return url }
                         throw CancellationError()
                     }
                     group.addTask {
                         try await clock.sleep(for: timeout)
+                        logger.notice("The loopback redirect did not arrive in time")
                         throw PassportError(
                             .timedOut,
                             recovery: .reauthenticate,

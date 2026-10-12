@@ -1,6 +1,7 @@
 #if canImport(Security)
     import Dispatch
     import Foundation
+    import Logging
     import PassportKit
     import Security
 
@@ -51,6 +52,7 @@
         private let accessibility: Accessibility
         private let usesDataProtection: Bool
         private let decodeLegacy: (@Sendable (Data) -> Credential?)?
+        private let logger: Logger
         private let queue = DispatchQueue(label: "PassportKit.KeychainCredentialStore")
 
         /// Creates a store.
@@ -72,12 +74,14 @@
             accessGroup: String? = nil,
             accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly,
             useDataProtectionKeychain: Bool = false,
-            decodeLegacy: (@Sendable (Data) -> Credential?)? = nil
+            decodeLegacy: (@Sendable (Data) -> Credential?)? = nil,
+            logger: Logger = Logger(label: "PassportKit")
         ) {
             self.accessGroup = accessGroup
             self.accessibility = accessibility
             self.usesDataProtection = useDataProtectionKeychain
             self.decodeLegacy = decodeLegacy
+            self.logger = logger
         }
 
         /// The stored credential, or `nil` when the item does not exist.
@@ -99,7 +103,9 @@
         public func delete(_ account: CredentialAccount) async throws {
             try await perform {
                 let status = SecItemDelete(self.query(for: account) as CFDictionary)
-                guard status == errSecSuccess || status == errSecItemNotFound else { throw Self.failure(status) }
+                guard status == errSecSuccess || status == errSecItemNotFound else {
+                    throw self.failure(status, operation: "delete")
+                }
             }
         }
 
@@ -117,11 +123,17 @@
             var result: CFTypeRef?
             let status = SecItemCopyMatching(search as CFDictionary, &result)
             if status == errSecItemNotFound { return nil }
-            guard status == errSecSuccess, let data = result as? Data else { throw Self.failure(status) }
+            guard status == errSecSuccess, let data = result as? Data else {
+                throw failure(status, operation: "load")
+            }
             do {
                 return try CredentialCoding.decode(data)
             } catch {
-                guard let credential = decodeLegacy?(data) else { throw error }
+                guard let credential = decodeLegacy?(data) else {
+                    logger.warning("The stored credential could not be decoded")
+                    throw error
+                }
+                logger.notice("Migrated a legacy stored credential")
                 if let current = try? CredentialCoding.encode(credential) {
                     try? saveSynchronously(current, for: account)
                 }
@@ -137,10 +149,19 @@
                 status = SecItemAdd(query(for: account).merging(changes) { $1 } as CFDictionary, nil)
                 if status == errSecDuplicateItem {
                     // Another process created the item between the update and the add.
+                    logger.debug("The Keychain item appeared during the save; updating it")
                     status = SecItemUpdate(query(for: account) as CFDictionary, changes as CFDictionary)
                 }
             }
-            guard status == errSecSuccess else { throw Self.failure(status) }
+            guard status == errSecSuccess else { throw failure(status, operation: "save") }
+        }
+
+        private func failure(_ status: OSStatus, operation: String) -> PassportError {
+            let level: Logger.Level = status == errSecInteractionNotAllowed ? .notice : .warning
+            logger.log(
+                level: level, "A Keychain operation failed",
+                metadata: ["operation": "\(operation)", "status": "\(status)"])
+            return Self.failure(status)
         }
 
         private var appliesAccessibility: Bool {
