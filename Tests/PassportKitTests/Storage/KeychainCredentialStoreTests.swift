@@ -9,7 +9,9 @@ import Testing
 /// Uses the real Keychain of the test host with a unique service per test, removed on exit. The default
 /// store uses the login keychain on macOS, which `swift test` can reach without entitlements; the data
 /// protection keychain needs a signed host, so its test runs only when the host grants access.
-@Suite("Keychain credential store", .timeLimit(.minutes(1)))
+@Suite(
+    "Keychain credential store", .timeLimit(.minutes(1)),
+    .enabled(if: KeychainAvailability.isAvailable, "The test host has no Keychain access group"))
 struct KeychainCredentialStoreTests {
     private let account = CredentialAccount(service: "PassportKitTests.\(UUID())", account: "user")
 
