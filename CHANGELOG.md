@@ -78,6 +78,16 @@ First development cycle; nothing is released yet.
 
 ### Changed
 
+- **Breaking:** HTTP currency types come from [swift-http-types](https://github.com/apple/swift-http-types)
+  (`from: "1.5.0"`, ADR 0010). `HTTPMethod`, `HTTPHeaders`, `HTTPRequest` and `HTTPResponse` are removed; use
+  `HTTPRequest.Method`, `HTTPFields` and `HTTPField.Name`, `HTTPTypes.HTTPRequest` and `HTTPTypes.HTTPResponse`
+  (`import HTTPTypes`). `HTTPTransport.send(_:)` is `send(_:body:)` and returns `(HTTPResponse, Data)`; requests carry
+  an absolute URL (`HTTPRequest(method:url:headerFields:)`). `ClientConfiguration.additionalHeaders` and
+  `RequestAuthorizer.evaluate(statusCode:headers:token:attempt:)` take `HTTPFields`; `RequestAuthorizer.send(_:for:)`
+  is `send(_:body:for:)` and returns `(HTTPResponse, Data)`. In `PassportKitTesting`, `RecordedRequest.headers` is
+  `headerFields` and `url` is optional, `RecordedRequest` has a `body`, `RecordingTransport.Step.respond` takes a
+  response and its body, and `FakeAuthorizationServer.ResponseOverride` has a `body`. `URLSessionTransport` converts
+  with `HTTPTypesFoundation`; its behaviour is unchanged. `Hashable` for `HTTPRequest` and `HTTPResponse` is gone.
 - Dependencies: the core depends on swift-crypto (`Crypto`, `"3.15.1"..<"6.0.0"`) for SHA-256 and swift-log (`Logging`,
   `from: 1.6.0`); `PassportKitApple` depends on SwiftKeychain (`.upToNextMinor(from: "2.1.0")`). The hand-written
   SHA-256 and the "no third-party runtime dependencies" policy are gone (ADR 0009, which supersedes parts of
@@ -133,7 +143,7 @@ First development cycle; nothing is released yet.
   `.noInteraction` (the value `none`), `.login`, `.consent` and `.selectAccount`, sent as one space-delimited
   parameter, so several values can be combined.
 
-- Conformances: `Hashable` for `HTTPRequest`, `HTTPResponse`, `TokenResponse`, `TokenExchangeRequest`,
+- Conformances: `Hashable` for `TokenResponse`, `TokenExchangeRequest`,
   `AuthorizationRequest` and `SessionEvent`; `Codable` for `PassportError.Code`; `PassportError` is a
   `LocalizedError` whose `errorDescription` is its redacted `description`. The sanitized server text that was
   `PassportError.errorDescription` is now `PassportError.detail` (and the `detail:` initializer parameter),
@@ -142,8 +152,7 @@ First development cycle; nothing is released yet.
 - Naming: `UserAgent` is `AuthorizationUserAgent`; `OAuthClient.refresh(_:scope:resources:additionalParameters:)`
   takes the refresh token without a label; `startDeviceAuthorization` is `beginDeviceAuthorization`, pairing with
   `completeDeviceAuthorization` like `beginAuthorization` and `completeAuthorization`;
-  `TokenManager.exchangeRefreshToken(audiences:)` takes an array like `TokenExchangeRequest.audiences`;
-  `HTTPHeaders.add(name:value:)` is `append(_:_:)`, like `AdditionalParameters.append(_:_:)`.
+  `TokenManager.exchangeRefreshToken(audiences:)` takes an array like `TokenExchangeRequest.audiences`.
 
 - `PassportKitTesting`: every lifetime and interval is a `Duration` (`ClientRegistration.accessTokenLifetime`,
   `refreshTokenLifetime`, `RotationLeeway.window` (was `seconds`), `Controls.deviceCodeLifetime`,
@@ -161,7 +170,10 @@ First development cycle; nothing is released yet.
   codes, authorization codes, PKCE verifiers, client secrets, revoked tokens, and the bearer token in a
   `WWW-Authenticate` description. Previously only runs of 24 or more characters were.
 - Dumping an `OAuthClient` no longer reaches the injected transport or observer.
-- `HTTPHeaders` no longer prints header values (names only) in descriptions, `debugDescription` and reflection.
+- `ClientConfiguration`, `RecordedRequest`, `RecordingTransport.Step` and `FakeAuthorizationServer.ResponseOverride`
+  print header names only, never values, in descriptions, `debugDescription` and reflection. swift-http-types prints
+  header values and the URL query in its own types, so a signed `HTTPRequest` and the responses the library returns
+  are the caller's values: do not log them. `Authorization` is marked never indexed (HPACK, RFC 7541 §7.1.3).
 - Error descriptions lose control, line-separator and invisible format characters.
 - Hostile `interval`, `expires_in` and `slow_down` values can no longer trap device polling.
 - `Secret` documents that `Codable` encodes plaintext.

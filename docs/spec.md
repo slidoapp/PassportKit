@@ -123,23 +123,20 @@ Rules:
 
 ## 4. HTTP
 
+PassportKit does not define HTTP currency types. It uses
+[swift-http-types](https://github.com/apple/swift-http-types) (`HTTPTypes`,
+ADR 0010): `HTTPRequest` (method, scheme, authority and path as pseudo header
+fields, `headerFields: HTTPFields`), `HTTPResponse` (`status`,
+`headerFields`), `HTTPFields` and `HTTPField.Name`. The body is not part of
+either type; it travels beside them as `Data`, as in swift-openapi-runtime's
+`ClientTransport`. Callers that implement a transport or build a request
+`import HTTPTypes`.
+
 ```swift
-public struct HTTPRequest: Sendable, Hashable, CustomStringConvertible {   // description redacts body and Authorization
-    public var method: HTTPMethod
-    public var url: URL
-    public var headers: HTTPHeaders
-    public var body: Data?
-}
-public struct HTTPResponse: Sendable, Hashable { public var statusCode: Int; public var headers: HTTPHeaders; public var body: Data }
-public struct HTTPHeaders: Sendable, Hashable, Sequence, ExpressibleByDictionaryLiteral {
-    // case-insensitive names, preserves multiple values (multiple WWW-Authenticate lines)
-    public subscript(name: String) -> String? { get set }   // first value
-    public func values(for name: String) -> [String]
-    public mutating func append(_ name: String, _ value: String)
-}
 public protocol HTTPTransport: Sendable {
+    /// `request` carries an absolute URL (`HTTPRequest(method:url:headerFields:)`).
     /// Throws only for transport failures; any HTTP status is a normal response.
-    func send(_ request: HTTPRequest) async throws -> HTTPResponse
+    func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data)
 }
 public struct URLSessionTransport: HTTPTransport {
     public init(configuration: URLSessionConfiguration = .ephemeral,
@@ -163,7 +160,16 @@ public struct URLSessionTransport: HTTPTransport {
   refresh token is never lost;
 - caps response bodies at 1 MiB (`.invalidResponse` beyond that).
 
-`HTTPHeaders` descriptions and reflection show header names only.
+Redaction: `HTTPFields` prints header values (`description`, `debugDescription`
+and `dump`), and `HTTPRequest` prints its URL with query under `dump` as well as
+its fields. PassportKit therefore never holds an `HTTPFields` in a public type
+that can be printed unredacted: `ClientConfiguration`, `RecordedRequest`,
+`RecordingTransport.Step` and `FakeAuthorizationServer.ResponseOverride` show
+header names only. A request or response handed back to the caller (the signed
+request of `RequestAuthorizer.sign`, the response of `send`) is the caller's
+value and prints like any `HTTPTypes` value; apps must not log it. The library
+sets `Authorization` with `indexingStrategy = .disallow` (never indexed in
+HPACK or QPACK, RFC 7541 §7.1.3).
 
 Form bodies follow RFC 6749 Appendix B: UTF-8, every character except
 unreserved ones percent-encoded, space as `+`, `+` as `%2B`.
@@ -191,12 +197,12 @@ public struct ClientConfiguration: Sendable {
     public var endpoints: Endpoints
     public var authentication: ClientAuthentication
     public var issuer: URL?                          // used for RFC 9207 `iss` checks
-    public var additionalHeaders: HTTPHeaders = [:] // sent on every request to the authorization server
+    public var additionalHeaders: HTTPFields = [:]  // sent on every request to the authorization server
     public var minimumTokenLifetime: Duration = .seconds(60)   // refresh earlier than this before expiry
     public var defaultTokenLifetime: Duration? = nil           // used when `expires_in` is missing; nil = treat as expired
     public var requiresIssuerInAuthorizationResponse: Bool = false   // RFC 9207 §2.4: a missing `iss` fails; needs `issuer`
     public init(metadata: AuthorizationServerMetadata, authentication: ClientAuthentication,
-                additionalHeaders: HTTPHeaders = [:], minimumTokenLifetime: Duration = .seconds(60),
+                additionalHeaders: HTTPFields = [:], minimumTokenLifetime: Duration = .seconds(60),
                 defaultTokenLifetime: Duration? = nil) throws
 }
 ```
@@ -730,11 +736,11 @@ public struct RequestAuthorizer: Sendable {
     public init(manager: TokenManager, transport: any HTTPTransport = URLSessionTransport(), allowedOrigins: Set<URL>? = nil)
     /// Adds `Authorization: Bearer <token>`. Throws if no token can be obtained; never returns an unsigned request.
     public func sign(_ request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
-    public func sign(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)
+    public func sign(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)   // the request is the caller's value: never log it
     /// Decides what to do with a resource-server response for a request sent with `token`.
-    public func evaluate(statusCode: Int, headers: HTTPHeaders, token: AccessToken, attempt: Int) async -> RetryDecision
+    public func evaluate(statusCode: Int, headers: HTTPFields, token: AccessToken, attempt: Int) async -> RetryDecision
     /// Convenience: sign, send on the transport given at creation, evaluate, retry at most once.
-    public func send(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> HTTPResponse
+    public func send(_ request: HTTPRequest, body: Data? = nil, for target: TokenTarget = .default) async throws -> (HTTPResponse, Data)
     /// The same for `URLSession`; the session is required, the library never uses `URLSession.shared`.
     public func data(for request: URLRequest, target: TokenTarget = .default, session: URLSession) async throws -> (Data, HTTPURLResponse)
 }
@@ -961,7 +967,7 @@ endpoints well enough to run every flow, and is scriptable:
   returning `401 access_denied` for a denied resource;
 - device flow: approve, deny, or leave pending per device code; emits
   `slow_down` on demand;
-- records every request with decoded form parameters;
+- records every request, with its body and decoded form parameters, in a `RecordedRequest` whose description shows header names only;
 - `makeClient(clientID:wallClock:clock:)` builds an `OAuthClient` for a registered
   client, and `userAgent(subject:decision:)` returns an `AuthorizationUserAgent` that
   plays the user; the token helpers `revoke(token:)`, `expire(token:)` and

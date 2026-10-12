@@ -11,7 +11,7 @@ change.
 
 | Module | Purpose | May import |
 |---|---|---|
-| `PassportKit` | Core: grants, token model, session actor (refresh coordination), credential store protocol and in-memory store, errors, metadata discovery, request authorization | Foundation, swift-crypto, swift-log; must build on Linux |
+| `PassportKit` | Core: grants, token model, session actor (refresh coordination), credential store protocol and in-memory store, errors, metadata discovery, request authorization | Foundation, swift-crypto, swift-http-types, swift-log; must build on Linux |
 | `PassportKitApple` | Apple adapters: Keychain storage, `ASWebAuthenticationSession`, loopback redirect listener | `PassportKit`, swift-log, SwiftKeychain, Apple frameworks |
 | `PassportKitTesting` | Fake authorization server and test clocks; public so consumers can test against it | `PassportKit` |
 
@@ -62,7 +62,7 @@ never the reverse. External dependencies follow ADR 0009.
 Extension points are the only place where server-specific behaviour
 enters. Each one is justified by an ADR.
 
-- HTTP transport (default: `URLSession`)
+- HTTP transport (default: `URLSession`); its currency types are swift-http-types' `HTTPRequest`, `HTTPResponse` and `HTTPFields`, with the body as `Data` beside them (ADR 0010)
 - Credential storage (default: Keychain on Apple platforms)
 - Clock and random source
 - Token acceptance hook

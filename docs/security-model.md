@@ -18,6 +18,13 @@ and reflection only. Encode a `Secret` solely into secure storage, never
 into logs, analytics, crash reports or unprotected files. `Secret ==` is
 not constant time; the library compares `state` in constant time itself.
 
+HTTP header values can carry credentials (`Authorization`, `Cookie`, API keys), and swift-http-types prints them:
+`HTTPFields` shows every value in `description`, `debugDescription` and `dump`, and `HTTPRequest` shows its URL with
+query. Public PassportKit types that store header fields (`ClientConfiguration`, `RecordedRequest` and the scripted
+responses of `PassportKitTesting`) therefore have redacting descriptions and mirrors that show header names only.
+A signed `HTTPRequest` or a response that the library returns is the caller's value and prints like any
+`HTTPTypes` value: do not log it. The library marks `Authorization` as never indexed (RFC 7541 §7.1.3).
+
 A server can make a library repeat what it was sent, for example by echoing
 a token in `error_description`. Every credential of a request (refresh,
 subject and actor tokens, authorization code, PKCE verifier, device code,

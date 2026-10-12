@@ -35,7 +35,8 @@ descriptions or errors.
 - Swift 6.2 or later (Xcode 26 or later).
 - `PassportKit` (the core) builds on macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1 and Linux.
 - `PassportKitApple` (Keychain, `ASWebAuthenticationSession`, loopback listener) needs an Apple platform.
-- Dependencies: [swift-crypto](https://github.com/apple/swift-crypto) and [swift-log](https://github.com/apple/swift-log)
+- Dependencies: [swift-crypto](https://github.com/apple/swift-crypto),
+  [swift-http-types](https://github.com/apple/swift-http-types) and [swift-log](https://github.com/apple/swift-log)
   in the core, plus SwiftKeychain in `PassportKitApple` ([ADR 0009](docs/decisions/0009-external-dependencies.md)).
 
 ## Installation
