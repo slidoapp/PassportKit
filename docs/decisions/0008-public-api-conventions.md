@@ -82,9 +82,9 @@ The namespaces (`OAuthParameter`, `AuthorizationResponseField`,
 `ErrorResponseField`, `TokenResponseField`, `DeviceAuthorizationResponseField`,
 `ResponseType`, `CodeChallengeMethod`, `AuthenticationScheme`, `MediaType`) live
 together in `Core/WireNames.swift`, because most are used by several files
-and by `PassportKitApple`: a reader checks a name against the RFCs in one place.
-Those the Apple module needs, and `LogKey` (in `Logging.swift`, next to the
-metadata builder), are `package`; the rest are internal. Not constants:
+and by the user agents: a reader checks a name against the RFCs in one place.
+`LogKey` (in `Logging.swift`, next to the metadata builder) and the other
+namespaces are internal; `OAuthParameter` is `package`. Not constants:
 one-off human-readable text (error details, log messages), and
 `PassportKitTesting` and the tests, which spell the wire format literally
 so that a typo in a library constant fails the conformance tests.

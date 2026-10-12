@@ -1,5 +1,5 @@
 #!/bin/sh
-# Fails when the core module reaches for the system clock, randomness, sleeping or the shared URLSession
+# Fails when PassportKit reaches for the system clock, randomness, sleeping or the shared URLSession
 # outside the default implementations of the injected seams (docs/spec.md §15, ADR 0006).
 set -eu
 

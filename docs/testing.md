@@ -7,7 +7,7 @@
 | Unit | `Tests/PassportKitTests` | Request building, response and error parsing, PKCE, form encoding, `WWW-Authenticate` parsing, metadata parsing |
 | Conformance | `Tests/ConformanceTests` | End-to-end flows against the fake authorization server: rotation, coalesced refresh, device polling, token exchange, resource indicators, error handling, and the redaction canary |
 | Integration | `Tests/IntegrationTests` | The real flows against a local `oidc-provider` server (`Tools/integration-server`): discovery, authorization code with PKCE and `iss`, device flow, refresh rotation and reuse rejection, token exchange, the underscoped-200 case, client credentials, revocation, Keychain; macOS |
-| Apple adapters | `Tests/PassportKitAppleTests` | Keychain storage, redirect handling; macOS only |
+| Apple integrations | `Tests/PassportKitTests/Storage`, `Tests/PassportKitTests/UserAgents` | Keychain storage, redirect handling; part of the unit target, macOS only |
 
 ## Integration tests
 
@@ -62,8 +62,8 @@ the headers it carries.
 ## Documentation samples
 
 The code in the DocC articles is compiled in
-`Tests/ConformanceTests/DocumentationSnippets.swift` (and, for Apple adapters,
-`Tests/PassportKitAppleTests/DocumentationSnippets.swift`). They are never run; they keep the samples
+`Tests/ConformanceTests/DocumentationSnippets.swift` (and, for the user agents,
+`Tests/PassportKitTests/UserAgents/UserAgentDocumentationSnippets.swift`). They are never run; they keep the samples
 in step with the API. Change both together.
 
 ## Rules

@@ -50,7 +50,7 @@ First development cycle; nothing is released yet.
   `WebAuthenticationSessionUserAgent.init`, and `logger: Logger? = nil` on `TokenManager.init` (defaults to the
   client's). `PassportObserver` is unchanged. See `docs/spec.md` for the level policy.
 
-#### Apple platforms (`PassportKitApple`)
+#### Apple platforms (now part of `PassportKit`)
 
 - `KeychainCredentialStore`: non-synchronizable generic password items updated in place, an accessibility class
   option and a `decodeLegacy` migration hook.
@@ -67,7 +67,7 @@ First development cycle; nothing is released yet.
 
 #### Documentation and tooling
 
-- DocC catalogs for all three libraries, with articles on getting started, sessions and token targets, resource
+- DocC catalogs for the libraries, with articles on getting started, sessions and token targets, resource
   access and scopes, error handling, native app redirects and testing; `make docs` builds them and fails on any
   warning, and CI runs it. `.spi.yml` for the Swift Package Index.
 - `passportkit-example`, a command-line client for the device and loopback code flows, and an integration test
@@ -88,8 +88,8 @@ First development cycle; nothing is released yet.
   `headerFields` and `url` is optional, `RecordedRequest` has a `body`, `RecordingTransport.Step.respond` takes a
   response and its body, and `FakeAuthorizationServer.ResponseOverride` has a `body`. `URLSessionTransport` converts
   with `HTTPTypesFoundation`; its behaviour is unchanged. `Hashable` for `HTTPRequest` and `HTTPResponse` is gone.
-- Dependencies: the core depends on swift-crypto (`Crypto`, `"3.15.1"..<"6.0.0"`) for SHA-256 and swift-log (`Logging`,
-  `from: 1.6.0`); `PassportKitApple` depends on SwiftKeychain (`.upToNextMinor(from: "2.1.0")`). The hand-written
+- Dependencies: the core depends on swift-log (`Logging`,
+  `from: 1.6.0`); SwiftKeychain (`.upToNextMinor(from: "2.1.0")`) is a dependency too. The hand-written
   SHA-256 and the "no third-party runtime dependencies" policy are gone (ADR 0009, which supersedes parts of
   ADR 0002).
 - `KeychainCredentialStore` is built on SwiftKeychain and no longer takes `useDataProtectionKeychain` (SwiftKeychain
@@ -114,6 +114,27 @@ First development cycle; nothing is released yet.
   new one, the acceptance policy has a time limit, a rejected token is remembered for 30 s instead of being
   requested again, event streams buffer 64 events, a grant without a refresh token ends its session when its access
   token expires, and `TokenTarget` ignores the order and repetition of resources and audiences.
+
+### Changed: Apple platforms only (breaking)
+
+Linux support is dropped ([ADR 0011](docs/decisions/0011-apple-platforms-only.md)). The minimum platforms are
+unchanged: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1.
+
+- `PassportKitApple` is merged into `PassportKit`: remove the `PassportKitApple` product from your target and
+  `import PassportKitApple`; `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent`,
+  `LoopbackRedirectListener` and `LoopbackUserAgent` come from `import PassportKit`. SwiftKeychain is now a
+  dependency of `PassportKit`.
+- `WebAuthenticationSessionUserAgent` is unavailable on tvOS and watchOS (as before, now declared by `#if os`), and
+  `LoopbackRedirectListener` and `LoopbackUserAgent` are only available on macOS, iOS and visionOS. The default
+  `openURL` of `LoopbackUserAgent` no longer has an unsupported-platform fallback.
+- SHA-256 uses CryptoKit; the swift-crypto dependency is removed from `PassportKit` and `PassportKitTesting`.
+- Shared state is guarded by `OSAllocatedUnfairLock` instead of `NSLock` with `@unchecked Sendable`.
+  `ManualClock.Instant` is `Sendable`.
+- The Linux CI job and the `canImport(FoundationNetworking)` code paths are gone.
+
+### Removed
+
+- The `PassportKitApple` product and target, the `PassportKitApple` DocC catalog, and Linux support.
 
 ### Changed: public API review before the first release
 

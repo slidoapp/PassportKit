@@ -25,13 +25,13 @@ Checked before any code was migrated (swift-http-types 1.8.0 unless noted).
 - **Platforms.** Its manifest declares no platform floor (availability macros
   say macOS 10.0). `HTTPTypesFoundation` built for macOS 14, iOS 17, tvOS 17,
   watchOS 10 and visionOS 1 with `xcodebuild` and those deployment targets, and
-  so did the migrated `PassportKit` target. Its CI builds Linux (Swift 5.9 to
-  nightly) and Windows. Linux could not be built locally: Linux is verified by
-  CI.
-- **Linux URLSession conversion.** `HTTPTypesFoundation` imports
-  `FoundationNetworking` where it exists, so `URLRequest(httpRequest:)`,
+  so did the migrated `PassportKit` target. Its CI also builds Linux and
+  Windows; that no longer matters to PassportKit ([0011](0011-apple-platforms-only.md)).
+- **URLSession conversion.** (Written when Linux was supported; Linux
+  notes are superseded by [0011](0011-apple-platforms-only.md).)
+  `HTTPTypesFoundation` provides `URLRequest(httpRequest:)`,
   `URLRequest.httpRequest`, `HTTPURLResponse.httpResponse` and
-  `HTTPURLResponse(httpResponse:url:)` compile there. Repeated header lines are
+  `HTTPURLResponse(httpResponse:url:)`. Repeated header lines are
   merged with `", "` (`"; "` for `Cookie`); `URLSession` merges response
   lines the same way, so `WWW-Authenticate` challenges still arrive as one
   value, as before.
@@ -140,6 +140,6 @@ field names are `HTTPField.Name` values, which cannot hold an invalid name;
 invalid values are sanitized by `HTTPField`. There is no longer a
 `Hashable` request or response in PassportKit.
 
-Three limits stay. Linux is verified by CI, not locally. The caller owns the
+Two limits stay. ~~Linux is verified by CI, not locally.~~ The caller owns the
 redaction of what we hand back. `URLRequest(httpRequest:)` merges repeated
 request header lines into one, as `URLSession` does on the wire.

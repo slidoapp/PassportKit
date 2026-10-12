@@ -72,6 +72,8 @@ swift test --filter <Suite>/<test>   # a single test
 - `docs/testing.md` — test layers, fake authorization server, fixtures.
 - `Sources/*/*.docc` — DocC catalogs; the articles are in
   `Sources/PassportKit/PassportKit.docc`.
+- `Sources/PassportKit/Storage`, `Sources/PassportKit/UserAgents` — the
+  Keychain store and the sign-in user agents (formerly `PassportKitApple`).
 - `Tools/integration-server` — the local authorization server that
   `make integration` runs the `IntegrationTests` against (Node.js).
 - `scripts/` — `check-determinism.sh` (run by `make lint`) and
@@ -83,12 +85,15 @@ swift test --filter <Suite>/<test>   # a single test
 
 - Swift 6 language mode with complete concurrency checking.
 - No `@unchecked Sendable` or `nonisolated(unsafe)` without a comment that
-  explains why it is safe.
+  explains why it is safe. Guard state shared by a class with
+  `OSAllocatedUnfairLock` so the class is `Sendable` without either.
 - `swift format` decides formatting. Do not hand-format.
 - Inject time, randomness, and HTTP transport. Core code never calls
   `Date()`, `URLSession.shared`, or random APIs directly.
-- Core code builds on Linux: no `Security`, `AuthenticationServices`,
-  `AppKit`, or `UIKit` imports outside the Apple adapter module.
+- Apple platforms only (ADR 0011): no Linux code paths or
+  `canImport(FoundationNetworking)`. Guard only real framework gaps with
+  `#if os(...)`: `ASWebAuthenticationSession` is unavailable on tvOS and
+  watchOS, the loopback listener needs macOS, iOS or visionOS.
 - Typed errors that preserve the RFC error code and description.
 - Prefer `async`/`await` and structured concurrency over callbacks and
   unstructured `Task {}`. Every long-running operation honours

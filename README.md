@@ -33,11 +33,12 @@ descriptions or errors.
 ## Requirements
 
 - Swift 6.2 or later (Xcode 26 or later).
-- `PassportKit` (the core) builds on macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1 and Linux.
-- `PassportKitApple` (Keychain, `ASWebAuthenticationSession`, loopback listener) needs an Apple platform.
-- Dependencies: [swift-crypto](https://github.com/apple/swift-crypto),
-  [swift-http-types](https://github.com/apple/swift-http-types) and [swift-log](https://github.com/apple/swift-log)
-  in the core, plus SwiftKeychain in `PassportKitApple` ([ADR 0009](docs/decisions/0009-external-dependencies.md)).
+- Apple platforms only: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1 ([ADR 0011](docs/decisions/0011-apple-platforms-only.md)).
+  `ASWebAuthenticationSession` is not available on tvOS and watchOS, and the loopback redirect needs macOS, iOS or
+  visionOS; use the device flow elsewhere.
+- Dependencies: [swift-http-types](https://github.com/apple/swift-http-types),
+  [swift-log](https://github.com/apple/swift-log) and SwiftKeychain
+  ([ADR 0009](docs/decisions/0009-external-dependencies.md)). SHA-256 comes from CryptoKit.
 
 ## Installation
 
@@ -50,7 +51,6 @@ dependencies: [
 targets: [
     .target(name: "MyApp", dependencies: [
         .product(name: "PassportKit", package: "PassportKit"),
-        .product(name: "PassportKitApple", package: "PassportKit"),  // Apple platforms only
     ]),
     .testTarget(name: "MyAppTests", dependencies: [
         .product(name: "PassportKitTesting", package: "PassportKit")
@@ -88,14 +88,14 @@ let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
 let (data, response) = try await authorizer.data(for: request, session: URLSession(configuration: .ephemeral))
 ```
 
-Use `KeychainCredentialStore` from `PassportKitApple` instead of `InMemoryCredentialStore` in an app. The
+Use `KeychainCredentialStore` instead of `InMemoryCredentialStore` in an app. The
 `passportkit-example` executable runs the device and code flows against a server you name.
 
 ## Logging
 
 The library logs through [swift-log](https://github.com/apple/swift-log). Without any setup it uses a logger labelled
 `PassportKit`, so whatever `LoggingSystem.bootstrap` your app configured applies. Pass `logger:` to `OAuthClient`,
-`TokenManager`, `Discovery.fetchMetadata` or the Apple adapters to choose the label or metadata. `debug` logs each
+`TokenManager`, `Discovery.fetchMetadata`, `KeychainCredentialStore` or the user agents to choose the label or metadata. `debug` logs each
 request, `info` the session lifecycle, `notice` and `warning` failures and retries. Tokens, codes, verifiers and URLs
 with queries are never logged. `PassportObserver` remains the channel for typed events.
 

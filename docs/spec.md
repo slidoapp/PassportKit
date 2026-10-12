@@ -33,24 +33,21 @@ DPoP and PAR (see §11).
 
 - `swift-tools-version: 6.2`, Swift 6 language mode, warnings as errors
   in CI.
-- Platforms: macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1. Linux for
-  the core and testing modules.
+- Platforms: macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1. Apple
+  platforms only (ADR 0011).
 - Dependencies are limited to well-maintained Apple and Swift project
-  packages (ADR 0009): swift-crypto (`Crypto`, SHA-256 for PKCE) and
-  swift-log (`Logging`) in the core, plus SwiftKeychain in
-  `PassportKitApple`.
+  packages (ADR 0009): swift-http-types, swift-log (`Logging`) and
+  SwiftKeychain in the core. SHA-256 for PKCE comes from CryptoKit.
 
 | Product / target | Contents | Imports |
 |---|---|---|
-| `PassportKit` | Everything protocol-level: types, client, token manager, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store | Foundation (FoundationNetworking on Linux), swift-crypto, swift-log |
-| `PassportKitApple` | `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | `PassportKit`, swift-log, SwiftKeychain, Security, AuthenticationServices, Network, AppKit/UIKit |
+| `PassportKit` | Everything: types, client, token manager, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store, and the Apple integrations (§13): `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | Foundation, CryptoKit, swift-http-types, swift-log, SwiftKeychain, Security, AuthenticationServices, Network, AppKit/UIKit |
 | `PassportKitTesting` | `FakeAuthorizationServer`, `ManualClock`, `ManualWallClock`, `SequenceRandomSource`, `RecordingTransport` | `PassportKit` |
 
 Test targets: `PassportKitTests` (unit), `PassportKitTestingTests` (the
 fake server itself), `ConformanceTests` (scenarios against the fake
 server, including the redaction canary), `IntegrationTests` (a local
-open-source server, macOS, run by `make integration`) and
-`PassportKitAppleTests` (Apple only).
+open-source server, macOS, run by `make integration`).
 
 An executable target `passportkit-example` (not a product) demonstrates
 discovery, the device and loopback code flows and one refresh against a
@@ -894,7 +891,13 @@ snake_case keys. Logs never contain tokens, codes, `state`, verifiers,
 client secrets, URLs with queries, headers, bodies or server
 `error_description`; an error is logged as its `error_code` only.
 
-## 13. Apple module
+## 13. Apple integrations
+
+Part of `PassportKit`. `ASWebAuthenticationSession` does not exist on tvOS
+and watchOS, so `WebAuthenticationSessionUserAgent` is unavailable there;
+the loopback listener and agent exist on macOS, iOS and visionOS. On tvOS
+and watchOS use the device flow.
+
 
 - `KeychainCredentialStore(accessGroup: String? = nil, accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly, decodeLegacy: (@Sendable (Data) -> Credential?)? = nil, logger: Logger = Logger(label: "PassportKit"))`:
   built on SwiftKeychain (ADR 0009); generic password items, `kSecAttrService` = `account.service`,
@@ -981,9 +984,8 @@ instead of hanging; `waitForSleeper(timeout:)` returns `false` instead. `ManualW
 ## 15. Quality gates
 
 - `make check` (format lint, determinism grep, build with warnings as
-  errors, all tests) passes on macOS; the core and testing modules build
-  and test on Linux.
-- `make docs` (DocC archives of all three libraries) has no warning, so
+  errors, all tests) passes on macOS.
+- `make docs` (DocC archives of both libraries) has no warning, so
   every symbol link resolves. `make integration` passes against the local
   server.
 - No `Date()`, `Date.now`, `Task.sleep`, `URLSession.shared`, `UUID()` or
