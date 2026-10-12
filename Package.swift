@@ -22,10 +22,21 @@ let package = Package(
         .library(name: "PassportKitApple", targets: ["PassportKitApple"]),
         .library(name: "PassportKitTesting", targets: ["PassportKitTesting"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.15.1")
+    ],
     targets: [
-        .target(name: "PassportKit", swiftSettings: swiftSettings),
+        .target(
+            name: "PassportKit",
+            dependencies: [.product(name: "Crypto", package: "swift-crypto")],
+            swiftSettings: swiftSettings
+        ),
         .target(name: "PassportKitApple", dependencies: ["PassportKit"], swiftSettings: swiftSettings),
-        .target(name: "PassportKitTesting", dependencies: ["PassportKit"], swiftSettings: swiftSettings),
+        .target(
+            name: "PassportKitTesting",
+            dependencies: ["PassportKit", .product(name: "Crypto", package: "swift-crypto")],
+            swiftSettings: swiftSettings
+        ),
         .testTarget(
             name: "PassportKitTests", dependencies: ["PassportKit", "PassportKitTesting"], swiftSettings: swiftSettings),
         .testTarget(

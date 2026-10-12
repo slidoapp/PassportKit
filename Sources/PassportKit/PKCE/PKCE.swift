@@ -1,3 +1,5 @@
+import Crypto
+
 /// Proof Key for Code Exchange, S256 only (RFC 7636).
 enum PKCE {
     /// Entropy of a verifier in bytes; RFC 7636 §4.1 recommends 32 octets, giving 43 characters.
@@ -19,7 +21,7 @@ enum PKCE {
 
     /// The S256 `code_challenge`: base64url of the SHA-256 of the ASCII verifier (RFC 7636 §4.2).
     static func challenge(for verifier: Secret) -> String {
-        Base64URL.encode(SHA256Hasher.hash(Array(verifier.reveal().utf8)))
+        Base64URL.encode(Array(SHA256.hash(data: Array(verifier.reveal().utf8))))
     }
 
     /// The only supported `code_challenge_method` (RFC 7636 §4.3).
