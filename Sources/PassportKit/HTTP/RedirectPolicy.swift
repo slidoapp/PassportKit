@@ -1,9 +1,5 @@
 import Foundation
 
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
-
 /// Which redirects a request that may carry credentials follows. Shared by ``URLSessionTransport`` and
 /// ``RequestAuthorizer/data(for:target:session:)``.
 enum RedirectPolicy {

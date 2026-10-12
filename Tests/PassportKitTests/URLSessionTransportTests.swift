@@ -4,10 +4,6 @@ import Testing
 
 @testable import PassportKit
 
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
-
 /// Serves canned responses chosen by URL path, so tests need no network and no shared state.
 final class StubURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }

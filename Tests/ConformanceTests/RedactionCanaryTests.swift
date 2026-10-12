@@ -5,10 +5,6 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
-
 /// Specification §15: a run of every flow with canary secrets must leave no canary in any error, event, log
 /// line or rendering of a public value. The canaries are the client secret and every token, code, verifier and device
 /// code that crossed the wire, including the ones the fake server issued.

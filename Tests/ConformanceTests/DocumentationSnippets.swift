@@ -3,10 +3,6 @@ import HTTPTypes
 import PassportKit
 import PassportKitTesting
 
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
-
 // The code samples of the DocC articles in Sources/PassportKit/PassportKit.docc, kept here so that the compiler
 // checks them against the real API. They are never run. When you change a sample in an article, change it here.
 

@@ -3,10 +3,6 @@ import Testing
 
 @testable import PassportKit
 
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
-
 struct RedirectPolicyTests {
     private static let headers = [
         "Authorization": "Bearer x", "X-Api-Key": "k", "Cookie": "a=b",

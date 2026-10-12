@@ -3,10 +3,6 @@ import HTTPTypes
 import HTTPTypesFoundation
 import Logging
 
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
-
 /// Signs requests to a protected resource with a bearer token and decides what a failure means
 /// (RFC 6750 §2.1, §3, §3.1).
 ///

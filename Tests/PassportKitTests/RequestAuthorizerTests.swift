@@ -5,10 +5,6 @@ import Testing
 
 @testable import PassportKit
 
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
-
 @Suite(.timeLimit(.minutes(1)))
 struct RequestAuthorizerTests {
     private func authorizer() throws -> RequestAuthorizer {

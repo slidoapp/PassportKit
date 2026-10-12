@@ -2,10 +2,6 @@ import Foundation
 import HTTPTypes
 import HTTPTypesFoundation
 
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
-
 /// The default ``HTTPTransport``, built on `URLSession`.
 ///
 /// - Uses an ephemeral configuration by default, with cookies and the URL cache disabled.
