@@ -35,12 +35,15 @@ DPoP and PAR (see §11).
   in CI.
 - Platforms: macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1. Linux for
   the core and testing modules.
-- No third-party runtime dependencies.
+- Dependencies are limited to well-maintained Apple and Swift project
+  packages (ADR 0009): swift-crypto (`Crypto`, SHA-256 for PKCE) and
+  swift-log (`Logging`) in the core, plus SwiftKeychain in
+  `PassportKitApple`.
 
 | Product / target | Contents | Imports |
 |---|---|---|
-| `PassportKit` | Everything protocol-level: types, client, token manager, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store | Foundation (FoundationNetworking on Linux); CryptoKit when available |
-| `PassportKitApple` | `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | `PassportKit`, Security, AuthenticationServices, Network, AppKit/UIKit |
+| `PassportKit` | Everything protocol-level: types, client, token manager, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store | Foundation (FoundationNetworking on Linux), swift-crypto, swift-log |
+| `PassportKitApple` | `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | `PassportKit`, swift-log, SwiftKeychain, Security, AuthenticationServices, Network, AppKit/UIKit |
 | `PassportKitTesting` | `FakeAuthorizationServer`, `ManualClock`, `ManualWallClock`, `SequenceRandomSource`, `RecordingTransport` | `PassportKit` |
 
 Test targets: `PassportKitTests` (unit), `PassportKitTestingTests` (the
@@ -859,27 +862,57 @@ Every `.request` is followed by exactly one `.response` or one
 cancellation). Events carry no URLs with query strings, no bodies and no
 secrets.
 
+### Logging
+
+Logging through swift-log is an additional channel; `PassportObserver` and
+`PassportEvent` are unchanged and remain the interface for metrics and
+tests. `OAuthClient.init`, `Discovery.fetchMetadata`,
+`KeychainCredentialStore.init`, `LoopbackRedirectListener.start` and
+`WebAuthenticationSessionUserAgent.init` take `logger: Logger =
+Logger(label: "PassportKit")`; with the default label the lines go to the
+`LoggingSystem` the host app bootstrapped. `TokenManager.init` takes
+`logger: Logger? = nil` and uses its client's logger when `nil`;
+`RequestAuthorizer` uses its manager's client's. `OAuthClient.logger` is
+public.
+
+| Level | What |
+|---|---|
+| `trace` | refresh lane turns, request coalescing, cache hits, discarded results of superseded sessions |
+| `debug` | each request (`endpoint`, `grant_type`, `status`, `error_code`, `duration_ms`), loopback listener internals |
+| `info` | session lifecycle: signed in (`reason`: grant, restored), signed out or session ended (`reason`), refresh token rotated |
+| `notice` | storage failures, acceptance policy rejections, a 401 retry, `insufficient_scope`, legacy credential migration, a loopback redirect that failed validation |
+| `warning` | transport failures, failed or timed-out revocation, a renewed token rejected again, Keychain failures (`status`), failed web authentication sessions |
+
+Messages are constant strings and variable data goes in metadata with
+snake_case keys. Logs never contain tokens, codes, `state`, verifiers,
+client secrets, URLs with queries, headers, bodies or server
+`error_description`; an error is logged as its `error_code` only.
+
 ## 13. Apple module
 
-- `KeychainCredentialStore(accessGroup: String? = nil, accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly, useDataProtectionKeychain: Bool = false, decodeLegacy: (@Sendable (Data) -> Credential?)? = nil)`:
-  generic password items, `kSecAttrService` = `account.service`,
-  `kSecAttrAccount` = `account.account`; versioned JSON payload
-  (`CredentialCoding`). `save` is `SecItemUpdate`, then `SecItemAdd` on
-  `errSecItemNotFound`, then one more update on `errSecDuplicateItem`
-  (never delete-then-add). `load` returns `nil` for `errSecItemNotFound`;
-  an undecodable payload and any other status are `.storageFailure` (the
+- `KeychainCredentialStore(accessGroup: String? = nil, accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly, decodeLegacy: (@Sendable (Data) -> Credential?)? = nil, logger: Logger = Logger(label: "PassportKit"))`:
+  built on SwiftKeychain (ADR 0009); generic password items, `kSecAttrService` = `account.service`,
+  `kSecAttrAccount` = `account.account`; the versioned JSON payload
+  (`CredentialCoding`) is one value in SwiftKeychain's archived
+  dictionary. `load` returns `nil` for `errSecItemNotFound`; an
+  undecodable payload and any other status are `.storageFailure` (the
   status number in the description, never item data);
   `errSecInteractionNotAllowed` (device locked) has recovery
   `.retryLater(after: nil)`. `delete` treats "not found" as success.
-  Items are never synchronizable (`kSecAttrSynchronizable` is `false`, no
-  option): a refresh token must not sync between devices.
-  `useDataProtectionKeychain` maps to `kSecUseDataProtectionKeychain` on
-  macOS and is ignored elsewhere; `accessibility` applies on iOS-family
-  platforms and the macOS data protection keychain only. Calls block, so
-  each runs on a private serial `DispatchQueue` bridged with a
+  Items are never synchronizable (`kSecAttrSynchronizable` is not set, so
+  `false`, no option): a refresh token must not sync between devices.
+  `accessibility` is `kSecAttrAccessible`; the store uses the login
+  keychain on macOS (SwiftKeychain cannot target the data protection
+  keychain, so there is no `useDataProtectionKeychain` option). Calls
+  block, so each runs on a private serial `DispatchQueue` bridged with a
   continuation. `decodeLegacy` is the migration hook: it is called only
-  when versioned decoding fails, and a credential it returns is written
-  back in the current format.
+  when versioned decoding of the payload fails, and receives the payload
+  bytes (the raw item data when the item is not a SwiftKeychain
+  envelope); a credential it returns is written back in the current
+  format. An item holding the current JSON directly is read and wrapped
+  without the hook. **Known issue (ADR 0009):** SwiftKeychain replaces an
+  existing item by delete-then-add, so a failed second step loses the
+  credential.
 - `WebAuthenticationSessionUserAgent` (`@MainActor`): wraps
   `ASWebAuthenticationSession` with a presentation-anchor provider and
   `prefersEphemeralWebBrowserSession`; private-use-scheme callbacks on all

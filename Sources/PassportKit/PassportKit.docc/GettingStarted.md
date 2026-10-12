@@ -24,7 +24,7 @@ secret. A confidential client uses ``ClientAuthentication/clientSecretBasic(clie
 or ``ClientAuthentication/clientSecretPost(clientID:secret:)``. Without
 discovery, build an ``Endpoints`` value by hand.
 
-``OAuthClient/init(configuration:transport:wallClock:clock:random:observer:)``
+``OAuthClient/init(configuration:transport:wallClock:clock:random:observer:logger:)``
 throws ``PassportError`` with the code
 ``PassportError/Code-swift.struct/invalidConfiguration`` when an endpoint is
 not `https` (or loopback `http`), so a misconfigured client never exists.
@@ -91,6 +91,23 @@ credential in the Keychain with `PassportKitApple`'s
 `KeychainCredentialStore`. On the next launch call
 ``TokenManager/load()`` instead of signing in again. Subscribe to
 ``TokenManager/events`` to learn when the session ends.
+
+## See what the library does
+
+PassportKit logs through [swift-log](https://github.com/apple/swift-log). A default
+client, manager and Apple adapter log to a logger labelled `PassportKit`, which uses whatever
+`LoggingSystem.bootstrap` your app configured, so you get logs without wiring. Pass a `logger:` to choose a label
+or metadata:
+
+```swift
+var logger = Logger(label: "com.example.app.auth")
+logger.logLevel = .debug
+let client = try OAuthClient(configuration: configuration, logger: logger)
+```
+
+`debug` shows each request with its endpoint, grant type, status and duration, `info` the session lifecycle,
+and `notice` and `warning` storage failures, policy rejections, retries and revocation failures. Logs never contain
+tokens, codes, verifiers, URLs with queries or response bodies. Use a ``PassportObserver`` for typed events.
 
 ## Call an API
 

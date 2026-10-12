@@ -40,6 +40,7 @@
         /// - Parameters:
         ///   - path: The redirect path, such as `/callback`. It must start with `/` and have no query.
         ///   - clock: Times ``waitForCallback(timeout:accept:)``.
+        ///   - logger: Receives listener events, never request URLs or their queries.
         /// - Throws: `PassportError` with `.invalidConfiguration` for an invalid `path`, and
         ///   `.transportFailure` when the socket cannot be opened.
         public static func start(

@@ -24,6 +24,11 @@ Ideas that came out of the pre-release API review and were left out on
 purpose. None of them blocks the first release; each needs a design and an
 ADR before work starts.
 
+- **Fix the SwiftKeychain write path upstream.** Replace delete-then-add
+  on `errSecDuplicateItem` with `SecItemUpdate`, then add on
+  `errSecItemNotFound`; throw typed errors instead of archiving with
+  `try?`. Then restore the multi-store race test (now a known issue) and
+  consider the data protection keychain (ADR 0009).
 - **Client credentials target in `TokenManager`.** Cache and coalesce
   machine-to-machine tokens (RFC 6749 §4.4) the way user tokens are, with
   a target derivation of their own and no refresh token or session.

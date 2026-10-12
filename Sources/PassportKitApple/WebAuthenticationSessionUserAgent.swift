@@ -29,6 +29,7 @@
         ///     always asked to sign in and no single sign-on session is created.
         ///   - presentationAnchor: Returns the window the sheet is presented from. The default, `nil`, is
         ///     the application's key window.
+        ///   - logger: Receives session outcomes, never redirect URLs.
         public init(
             prefersEphemeralWebBrowserSession: Bool = false,
             presentationAnchor: (@MainActor @Sendable () -> ASPresentationAnchor)? = nil,

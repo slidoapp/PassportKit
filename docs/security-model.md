@@ -33,6 +33,22 @@ the response is `invalidResponse`; `error_uri` keeps only `http` and
 format characters (bidirectional overrides), long token-like runs and
 everything past 200 characters.
 
+## Logging
+
+Logs go through swift-log (`logger:` parameters, see `docs/spec.md`) and
+follow the same rules as errors and events:
+
+- Messages are constant strings; data goes in metadata.
+- Only low-cardinality, non-secret metadata: endpoint kind, grant type,
+  HTTP status, the sanitized OAuth `error` code, duration, session
+  reason, Keychain `OSStatus`.
+- Never tokens, authorization codes, `state`, PKCE verifiers, device
+  codes, client secrets, URLs with a query, headers, request or response
+  bodies, or a server's `error_description`.
+- A new log line needs the redaction canary to cover its path: the test
+  captures every line of a run with a test `LogHandler` and searches
+  messages and metadata values for the canaries.
+
 ## Threats and mitigations
 
 | Threat | Mitigation |
@@ -46,7 +62,7 @@ everything past 200 characters.
 | Header injection through a token | A token that is not a `b64token` (RFC 6750 §2.1) is refused before it reaches a header |
 | Memory growth from many targets | The token cache and the remembered rejections are limited to 256 entries each |
 | Server text shown to a person | Error text is sanitized; a device `user_code` with control or invisible characters, or over 64 characters, is an invalid response; apps show it themselves (RFC 8628 §3.3), and the example executable prints server text through a sanitizer |
-| Token theft from logs | Redaction rules above, enforced by tests and by the redaction canary, which searches every error, event and description of every flow for the secrets it used |
+| Token theft from logs | Redaction rules above, enforced by tests and by the redaction canary, which searches every error, event, log line and description of every flow for the secrets it used |
 | Token sent with the wrong scheme | Only `Bearer` tokens are sent by `RequestAuthorizer`; sender-constrained types fail before any request |
 | Token theft from storage | Platform secure storage (Keychain) with the strictest workable accessibility class |
 | Refresh token replay after rotation | Persist rotated refresh token before use; serialize refresh-token-consuming operations |
@@ -71,6 +87,12 @@ everything past 200 characters.
 
 ## Known limits
 
+- **The Keychain write path can lose the credential.** `KeychainCredentialStore` is built on SwiftKeychain, which
+  replaces an existing item by deleting it and adding it again. If the add fails (device locked, denied prompt,
+  entitlement problem) or the process dies in between, the stored credential is gone; with refresh token rotation the
+  replaced token is already invalid, so the user must sign in again. Stores writing one item at once can fail the
+  same way, and the payload is archived with `try?`. See ADR 0009; the planned fix is an upstream
+  update-then-add change.
 - **ID tokens are stored, never validated.** PassportKit is an OAuth 2.0 client, not an OpenID Connect relying
   party: an `id_token` is kept in the credential without checking its signature, issuer, audience or nonce. Do not
   treat it as proof of identity.

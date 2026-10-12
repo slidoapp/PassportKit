@@ -45,10 +45,15 @@ First development cycle; nothing is released yet.
 - `Retry-After` is also read as an HTTP-date.
 - `RequestAuthorizer(manager:transport:allowedOrigins:)` limits the origins a token may be sent to.
 
+- Logging through swift-log: `logger: Logger = Logger(label: "PassportKit")` on `OAuthClient.init` (with a public
+  `logger` property), `Discovery.fetchMetadata`, `KeychainCredentialStore.init`, `LoopbackRedirectListener.start` and
+  `WebAuthenticationSessionUserAgent.init`, and `logger: Logger? = nil` on `TokenManager.init` (defaults to the
+  client's). `PassportObserver` is unchanged. See `docs/spec.md` for the level policy.
+
 #### Apple platforms (`PassportKitApple`)
 
 - `KeychainCredentialStore`: non-synchronizable generic password items updated in place, an accessibility class
-  option, optional data protection keychain on macOS and a `decodeLegacy` migration hook.
+  option and a `decodeLegacy` migration hook.
 - `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and
   `LoopbackUserAgent` (RFC 8252). `waitForCallback(timeout:accept:)` takes a predicate that decides which
   authorization-response-shaped request ends the wait; `LoopbackUserAgent` passes one that matches `state`.
@@ -73,6 +78,14 @@ First development cycle; nothing is released yet.
 
 ### Changed
 
+- Dependencies: the core depends on swift-crypto (`Crypto`, `from: 3.15.1`) for SHA-256 and swift-log (`Logging`,
+  `from: 1.6.0`); `PassportKitApple` depends on SwiftKeychain (`.upToNextMinor(from: "2.1.0")`). The hand-written
+  SHA-256 and the "no third-party runtime dependencies" policy are gone (ADR 0009, which supersedes parts of
+  ADR 0002).
+- `KeychainCredentialStore` is built on SwiftKeychain and no longer takes `useDataProtectionKeychain` (SwiftKeychain
+  cannot target the data protection keychain). Records written directly as JSON are still read. Known issue:
+  SwiftKeychain replaces an existing item by delete-then-add, which can lose the credential if the add fails; see
+  `docs/security-model.md`.
 - A token exchange response without `issued_token_type` is rejected (RFC 8693 §2.2.1).
 - The `resource` indicators of an authorization request are repeated on its token request (RFC 8707 §2.2).
 - `additionalParameters` may not use `client_id` or `client_secret`.

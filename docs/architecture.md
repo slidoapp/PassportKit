@@ -11,12 +11,12 @@ change.
 
 | Module | Purpose | May import |
 |---|---|---|
-| `PassportKit` | Core: grants, token model, session actor (refresh coordination), credential store protocol and in-memory store, errors, metadata discovery, request authorization | Foundation only; must build on Linux |
-| `PassportKitApple` | Apple adapters: Keychain storage, `ASWebAuthenticationSession`, loopback redirect listener | `PassportKit`, Apple frameworks |
+| `PassportKit` | Core: grants, token model, session actor (refresh coordination), credential store protocol and in-memory store, errors, metadata discovery, request authorization | Foundation, swift-crypto, swift-log; must build on Linux |
+| `PassportKitApple` | Apple adapters: Keychain storage, `ASWebAuthenticationSession`, loopback redirect listener | `PassportKit`, swift-log, SwiftKeychain, Apple frameworks |
 | `PassportKitTesting` | Fake authorization server and test clocks; public so consumers can test against it | `PassportKit` |
 
 Dependencies point inward only: adapters and testing depend on the core,
-never the reverse. The core has no third-party runtime dependencies.
+never the reverse. External dependencies follow ADR 0009.
 
 ## Concurrency model
 
@@ -68,7 +68,7 @@ enters. Each one is justified by an ADR.
 - Token acceptance hook
 - Additional request parameters and headers per request
 - Error classification for resource-server responses
-- Logging/observability events (secrets are never part of an event)
+- Logging (swift-log `Logger` parameters) and observability events (secrets are never part of either)
 
 ## What the library deliberately does not know
 

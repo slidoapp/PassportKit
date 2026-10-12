@@ -35,6 +35,8 @@ descriptions or errors.
 - Swift 6.2 or later (Xcode 26 or later).
 - `PassportKit` (the core) builds on macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1 and Linux.
 - `PassportKitApple` (Keychain, `ASWebAuthenticationSession`, loopback listener) needs an Apple platform.
+- Dependencies: [swift-crypto](https://github.com/apple/swift-crypto) and [swift-log](https://github.com/apple/swift-log)
+  in the core, plus SwiftKeychain in `PassportKitApple` ([ADR 0009](docs/decisions/0009-external-dependencies.md)).
 
 ## Installation
 
@@ -87,6 +89,14 @@ let (data, response) = try await authorizer.data(for: request, session: URLSessi
 
 Use `KeychainCredentialStore` from `PassportKitApple` instead of `InMemoryCredentialStore` in an app. The
 `passportkit-example` executable runs the device and code flows against a server you name.
+
+## Logging
+
+The library logs through [swift-log](https://github.com/apple/swift-log). Without any setup it uses a logger labelled
+`PassportKit`, so whatever `LoggingSystem.bootstrap` your app configured applies. Pass `logger:` to `OAuthClient`,
+`TokenManager`, `Discovery.fetchMetadata` or the Apple adapters to choose the label or metadata. `debug` logs each
+request, `info` the session lifecycle, `notice` and `warning` failures and retries. Tokens, codes, verifiers and URLs
+with queries are never logged. `PassportObserver` remains the channel for typed events.
 
 ## Documentation
 

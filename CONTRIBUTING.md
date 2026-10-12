@@ -43,6 +43,11 @@ We expect new pull requests to include tests for any affected behavior, and,
 as we follow semantic versioning, we may reserve breaking changes until the
 next major version release.
 
+### Dependencies
+
+A new dependency needs to meet the criteria of [ADR 0009](docs/decisions/0009-external-dependencies.md) and a row in
+its table. Never log or interpolate secrets into log messages or metadata (see `docs/security-model.md`).
+
 ### Development
 
 Requirements: Swift 6.2 or later (Xcode 26 or later on macOS).
