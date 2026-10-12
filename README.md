@@ -46,7 +46,7 @@ Add the package to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/OWNER/PassportKit.git", from: "0.1.0")
+    .package(url: "https://github.com/slidoapp/PassportKit.git", from: "0.1.0")
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -58,7 +58,7 @@ targets: [
 ]
 ```
 
-There is no release yet; replace `OWNER` and the version once one exists.
+The API may change in any 0.x release; pin with `.upToNextMinor(from:)` if you need stability.
 
 ## Quick start
 

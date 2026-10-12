@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-First development cycle; nothing is released yet.
+## [0.1.0] - 2026-10-12
+
+First release.
 
 ### Added
 
@@ -219,3 +221,6 @@ unchanged: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1.
 - A 401 that carries challenges for other schemes only (`Basic`, `DPoP`) is delivered instead of refreshing the token.
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization request query as form data, so a `+` in
   `scope` is a space.
+
+[Unreleased]: https://github.com/slidoapp/PassportKit/compare/0.1.0...HEAD
+[0.1.0]: https://github.com/slidoapp/PassportKit/releases/tag/0.1.0
