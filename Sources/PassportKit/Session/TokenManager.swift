@@ -200,7 +200,12 @@ public actor TokenManager {
     ///   - refreshToken: The refresh token of the client this manager is configured for.
     ///   - grantedScope: The scope the grant carries, if known.
     ///   - idToken: An ID token that belongs to the session, if there is one.
-    public func signIn(refreshToken: Secret, grantedScope: ScopeSet? = nil, idToken: Secret? = nil) async {
+    /// - Throws: ``PassportError`` with ``PassportError/Code-swift.struct/invalidConfiguration`` when
+    ///   `refreshToken` is empty; the current session is then left untouched.
+    public func signIn(refreshToken: Secret, grantedScope: ScopeSet? = nil, idToken: Secret? = nil) async throws {
+        guard !refreshToken.reveal().isEmpty else {
+            throw PassportError(.invalidConfiguration, detail: "The refresh token is empty.")
+        }
         startNewSession()
         let credential = Credential(
             clientID: client.configuration.authentication.clientID,

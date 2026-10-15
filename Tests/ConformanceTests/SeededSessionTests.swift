@@ -11,7 +11,7 @@ struct SeededSessionTests {
         let grant = try await harness.grant()
         let seeded = try #require(grant.refreshToken)
 
-        await harness.manager.signIn(refreshToken: seeded, grantedScope: ["read", "write"])
+        try await harness.manager.signIn(refreshToken: seeded, grantedScope: ["read", "write"])
         #expect(await harness.tokenRequests(.refreshToken).isEmpty, "seeding must not contact the server")
 
         let token = try await harness.manager.accessToken()
@@ -31,7 +31,7 @@ struct SeededSessionTests {
         let grant = try await harness.grant()
         let seeded = try #require(grant.refreshToken)
 
-        await harness.manager.signIn(refreshToken: seeded, grantedScope: ["read"], idToken: Secret("id-token"))
+        try await harness.manager.signIn(refreshToken: seeded, grantedScope: ["read"], idToken: Secret("id-token"))
         let stored = try #require(try await harness.store.load(harness.account))
         #expect(stored.refreshToken == seeded)
         #expect(stored.idToken == Secret("id-token"))
@@ -57,7 +57,7 @@ struct SeededSessionTests {
         try await harness.clock.waitForSleeper()
 
         let seeded = try #require(try await harness.grant().refreshToken)
-        await manager.signIn(refreshToken: seeded, grantedScope: ["read", "write"])
+        try await manager.signIn(refreshToken: seeded, grantedScope: ["read", "write"])
         let next = Task { try await manager.accessToken() }
         #expect(await finishes(next), "the seeded session waited for the old one")
 
@@ -66,5 +66,17 @@ struct SeededSessionTests {
         _ = try await next.value
         #expect(await manager.credential != nil, "the stale invalid_grant ended the seeded session")
         #expect(await harness.presentedRefreshTokens().contains(seeded.reveal()))
+    }
+
+    @Test("an empty refresh token is refused and the current session stays")
+    func emptyRefreshTokenIsRefused() async throws {
+        let harness = try await Harness()
+        let before = await harness.manager.credential
+
+        let error = await #expect(throws: PassportError.self) {
+            try await harness.manager.signIn(refreshToken: Secret(""))
+        }
+        #expect(error?.code == .invalidConfiguration)
+        #expect(await harness.manager.credential == before)
     }
 }

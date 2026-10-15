@@ -76,7 +76,7 @@ derives a refresh token for another client; the issued token arrives in
 let reports = TokenManager(client: reportsClient, store: reportsStore, account: reportsAccount)
 
 let issued = try await manager.exchangeRefreshToken(audiences: ["reports"])
-await reports.signIn(refreshToken: issued.accessToken, grantedScope: ["reports.read"])
+try await reports.signIn(refreshToken: issued.accessToken, grantedScope: ["reports.read"])
 
 // Refreshes with the issued token; the rotated one is saved for next time.
 let token = try await reports.accessToken()

@@ -60,7 +60,7 @@ enum DocumentationSnippets {
         let reports = TokenManager(client: reportsClient, store: reportsStore, account: reportsAccount)
 
         let issued = try await manager.exchangeRefreshToken(audiences: ["reports"])
-        await reports.signIn(refreshToken: issued.accessToken, grantedScope: ["reports.read"])
+        try await reports.signIn(refreshToken: issued.accessToken, grantedScope: ["reports.read"])
 
         let token = try await reports.accessToken()
         _ = token
@@ -79,7 +79,8 @@ enum DocumentationSnippets {
 
         guard let legacyRefreshToken = loadLegacyRefreshToken() else { return manager }
         if await manager.credential == nil {
-            await manager.signIn(refreshToken: Secret(legacyRefreshToken), grantedScope: ["openid", "offline_access"])
+            try await manager.signIn(
+                refreshToken: Secret(legacyRefreshToken), grantedScope: ["openid", "offline_access"])
         }
         do {
             _ = try await manager.accessToken()

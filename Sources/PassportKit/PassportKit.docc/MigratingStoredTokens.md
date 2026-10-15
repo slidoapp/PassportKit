@@ -38,7 +38,7 @@ func migratedManager(client: OAuthClient) async throws -> TokenManager {
 
     guard let legacyRefreshToken = loadLegacyRefreshToken() else { return manager }
     if await manager.credential == nil {
-        await manager.signIn(refreshToken: Secret(legacyRefreshToken), grantedScope: ["openid", "offline_access"])
+        try await manager.signIn(refreshToken: Secret(legacyRefreshToken), grantedScope: ["openid", "offline_access"])
     }
     do {
         _ = try await manager.accessToken()

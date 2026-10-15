@@ -542,7 +542,7 @@ public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, 
 }
 ```
 
-`signIn(refreshToken:grantedScope:idToken:)` seeds a session from a refresh token
+`signIn(refreshToken:grantedScope:idToken:) async throws` seeds a session from a refresh token
 the app received elsewhere, typically the token `exchangeRefreshToken(audiences:)`
 issued for another client (it arrives in `accessToken`, whatever its type). It
 has the semantics of `signIn(with:)` (replaces the session, emits `.signedIn`,
