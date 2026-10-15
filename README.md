@@ -7,7 +7,7 @@ keeping the session safe while refresh tokens rotate, and signing requests to pr
 and the HTTP transport are injected, so every flow can be tested offline, and secrets never appear in logs,
 descriptions or errors.
 
-> **Status:** pre-1.0. The API may change between minor versions until 1.0.
+> **Status:** pre-1.0. The API can change in any minor version; see [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
@@ -33,8 +33,8 @@ descriptions or errors.
 ## Requirements
 
 - Swift 6.2 or later (Xcode 26 or later).
-- macOS 14 and iOS 17 only ([ADR 0011](docs/decisions/0011-apple-platforms-only.md)). tvOS, watchOS and visionOS are
-  not supported for now.
+- macOS 14 and iOS 17 ([ADR 0011](docs/decisions/0011-apple-platforms-only.md)). Other platforms, including Linux, are
+  not supported.
 - Dependencies: [swift-http-types](https://github.com/apple/swift-http-types),
   [swift-log](https://github.com/apple/swift-log) and SwiftKeychain
   ([ADR 0009](docs/decisions/0009-external-dependencies.md)). SHA-256 comes from CryptoKit.
@@ -45,7 +45,7 @@ Add the package to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/slidoapp/PassportKit.git", from: "0.1.0")
+    .package(url: "https://github.com/slidoapp/PassportKit.git", from: "0.2.0")
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -57,19 +57,21 @@ targets: [
 ]
 ```
 
-The API may change in any 0.x release; pin with `.upToNextMinor(from:)` if you need stability.
+Pin with `.upToNextMinor(from: "0.2.0")` if you need stability: a 0.x minor version can break the API.
 
 ## Quick start
 
-Sign in with the device flow, keep the session, and call an API:
+Sign in with the device flow, keep the session, and call an API (the sample is compiled in
+`Tests/ConformanceTests/DocumentationSnippets.swift`):
 
 ```swift
 import PassportKit
 
 let issuer = URL(string: "https://as.example.com")!
 let metadata = try await Discovery.fetchMetadata(issuer: issuer)
-let client = try OAuthClient(
-    configuration: ClientConfiguration(metadata: metadata, authentication: .publicClient(clientID: "my-app")))
+let configuration = try ClientConfiguration(
+    metadata: metadata, authentication: .publicClient(clientID: "my-app"))
+let client = try OAuthClient(configuration: configuration)
 
 // 1. Sign in. Show the code, then wait for the person to approve.
 let authorization = try await client.beginDeviceAuthorization(scope: ["openid", "offline_access"])
@@ -82,21 +84,21 @@ let manager = TokenManager(client: client, store: InMemoryCredentialStore(), acc
 try await manager.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
 // 3. Call an API. The authorizer adds the token and refreshes once if the server rejects it.
-let authorizer = RequestAuthorizer(manager: manager)
+let authorizer = RequestAuthorizer(manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
 let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
 let (data, response) = try await authorizer.data(for: request, session: URLSession(configuration: .ephemeral))
 ```
 
-Use `KeychainCredentialStore` instead of `InMemoryCredentialStore` in an app. The
-`passportkit-example` executable runs the device and code flows against a server you name.
+In an app, store the session in `KeychainCredentialStore` instead of `InMemoryCredentialStore`. `allowedOrigins` limits
+where a token may be sent. The `passportkit-example` executable runs the device and code flows against a server you name.
 
 ## Logging
 
-The library logs through [swift-log](https://github.com/apple/swift-log). Without any setup it uses a logger labelled
-`PassportKit`, so whatever `LoggingSystem.bootstrap` your app configured applies. Pass `logger:` to `OAuthClient`,
-`TokenManager`, `Discovery.fetchMetadata`, `KeychainCredentialStore` or the user agents to choose the label or metadata. `debug` logs each
-request, `info` the session lifecycle, `notice` and `warning` failures and retries. Tokens, codes, verifiers and URLs
-with queries are never logged. `PassportObserver` remains the channel for typed events.
+The library logs through [swift-log](https://github.com/apple/swift-log) with a logger labelled `PassportKit`, so
+whatever `LoggingSystem.bootstrap` your app configured applies. Pass `logger:` to `OAuthClient`, `TokenManager`,
+`Discovery.fetchMetadata`, `KeychainCredentialStore` or the user agents to choose the label or metadata. Tokens,
+codes, verifiers and URLs with queries are never logged. `PassportObserver` is the channel for typed events. See the
+[getting started](Sources/PassportKit/PassportKit.docc/GettingStarted.md) article for the levels.
 
 ## Documentation
 
@@ -108,11 +110,14 @@ The DocC catalogs are in `Sources/*/*.docc` and are published on the Swift Packa
   200 response is not proof of access
 - [Error handling](Sources/PassportKit/PassportKit.docc/ErrorHandling.md)
 - [Native app redirects](Sources/PassportKit/PassportKit.docc/NativeAppRedirects.md)
+- [Migrating stored tokens](Sources/PassportKit/PassportKit.docc/MigratingStoredTokens.md): keep users signed in when
+  you replace another OAuth library
 - [Testing](Sources/PassportKit/PassportKit.docc/Testing.md)
 
 Design documents: [specification](docs/spec.md), [architecture](docs/architecture.md),
-[security model](docs/security-model.md) and the [decision records](docs/decisions/). Run `make docs` to build
-the DocC archives locally.
+[security model](docs/security-model.md), [RFC traceability](docs/rfc-matrix.md), the
+[decision records](docs/decisions/README.md) and the [roadmap](docs/roadmap.md). Run `make docs` to build the DocC
+archives locally.
 
 ## Testing your app
 

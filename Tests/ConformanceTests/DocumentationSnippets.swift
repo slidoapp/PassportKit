@@ -1,9 +1,10 @@
 import Foundation
 import HTTPTypes
+import Logging
 import PassportKit
 import PassportKitTesting
 
-// The code samples of the DocC articles in Sources/PassportKit/PassportKit.docc, kept here so that the compiler
+// The code samples of README.md and the DocC articles in Sources/PassportKit/PassportKit.docc, kept here so that the compiler
 // checks them against the real API. They are never run. When you change a sample in an article, change it here.
 
 enum DocumentationSnippets {
@@ -31,6 +32,39 @@ enum DocumentationSnippets {
         let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
         let (data, response) = try await authorizer.data(for: request, session: session)
         _ = (data, response)
+    }
+
+    // README.md, quick start
+    static func readmeQuickStart() async throws {
+        let issuer = URL(string: "https://as.example.com")!
+        let metadata = try await Discovery.fetchMetadata(issuer: issuer)
+        let configuration = try ClientConfiguration(
+            metadata: metadata, authentication: .publicClient(clientID: "my-app"))
+        let client = try OAuthClient(configuration: configuration)
+
+        // 1. Sign in. Show the code, then wait for the person to approve.
+        let authorization = try await client.beginDeviceAuthorization(scope: ["openid", "offline_access"])
+        print("Open \(authorization.verificationURI) and enter \(authorization.userCode)")
+        let tokens = try await client.completeDeviceAuthorization(authorization)
+
+        // 2. Keep the session: the manager stores, rotates and refreshes.
+        let account = CredentialAccount(service: "com.example.app", account: "default")
+        let manager = TokenManager(client: client, store: InMemoryCredentialStore(), account: account)
+        try await manager.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
+
+        // 3. Call an API. The authorizer adds the token and refreshes once if the server rejects it.
+        let authorizer = RequestAuthorizer(manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
+        let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
+        let (data, response) = try await authorizer.data(for: request, session: URLSession(configuration: .ephemeral))
+        _ = (data, response)
+    }
+
+    // GettingStarted.md, logging
+    static func logging(configuration: ClientConfiguration) throws -> OAuthClient {
+        var logger = Logger(label: "com.example.app.auth")
+        logger.logLevel = .debug
+        let client = try OAuthClient(configuration: configuration, logger: logger)
+        return client
     }
 
     static func signIn(client: OAuthClient, using userAgent: any AuthorizationUserAgent) async throws -> TokenResponse {

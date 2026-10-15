@@ -15,6 +15,10 @@ A grant that issued no refresh token still works until its access token
 expires. Then the session ends with the reason
 ``SignOutReason/expiredWithoutRefreshToken``.
 
+The stored ``Credential`` keeps the ID token, if one was issued, without
+validating it: PassportKit is an OAuth 2.0 client, not an OpenID Connect
+relying party. Do not treat it as proof of identity.
+
 ## Asking for a token
 
 ``TokenManager/accessToken(for:)`` returns a token that is valid for at least
@@ -35,6 +39,10 @@ let bound = try await manager.accessToken(
 let exchanged = try await manager.accessToken(
     for: .exchange(audiences: ["reports"]))
 ```
+
+The manager keeps at most 256 tokens and 256 remembered rejections, dropping
+expired entries first and then the oldest, so targets built from request URLs
+cannot grow it without bound.
 
 Two targets are equal when their derivation, scope and the sets of resources and
 audiences are equal. Order and repetition do not matter. A token is never
@@ -120,14 +128,6 @@ revokes the newest refresh token (RFC 7009) with a time limit. The
 happened to the revocation; the in-memory session is always cleared.
 
 ## After a 401
-
-The cache keeps at most 256 tokens and 256 remembered rejections, dropping
-expired entries first and then the oldest, so targets built from request URLs
-cannot grow it without bound.
-
-The stored ``Credential`` keeps the ID token, if one was issued, without
-validating it: PassportKit is an OAuth 2.0 client, not an OpenID Connect
-relying party. Do not treat it as proof of identity.
 
 ``TokenManager/invalidate(_:)`` drops a cached token that a resource server
 rejected. Pass the exact ``AccessToken`` that was used: only that token is

@@ -11,8 +11,8 @@ device authorization, refresh tokens with rotation, token exchange, resource
 indicators, authorization server metadata, token revocation, and bearer
 token usage.
 
-It supports macOS 14 and iOS 17 only, and includes Keychain storage and the user agents that complete a
-sign-in in the system browser (see <doc:NativeAppRedirects>).
+It supports macOS 14 and iOS 17, and includes Keychain storage and the user agents that complete a sign-in in the
+system browser (see <doc:NativeAppRedirects>).
 
 Two layers fit together:
 
@@ -84,8 +84,11 @@ appear in descriptions, errors or events.
 
 - ``TokenAcceptancePolicy``
 - ``TokenAcceptance``
+- ``TokenAcceptanceContext``
 - ``AcceptAnyToken``
 - ``RequireAnyScope``
+- ``TargetSelector``
+- ``ClosureTokenAcceptancePolicy``
 
 ### Credential storage
 

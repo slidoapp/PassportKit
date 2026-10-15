@@ -34,8 +34,8 @@ get ``PassportError/Code-swift.struct/userCancelled``.
 
 ## Loopback redirect
 
-Desktop apps and command-line tools (and, with a browser on the same device, iOS apps) can listen on `127.0.0.1` (RFC 8252
-§7.3). Start the listener first, because the redirect URI carries the port the
+Desktop apps and command-line tools (and iOS apps, when a browser on the same device can reach them) can listen on
+`127.0.0.1` (RFC 8252 §7.3). Start the listener first, because the redirect URI carries the port the
 system assigned:
 
 ```swift
@@ -64,8 +64,8 @@ open the URL yourself, for example to print it.
 
 ## Device flow
 
-When the device has no browser or no keyboard (a television, a command-line
-tool over SSH), use the device authorization grant instead. Nothing has to
+When the device has no browser or no keyboard (a command-line tool over SSH,
+or a device without text input), use the device authorization grant instead. Nothing has to
 reach your app: the person approves on another device while your app polls.
 See <doc:GettingStarted>. It needs a device authorization endpoint and a client
 registered for the grant.

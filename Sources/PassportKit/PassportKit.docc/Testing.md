@@ -49,10 +49,10 @@ the person: it approves, or with `.deny` declines, every authorization request.
 
 ## Controlling the scenario
 
-`configure(_:)` changes the server's behaviour:
+Register clients when you create the server: public or confidential, with
+refresh token rotation, a reuse leeway and a lifetime for each token type.
+`configure(_:)` then changes its behaviour through `Controls`:
 
-- Clients can be public or confidential, with refresh token rotation, a
-  reuse leeway and a lifetime for each token type.
 - `scopePolicy` narrows grants. `refreshWithUnauthorizedResource` and
   `exchangeForUnauthorizedResource` reproduce the two ways servers refuse a
   resource, so you can test your handling of both (see <doc:ResourceAccessAndScopes>).
