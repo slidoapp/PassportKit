@@ -61,7 +61,7 @@ actor GatedStore: CredentialStore {
 
 /// Polls `condition` until it holds. Gives up after `timeout` of real time, so a broken implementation fails the
 /// test instead of hanging it. Yields between polls; never sleeps.
-func waitUntil(timeout: Duration = .seconds(5), _ condition: () async -> Bool) async -> Bool {
+func waitUntil(timeout: Duration = .seconds(30), _ condition: () async -> Bool) async -> Bool {
     let deadline = ContinuousClock.now.advanced(by: timeout)
     while ContinuousClock.now < deadline {
         if await condition() { return true }
@@ -72,8 +72,12 @@ func waitUntil(timeout: Duration = .seconds(5), _ condition: () async -> Bool) a
 
 /// Whether `task` finishes (with a value or an error) within `timeout` of real time. Unlike awaiting the task, a
 /// task that never finishes makes this return `false` instead of hanging the test.
+///
+/// The default is generous on purpose: callers check a task that is either served soon or blocked until the
+/// test intervenes, so a long bound only delays a real failure, while a short one fails a correct run on a
+/// loaded machine (a parallel run on a CI simulator can take seconds to schedule a task).
 func finishes<Value: Sendable, Failure: Error>(
-    _ task: Task<Value, Failure>, within timeout: Duration = .seconds(2)
+    _ task: Task<Value, Failure>, within timeout: Duration = .seconds(30)
 ) async -> Bool {
     let flag = Flag()
     Task {
