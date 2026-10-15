@@ -85,9 +85,11 @@ func items(using manager: TokenManager) async throws -> Data? {
 }
 ```
 
-A rejected token is remembered for 30 seconds by default
+A rejected token is remembered for 5 seconds by default
 (`rejectedTokenCacheDuration`), so a view that retries in a loop does not
-make the manager rotate the refresh token again and again. Set it to `.zero`
+make the manager rotate the refresh token again and again. The window is
+short on purpose: it only has to absorb tight retry loops, and a long one
+makes a permission that was just granted look denied. Set it to `.zero`
 to ask the server every time.
 
 ## At the resource server

@@ -52,7 +52,7 @@ interleavings that this left open, all caused by work that suspends:
 - **Rejections are bounded and remembered.** The policy runs under a time
   limit (`acceptancePolicyTimeLimit`, default 10 s); no answer is a
   rejection. A rejection is remembered per target for
-  `rejectedTokenCacheDuration` (default 30 s) and thrown without a
+  `rejectedTokenCacheDuration` (default 5 s, changed from 30 s: the window only has to absorb tight retry loops) and thrown without a
   request. `withTimeLimit` races the operation in an unstructured task
   and returns when either finishes.
 
@@ -64,5 +64,5 @@ and the lane too whenever the hung call was a save from a refresh. A
 non-cooperative operation that outlives its time limit keeps running in
 the background until it ends. Two sessions can talk to the server
 concurrently, each on its own token chain. The cost of the negative
-cache is that a resource that becomes accessible within 30 s is not
+cache is that a resource that becomes accessible within the window is not
 retried until `invalidate(_:)`, a sign-in or the window passes.

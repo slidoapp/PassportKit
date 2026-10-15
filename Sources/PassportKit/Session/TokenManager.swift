@@ -69,14 +69,16 @@ public actor TokenManager {
     /// A policy that has not answered after `acceptancePolicyTimeLimit` rejects the token.
     /// A rejected token is remembered for `rejectedTokenCacheDuration`: asking for the same target again within
     /// that time throws the same rejection without a request, so a caller that retries in a loop cannot make the
-    /// manager rotate the refresh token over and over. Pass `.zero` to ask the server every time.
+    /// manager rotate the refresh token over and over. The default is short on purpose: the window only has to
+    /// absorb tight retry loops, and a long one makes a permission that was just granted look denied. Pass
+    /// `.zero` to ask the server every time.
     public init(
         client: OAuthClient,
         store: any CredentialStore,
         account: CredentialAccount,
         acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
         acceptancePolicyTimeLimit: Duration = .seconds(10),
-        rejectedTokenCacheDuration: Duration = .seconds(30),
+        rejectedTokenCacheDuration: Duration = .seconds(5),
         logger: Logger? = nil
     ) {
         self.client = client

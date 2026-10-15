@@ -71,7 +71,7 @@ struct Harness {
         defaultTokenLifetime: Duration? = nil,
         accessTokenLifetime: Duration = .seconds(900),
         store: any CredentialStore = InMemoryCredentialStore(),
-        rejectedTokenCacheDuration: Duration = .seconds(30),
+        rejectedTokenCacheDuration: Duration = .seconds(5),
         signedIn: Bool = true
     ) async throws {
         self.store = store

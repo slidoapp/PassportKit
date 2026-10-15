@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `TokenManager.init`: the default of `rejectedTokenCacheDuration` is 5 seconds (it was 30). The window only has to
+  absorb tight retry loops, which would otherwise rotate the refresh token on every attempt; a long one makes a
+  permission that was just granted look denied. Pass the old value to keep it.
+
 - **Breaking (`PassportKitTesting`):** `ManualClock.waitForSleeper()` and `ManualClock.advanceToNextSleeper()` are
   now `throws`; call them with `try await`. When no task sleeps within 60 seconds of real time (it was 10 seconds)
   they throw the new `ManualClock.WaitTimeout` instead of stopping the whole test process, so a slow wake-up on a

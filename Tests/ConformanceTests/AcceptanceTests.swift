@@ -66,7 +66,10 @@ struct AcceptanceTests {
         let later = try await Harness(policy: RequireAnyScope(["read"]))
         await later.server.configure { $0.isResourceUnauthorized = { $0.path.hasPrefix("/denied") } }
         _ = await thrownError { try await later.manager.accessToken(for: denied) }
-        later.wallClock.advance(by: .seconds(31))
+        later.wallClock.advance(by: .seconds(4))
+        _ = await thrownError { try await later.manager.accessToken(for: denied) }
+        #expect(await later.tokenRequests(.refreshToken).count == 1, "the default window is 5 seconds")
+        later.wallClock.advance(by: .seconds(2))
         _ = await thrownError { try await later.manager.accessToken(for: denied) }
         #expect(await later.tokenRequests(.refreshToken).count == 2)
     }

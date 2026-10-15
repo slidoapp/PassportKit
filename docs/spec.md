@@ -489,7 +489,7 @@ public actor TokenManager {
     public init(client: OAuthClient, store: any CredentialStore, account: CredentialAccount,
                 acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
                 acceptancePolicyTimeLimit: Duration = .seconds(10),    // no answer in time = rejection
-                rejectedTokenCacheDuration: Duration = .seconds(30))   // .zero: ask the server every time
+                rejectedTokenCacheDuration: Duration = .seconds(5))    // .zero: ask the server every time; short, so a newly granted permission is not hidden
 
     public func load() async throws -> Credential?                 // restores from the store
     public func signIn(with response: TokenResponse, requestedScope: ScopeSet? = nil) async throws  // adopt a grant result; throws .tokenRejected if the policy rejects its access token (the session still exists)
