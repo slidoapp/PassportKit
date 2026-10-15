@@ -1,4 +1,7 @@
-# Security Model
+# Security model
+
+What must never leak, which threats the library covers and where its limits are. Report vulnerabilities as
+described in [SECURITY.md](../SECURITY.md).
 
 ## Secrets
 
@@ -98,8 +101,8 @@ follow the same rules as errors and events:
   replaces an existing item by deleting it and adding it again. If the add fails (device locked, denied prompt,
   entitlement problem) or the process dies in between, the stored credential is gone; with refresh token rotation the
   replaced token is already invalid, so the user must sign in again. Stores writing one item at once can fail the
-  same way, and the payload is archived with `try?`. See ADR 0009; the planned fix is an upstream
-  update-then-add change.
+  same way, and the payload is archived with `try?`. See ADR 0009; the fix is an upstream
+  update-then-add change (`docs/roadmap.md`).
 - **The macOS login keychain does not enforce accessibility or access groups.** On macOS `KeychainCredentialStore`
   uses the file-based login keychain, because SwiftKeychain cannot target the data protection keychain. There
   `Accessibility` and `accessGroup` are accepted but not enforced: an item is readable whenever the login keychain

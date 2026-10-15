@@ -1,16 +1,19 @@
 # PassportKit Specification
 
-This is the implementation contract. Public names below are binding unless
-an ADR changes them. Sketches show shape, not every initializer.
+This is the contract of PassportKit's public API and behaviour. Declarations
+are abbreviated: they show names, labels, defaults and the members that matter,
+not every conformance or initializer. Section numbers are cited from doc
+comments and scripts, so do not renumber them. Reasons and history live in the
+decision records (`docs/decisions/README.md`) and `CHANGELOG.md`.
 
 ## 1. Scope
 
-PassportKit is an OAuth 2.0 client library for native and server-side
-Swift. It is built for one model in particular: **one root grant (a
+PassportKit is an OAuth 2.0 client library for macOS and iOS apps written in
+Swift (ADR 0011). It is built for one model in particular: **one root grant (a
 refresh token) from which many audience- or resource-bound access tokens
 are derived** (RFC 8707, RFC 8693), with refresh-token rotation.
 
-In scope for 1.0:
+Implemented:
 
 | Area | Standard |
 |---|---|
@@ -24,15 +27,14 @@ In scope for 1.0:
 | Token revocation | RFC 7009 |
 | Bearer token usage and `WWW-Authenticate` challenges | RFC 6750, RFC 9110 §11.6 |
 
-Out of scope for 1.0: implicit and password grants, OAuth 1.0, embedded
+Not implemented: implicit and password grants, OAuth 1.0, embedded
 web views, dynamic client registration, OpenID Connect ID token
 validation, introspection, DPoP, PAR, mTLS. The design leaves room for
 DPoP and PAR (see §11).
 
 ## 2. Package
 
-- `swift-tools-version: 6.2`, Swift 6 language mode, warnings as errors
-  in CI.
+- `swift-tools-version: 6.2`, Swift 6 language mode, warnings are errors.
 - Platforms: macOS 14 and iOS 17 only (ADR 0011).
 - Dependencies are limited to well-maintained Apple and Swift project
   packages (ADR 0009): swift-http-types, swift-log (`Logging`) and
@@ -101,7 +103,7 @@ touch system time and randomness):
 public protocol WallClock: Sendable { func now() -> Date }
 public struct SystemWallClock: WallClock {}
 public protocol RandomSource: Sendable { func bytes(count: Int) -> [UInt8] }
-public struct SystemRandomSource: RandomSource {}   // SystemRandomNumberGenerator (CSPRNG on all platforms)
+public struct SystemRandomSource: RandomSource {}   // SystemRandomNumberGenerator (a CSPRNG)
 ```
 
 Rules:
@@ -187,7 +189,6 @@ public struct ClientAuthentication: Sendable, Hashable {            // open: fac
     public static func clientSecretBasic(clientID: String, secret: Secret) -> ClientAuthentication   // RFC 6749 §2.3.1: form-encode id and secret before base64
     public var clientID: String { get }
 }
-}
 
 public struct ClientConfiguration: Sendable {
     public var endpoints: Endpoints
@@ -210,7 +211,7 @@ it takes the endpoints and `issuer` from the metadata and sets
 then validates. Prefer it over assembling a configuration by hand so the
 mix-up defence follows what the server advertises.
 
-HTTP `http` endpoints are rejected unless the host is a loopback address
+An `http` endpoint is rejected unless the host is a loopback address
 (`localhost`, `127.0.0.1`, `::1`). RFC 6749 §3.1, §3.2, RFC 7009 §2.1 and
 RFC 8414 §3 require TLS for these endpoints, so loopback `http` is a
 documented deviation for development servers; it is not a recommendation.
@@ -321,7 +322,8 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
                 wallClock: any WallClock = SystemWallClock(),
                 clock: any Clock<Duration> = ContinuousClock(),
                 random: any RandomSource = SystemRandomSource(),
-                observer: (any PassportObserver)? = nil) throws
+                observer: (any PassportObserver)? = nil,
+                logger: Logger = Logger(label: "PassportKit")) throws
     public let configuration: ClientConfiguration
     public let wallClock: any WallClock
 
@@ -489,11 +491,12 @@ public actor TokenManager {
     public init(client: OAuthClient, store: any CredentialStore, account: CredentialAccount,
                 acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
                 acceptancePolicyTimeLimit: Duration = .seconds(10),    // no answer in time = rejection
-                rejectedTokenCacheDuration: Duration = .seconds(5))    // .zero: ask the server every time; short, so a newly granted permission is not hidden
+                rejectedTokenCacheDuration: Duration = .seconds(5),    // .zero: ask the server every time; short, so a newly granted permission is not hidden
+                logger: Logger? = nil)                                 // nil: the client's logger
 
     public func load() async throws -> Credential?                 // restores from the store
     public func signIn(with response: TokenResponse, requestedScope: ScopeSet? = nil) async throws  // adopt a grant result; throws .tokenRejected if the policy rejects its access token (the session still exists)
-    public func signIn(refreshToken: Secret, grantedScope: ScopeSet? = nil, idToken: Secret? = nil) async  // start a session from an existing refresh token; no access token is cached, the first accessToken(for:) refreshes
+    public func signIn(refreshToken: Secret, grantedScope: ScopeSet? = nil, idToken: Secret? = nil) async throws  // start a session from an existing refresh token; no access token is cached, the first accessToken(for:) refreshes; throws .invalidConfiguration for an empty token
     public var credential: Credential? { get }
 
     public func accessToken(for target: TokenTarget = .default) async throws -> AccessToken
@@ -549,8 +552,9 @@ has the semantics of `signIn(with:)` (replaces the session, emits `.signedIn`,
 saves the credential before returning, reports a store failure as
 `.storageFailed`) except that no access token exists yet and nothing is sent: the
 first refresh also records the grant's scope when `grantedScope` is nil
-(invariant 8). It does not throw, because nothing is validated until the first
-refresh; an invalid token surfaces then, as `invalid_grant` ends the session.
+(invariant 8). It throws `.invalidConfiguration` for an empty refresh token and
+leaves the current session untouched. Nothing else is validated until the first
+refresh: an invalid token surfaces then, and `invalid_grant` ends the session.
 
 Invariants (each has a conformance test):
 
@@ -829,7 +833,8 @@ public enum Discovery {
     public static func fetchMetadata(issuer: URL, style: Style = .oauth, validation: IssuerValidation = .strict,
                                      transport: any HTTPTransport = URLSessionTransport(),
                                      observer: (any PassportObserver)? = nil,
-                                     clock: any Clock<Duration> = ContinuousClock()) async throws -> AuthorizationServerMetadata
+                                     clock: any Clock<Duration> = ContinuousClock(),
+                                     logger: Logger = Logger(label: "PassportKit")) async throws -> AuthorizationServerMetadata
     public enum Style: Sendable { case oauth, openIDConnect }
 }
 ```
@@ -931,7 +936,7 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   with a continuation. The store reads and writes only its own format: an
   item it cannot decode is a `.storageFailure`, and there is no migration
   hook (apps move credentials from another library with
-  `TokenManager.signIn(refreshToken:)`). **Known issue (ADR 0009):** SwiftKeychain replaces an
+  `TokenManager.signIn(refreshToken:)`, see the "Migrating stored tokens" article). **Known issue (ADR 0009):** SwiftKeychain replaces an
   existing item by delete-then-add, so a failed second step loses the
   credential.
 - `WebAuthenticationSessionUserAgent` (`@MainActor`): wraps
@@ -939,7 +944,7 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   `prefersEphemeralWebBrowserSession`; private-use-scheme callbacks on all
   supported versions, HTTPS callbacks where available; maps
   `canceledLogin` to `.userCancelled`.
-- `LoopbackRedirectListener`: `static func start(path: String = "/callback", clock:)`
+- `LoopbackRedirectListener`: `static func start(path: String = "/callback", clock:, logger:)`
   binds an `NWListener` to `127.0.0.1` on an ephemeral port and returns
   once it is ready; `redirectURI` carries the real port (RFC 8252 §7.3).
   `waitForCallback(timeout:accept:)` claims the first `GET` for the path on
@@ -1014,4 +1019,7 @@ slow wake-up fails only the waiting test; `waitForSleeper(timeout:)` returns
   description, event, `String(describing:)`, `String(reflecting:)` or `dump`
   of public values.
 - DocC comments on every public symbol; the article samples are compiled in
-  `Tests/ConformanceTests/DocumentationSnippets.swift`.
+  `Tests/ConformanceTests/DocumentationSnippets.swift` and
+  `Tests/PassportKitTests/UserAgents/UserAgentDocumentationSnippets.swift`.
+
+`AGENTS.md` lists these gates as the definition of done.

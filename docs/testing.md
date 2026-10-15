@@ -1,13 +1,17 @@
 # Testing
 
+How PassportKit is tested, and how to add a test. Run `make check` for everything offline; the commands are in
+`AGENTS.md`. The fake authorization server is also a public product for app tests, see the "Testing" DocC article.
+
 ## Layers
 
 | Layer | Location | What it covers |
 |---|---|---|
 | Unit | `Tests/PassportKitTests` | Request building, response and error parsing, PKCE, form encoding, `WWW-Authenticate` parsing, metadata parsing |
+| Fake server | `Tests/PassportKitTestingTests` | `PassportKitTesting` itself: every endpoint and control of `FakeAuthorizationServer`, `ManualClock`, `RecordingTransport` |
 | Conformance | `Tests/ConformanceTests` | End-to-end flows against the fake authorization server: rotation, coalesced refresh, device polling, token exchange, resource indicators, error handling, and the redaction canary |
 | Integration | `Tests/IntegrationTests` | The real flows against a local `oidc-provider` server (`Tools/integration-server`): discovery, authorization code with PKCE and `iss`, device flow, refresh rotation and reuse rejection, token exchange, the underscoped-200 case, client credentials, revocation, Keychain; macOS |
-| Apple integrations | `Tests/PassportKitTests/Storage`, `Tests/PassportKitTests/UserAgents` | Keychain storage, redirect handling; part of the unit target |
+| Apple integrations | `Tests/PassportKitTests/Storage`, `Tests/PassportKitTests/UserAgents` | Keychain storage, the loopback listener, `ASWebAuthenticationSession` through a stub launcher; part of the unit target |
 
 ## iOS
 
@@ -61,17 +65,16 @@ secret and every token, code, verifier and device code that crosses the wire
 treated as a canary. Error paths make the server repeat the secrets it was
 sent in `error_description` and in `WWW-Authenticate`. The test then renders
 every public value and error (`String(describing:)`, `String(reflecting:)`,
-`dump`, `localizedDescription`) and every `PassportEvent` and `SessionEvent`,
-and fails if any canary appears. A new flow or public value that holds a
-secret is added to it. `Foundation`'s own `URLRequest` is excluded: it prints
-the headers it carries.
+`dump`, `localizedDescription`), every `PassportEvent` and `SessionEvent`, and every log line (`LogCapture`),
+and fails if any canary appears. A new flow, public value or log line that could carry a secret gets coverage here.
+`Foundation`'s own `URLRequest` is excluded: it prints the headers it carries.
 
 ## Documentation samples
 
 The code in the DocC articles is compiled in
 `Tests/ConformanceTests/DocumentationSnippets.swift` (and, for the user agents,
 `Tests/PassportKitTests/UserAgents/UserAgentDocumentationSnippets.swift`). They are never run; they keep the samples
-in step with the API. Change both together.
+in step with the API. When you change a sample in an article or in `README.md`, change it in the snippet file too.
 
 ## Rules
 
@@ -105,8 +108,9 @@ Two hooks control expiry and response timing without sleeping:
 
 ## Fixtures
 
-- Golden HTTP exchanges live under `Tests/Fixtures`.
-- Fixtures are sanitised: no real tokens, no real hostnames
-  (`as.example.com`, `api.example.com`).
-- Do not edit an existing fixture to make a test pass. Add a new fixture
-  and explain why in the commit body.
+Scenarios are scripted inline against the fake server, and shared values (such as the RFC 7636 Appendix B vectors)
+live in `Tests/PassportKitTestingTests/Fixture.swift`. A captured HTTP exchange that several tests reuse goes under
+`Tests/Fixtures/` (create it with the first one).
+
+- Fixtures are sanitised: no real tokens, no real hostnames (`as.example.com`, `api.example.com`), no vendor headers.
+- Do not edit an existing fixture to make a test pass. Add a new one and explain why in the commit body.
