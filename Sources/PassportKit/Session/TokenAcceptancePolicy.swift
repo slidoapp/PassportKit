@@ -70,7 +70,7 @@ public struct TargetSelector: Sendable {
 /// narrowed scope when the user cannot access the resource. A token whose granted scope is unknown is rejected.
 ///
 /// Scopes are compared as exact strings (RFC 6749 §3.3 defines them as opaque, case-sensitive). `*` is not a
-/// wildcard: `"api:event:*"` accepts only a scope that is literally named `api:event:*`. List every scope that
+/// wildcard: `"items.*"` accepts only a scope that is literally named `items.*`. List every scope that
 /// should be accepted, or use ``TokenAcceptancePolicy/custom(_:)`` for prefix rules or other cases.
 public struct RequireAnyScope: TokenAcceptancePolicy {
     private let scopes: ScopeSet

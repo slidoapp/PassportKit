@@ -156,8 +156,8 @@ enum DocumentationSnippets {
                 guard let granted = context.token.grantedScope else {
                     return .reject(reason: "The granted scope is unknown.")
                 }
-                return granted.scopes.contains { $0.hasPrefix("api:event:") }
-                    ? .accept : .reject(reason: "No event scope was granted.")
+                return granted.scopes.contains { $0.hasPrefix("items.") }
+                    ? .accept : .reject(reason: "No items scope was granted.")
             })
         _ = manager
     }

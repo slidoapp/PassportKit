@@ -32,8 +32,8 @@ let manager = TokenManager(
 ```
 
 Scopes are compared as exact strings. `*` is not a wildcard:
-`RequireAnyScope(["api:event:*"])` accepts only a token whose scope is
-literally named `api:event:*`, not `api:event:read`. List each scope you
+`RequireAnyScope(["items.*"])` accepts only a token whose scope is
+literally named `items.*`, not `items.read`. List each scope you
 accept, or write the rule yourself as shown below.
 
 By default the policy applies to targets that name resources, which is
@@ -60,7 +60,7 @@ let manager = TokenManager(
 
 A rule that exact strings cannot express, such as any scope with a given
 prefix, is a closure too. This one accepts a token that carries at least one
-scope starting with `api:event:`, and rejects one whose scope is unknown:
+scope starting with `items.`, and rejects one whose scope is unknown:
 
 ```swift
 let manager = TokenManager(
@@ -69,8 +69,8 @@ let manager = TokenManager(
         guard let granted = context.token.grantedScope else {
             return .reject(reason: "The granted scope is unknown.")
         }
-        return granted.scopes.contains { $0.hasPrefix("api:event:") }
-            ? .accept : .reject(reason: "No event scope was granted.")
+        return granted.scopes.contains { $0.hasPrefix("items.") }
+            ? .accept : .reject(reason: "No items scope was granted.")
     })
 ```
 
