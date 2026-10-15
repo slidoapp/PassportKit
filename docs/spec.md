@@ -920,17 +920,24 @@ and watchOS use the device flow.
   status number in the description, never item data);
   `errSecInteractionNotAllowed` (device locked) has recovery
   `.retryLater(after: nil)`. `delete` treats "not found" as success.
-  Items are never synchronizable (`kSecAttrSynchronizable` is not set, so
-  `false`, no option): a refresh token must not sync between devices.
-  `accessibility` is `kSecAttrAccessible`; the store uses the login
-  keychain on macOS (SwiftKeychain cannot target the data protection
-  keychain, so there is no `useDataProtectionKeychain` option). Calls
+  Items are never synchronizable (the item type sets
+  `kSecAttrSynchronizable: false` on add, fetch and delete; no option): a
+  refresh token must not sync between devices.
+  `accessibility` is `kSecAttrAccessible`; the store uses the file-based
+  login keychain on macOS (SwiftKeychain cannot target the data
+  protection keychain, so there is no `useDataProtectionKeychain`
+  option). That keychain enforces neither accessibility classes nor
+  access groups, so on macOS `accessibility` and `accessGroup` do not
+  restrict access; they are enforced on iOS. `delete` matches the item
+  by class, service, account and access group, not by accessibility.
+  Calls
   block, so each runs on a private serial `DispatchQueue` bridged with a
   continuation. `decodeLegacy` is the migration hook: it is called only
   when versioned decoding of the payload fails, and receives the payload
   bytes (the raw item data when the item is not a SwiftKeychain
   envelope); a credential it returns is written back in the current
-  format. An item holding the current JSON directly is read and wrapped
+  format; a failed write-back is ignored, and because SwiftKeychain
+  deletes before it adds, it can leave nothing stored. An item holding the current JSON directly is read and wrapped
   without the hook. **Known issue (ADR 0009):** SwiftKeychain replaces an
   existing item by delete-then-add, so a failed second step loses the
   credential.

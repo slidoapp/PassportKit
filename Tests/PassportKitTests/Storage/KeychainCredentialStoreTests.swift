@@ -90,6 +90,7 @@ struct KeychainCredentialStoreTests {
         let query = KeychainCredentialStore(accessGroup: "group", accessibility: .whenUnlocked)
             .deletionQuery(for: account)
         #expect(query[kSecAttrAccessible as String] == nil)
+        #expect(query[kSecAttrSynchronizable as String] as? Bool == false)
         #expect(query[kSecAttrService as String] as? String == account.service)
         #expect(query[kSecAttrAccount as String] as? String == account.account)
         #expect(query[kSecAttrAccessGroup as String] as? String == "group")
@@ -174,9 +175,9 @@ struct KeychainCredentialStoreTests {
         defer { cleanUp() }
         try await store.save(credential(), for: account)
         let attributes = try storedAttributes()
-        // The attribute reads back as false (0) or is absent; it is never true.
-        let synchronizable = attributes[kSecAttrSynchronizable as String] as? Bool
-        #expect(synchronizable != true)
+        // The store sets the attribute to false. The login keychain of macOS does not report it back, so it
+        // reads as false or absent; it is never true.
+        #expect(attributes[kSecAttrSynchronizable as String] as? Bool != true)
         #if !os(macOS)
             // The file-based keychain of macOS does not report accessibility classes.
             let accessible = attributes[kSecAttrAccessible as String] as? String

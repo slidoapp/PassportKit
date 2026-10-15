@@ -14,7 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   credential and emits `.signedIn` like `signIn(with:requestedScope:)`, but caches no access token: the first
   `accessToken(for:)` refreshes.
 
+### Changed
+
+- `KeychainCredentialStore` sets `kSecAttrSynchronizable` to `false` explicitly when it adds, fetches and deletes
+  an item, instead of relying on the default. Items written before are found as before.
+
 ### Fixed
+
+- The documentation of `KeychainCredentialStore`, `KeychainCredentialStore.Accessibility` and the security model
+  said accessibility classes and access groups protect the item. On macOS the store uses the file-based login
+  keychain, which enforces neither; they apply on iOS. The note that a failed legacy write-back is retried by the
+  next load is corrected: SwiftKeychain deletes before it adds, so a failed write-back can leave nothing stored.
 
 - `KeychainCredentialStore.delete` matches the item by service, account and access group only. It no longer
   carries the accessibility class, so an item stored with another class is removed on sign-out, and it no

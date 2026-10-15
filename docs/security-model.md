@@ -71,7 +71,7 @@ follow the same rules as errors and events:
 | Server text shown to a person | Error text is sanitized; a device `user_code` with control or invisible characters, or over 64 characters, is an invalid response; apps show it themselves (RFC 8628 §3.3), and the example executable prints server text through a sanitizer |
 | Token theft from logs | Redaction rules above, enforced by tests and by the redaction canary, which searches every error, event, log line and description of every flow for the secrets it used |
 | Token sent with the wrong scheme | Only `Bearer` tokens are sent by `RequestAuthorizer`; sender-constrained types fail before any request |
-| Token theft from storage | Platform secure storage (Keychain) with the strictest workable accessibility class |
+| Token theft from storage | Platform secure storage (Keychain) with the strictest workable accessibility class, enforced on iOS; the macOS login keychain does not enforce it (Known limits) |
 | Refresh token replay after rotation | Persist rotated refresh token before use; serialize refresh-token-consuming operations |
 | Token used for the wrong resource | Tokens bound to their resource indicator; never reused across resources |
 | Insufficient token treated as valid | Granted scope recorded; app-supplied acceptance hook runs before a token becomes current |
@@ -100,6 +100,15 @@ follow the same rules as errors and events:
   replaced token is already invalid, so the user must sign in again. Stores writing one item at once can fail the
   same way, and the payload is archived with `try?`. See ADR 0009; the planned fix is an upstream
   update-then-add change.
+- **The macOS login keychain does not enforce accessibility or access groups.** On macOS `KeychainCredentialStore`
+  uses the file-based login keychain, because SwiftKeychain cannot target the data protection keychain. There
+  `Accessibility` and `accessGroup` are accepted but not enforced: an item is readable whenever the login keychain
+  is unlocked, and the access group does not separate apps. What protects the item is the keychain's access control
+  for the app that created it. On iOS both are enforced. The store sets `kSecAttrSynchronizable` to `false` on every
+  operation, so a credential never reaches iCloud Keychain on either platform.
+- **A failed legacy write-back can lose the credential.** The `decodeLegacy` migration writes the converted
+  credential back with the same delete-then-add as any save. The credential is returned for that load, but if the
+  add fails after the delete nothing is stored (ADR 0009).
 - **ID tokens are stored, never validated.** PassportKit is an OAuth 2.0 client, not an OpenID Connect relying
   party: an `id_token` is kept in the credential without checking its signature, issuer, audience or nonce. Do not
   treat it as proof of identity.

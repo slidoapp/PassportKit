@@ -10,7 +10,17 @@ import SwiftKeychain
 /// no defaults for either. Items are written through SwiftKeychain: the payload is the versioned JSON of
 /// `CredentialCoding`, kept as one value inside SwiftKeychain's archived dictionary. Items are never
 /// synchronizable: a refresh token is a bearer secret for one device and must not travel through iCloud
-/// Keychain, so `kSecAttrSynchronizable` is always `false` and there is no option to change it.
+/// Keychain. The store sets `kSecAttrSynchronizable` to `false` when it adds, fetches and deletes an item,
+/// and there is no option to change it.
+///
+/// ## Platform differences
+///
+/// On iOS the items live in the data protection keychain, which enforces ``Accessibility`` and the access
+/// group. On macOS the store uses the file-based login keychain, because SwiftKeychain cannot target the
+/// data protection keychain, and there neither is enforced: an item is readable whenever the login keychain
+/// is unlocked, whatever its accessibility class, and the access group does not partition items. Access to
+/// an item is then decided by the keychain's own access control for the app that created it. Do not rely on
+/// ``Accessibility`` or `accessGroup` to protect or share a credential on macOS.
 ///
 /// Keychain calls block, so each runs on a private serial queue and the caller's executor is not held.
 /// The queue also serializes this store's own writes.
@@ -18,7 +28,11 @@ import SwiftKeychain
 /// Known issue: when an item already exists, SwiftKeychain replaces it by deleting it and adding it again
 /// instead of updating it. If the second step fails (device locked, denied prompt, entitlement problem) or
 /// the process dies in between, the stored credential is lost and the user has to sign in again; two
-/// stores writing the same item at once can fail the same way. See ADR 0009.
+/// stores writing the same item at once can fail the same way. See ADR 0009. The same applies to the
+/// write-back of a migrated credential: the legacy item is replaced by deleting and adding it, so when the
+/// add fails after the delete, the credential is returned by that ``load(_:)`` and is not stored anywhere.
+/// When the add fails before the delete (for example while the device is locked), the legacy item is intact
+/// and the next load migrates it again.
 ///
 /// Keychain access is a security boundary of the app, not of the library: an access group needs the
 /// matching entitlement, and without one the Keychain answers `errSecMissingEntitlement`, reported as
@@ -27,8 +41,8 @@ public final class KeychainCredentialStore: CredentialStore {
     /// When the Keychain releases an item to the app (`kSecAttrAccessible`).
     ///
     /// The `…ThisDeviceOnly` classes keep the item out of backups and device migration. Prefer them for
-    /// refresh tokens. The store uses the login keychain on macOS: SwiftKeychain cannot target the data
-    /// protection keychain.
+    /// refresh tokens. The class is enforced on iOS only: the login keychain that the store uses on macOS
+    /// does not enforce it, because SwiftKeychain cannot target the data protection keychain.
     public enum Accessibility: Sendable, Hashable {
         /// Readable while the device is unlocked.
         case whenUnlocked
@@ -65,13 +79,13 @@ public final class KeychainCredentialStore: CredentialStore {
     ///
     /// - Parameters:
     ///   - accessGroup: The Keychain access group, to share credentials between apps of one team. `nil`
-    ///     uses the app's default group.
+    ///     uses the app's default group. Enforced on iOS only; the login keychain on macOS ignores it.
     ///   - accessibility: When items become readable. Applied when an item is created, and part of the
     ///     item's identity: an item stored with another class is not found.
     ///   - decodeLegacy: The migration hook. When a stored payload is not a record `CredentialCoding`
     ///     reads, the hook gets the payload bytes (the raw item data, or the JSON inside SwiftKeychain's
     ///     envelope); a credential it returns is used and written back in the current format (a failed
-    ///     write-back is ignored and retried by the next ``load(_:)``). Return `nil` for data it does not
+    ///     write-back is ignored and the credential is still returned; see below). Return `nil` for data it does not
     ///     recognise, which then fails as a malformed record. The hook runs on the store's private queue
     ///     and must not block.
     ///   - logger: Receives storage failures and migrations, never credentials.
@@ -198,6 +212,7 @@ public final class KeychainCredentialStore: CredentialStore {
             String(kSecClass): String(kSecClassGenericPassword),
             String(kSecAttrService): account.service,
             String(kSecAttrAccount): account.account,
+            String(kSecAttrSynchronizable): false,
         ]
         if let accessGroup { query[String(kSecAttrAccessGroup)] = accessGroup }
         return query
@@ -253,4 +268,17 @@ private struct CredentialItem: KeychainGenericPasswordType {
     let storedClasses: [AnyClass]
     var data = KeychainData()
     var dataToStore: KeychainData { data }
+
+    /// SwiftKeychain's attributes plus `kSecAttrSynchronizable: false`, so adding, fetching and
+    /// deleting never involve an iCloud Keychain item. The rest repeats what its default
+    /// implementation builds, which a type cannot call once it supplies its own.
+    var attributes: KeychainAttributes {
+        [
+            String(kSecClass): String(kSecClassGenericPassword),
+            String(kSecAttrAccessible): accessMode,
+            String(kSecAttrService): serviceName,
+            String(kSecAttrAccount): accountName,
+            String(kSecAttrSynchronizable): false,
+        ]
+    }
 }
