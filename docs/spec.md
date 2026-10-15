@@ -1003,7 +1003,12 @@ endpoints well enough to run every flow, and is scriptable:
 - per-request hooks to override responses (status, body, headers, delay) and to
   delay the answer of a request the server has already handled (`responseDelay`);
 - token exchange with a refresh token subject spends and rotates it like a
-  refresh grant, and `requested_token_type` = refresh token issues a refresh token;
+  refresh grant, and `requested_token_type` = refresh token issues a refresh token. When `audience` names a
+  registered client, that token belongs to the audience client in a new grant (its own rotation chain, lifetimes and
+  rotation settings; same subject; scope narrowed by the scope policy), so only that client can redeem it
+  (RFC 6749 §6) and revoking either chain leaves the other intact. An audience that is not a registered client keeps
+  the token in the requester's grant; a registered audience client that may not use refresh tokens gets
+  `invalid_target`;
 - scope policy closure `(subject, requestedResources) -> ScopeSet` to
   simulate narrowed grants;
 - toggles for the two behaviours seen in the wild: refresh with

@@ -65,6 +65,10 @@ refresh token rotation, a reuse leeway and a lifetime for each token type.
 - Device authorizations can be approved or denied with `approve(userCode:)`
   and `deny(userCode:)`, and `requireSlowDown(times:)` answers `slow_down`.
 - `expire(token:)` makes one issued token expired.
+- A token exchange with a refresh token subject and `requested_token_type` refresh token issues the refresh token
+  for the registered client named by `audience`, in a new grant of its own: only that client can redeem it, and
+  revoking it or its subject does not affect the other (RFC 8693 §2.1, RFC 6749 §6). An audience that is not a
+  registered client keeps the issued token in the requester's grant.
 - `requests` lists what the server received, with decoded form parameters.
 
 ## Time without sleeping

@@ -57,8 +57,18 @@ extension FakeAuthorizationServer {
             kind == .refresh
             ? rotate(current, isReuse: isReuse, issuance: rootIssuance, scope: subject.scope, client: client) : nil
         if requestedType == .refreshToken {
-            // The issued token is itself a refresh token, carried in access_token (RFC 8693 §2.2.1).
-            let issued = mint(.refresh, issuance, scope: granted)
+            // The issued token is itself a refresh token, carried in access_token (RFC 8693 §2.2.1). One for a
+            // registered audience client belongs to that client and starts a grant of its own (RFC 6749 §6).
+            var issuedFor = issuance
+            if let audienceClient = audience.lazy.compactMap({ self.clients[$0] }).first {
+                guard audienceClient.allowedGrants.contains(.refreshToken) else {
+                    throw Failure.oauth("invalid_target", "The audience client may not use refresh tokens.")
+                }
+                issuedFor = Issuance(
+                    client: audienceClient, grantID: nextGrantID(), subject: subject.subject, resources: resources,
+                    audience: audience)
+            }
+            let issued = mint(.refresh, issuedFor, scope: granted)
             return tokenResponse(
                 accessToken: issued, scope: granted, client: client, refreshToken: rotated,
                 issuedTokenType: .refreshToken, tokenType: "N_A")

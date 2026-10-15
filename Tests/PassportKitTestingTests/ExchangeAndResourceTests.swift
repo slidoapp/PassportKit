@@ -192,3 +192,102 @@ struct ExchangeAndResourceTests {
         #expect(await fixture.server.revoked == [second.accessToken])
     }
 }
+
+@Suite("Fake server: refresh token exchange for an audience client")
+struct AudienceExchangeTests {
+    static let exchangeType = "urn:ietf:params:oauth:grant-type:token-exchange"
+    static let refreshType = "urn:ietf:params:oauth:token-type:refresh_token"
+
+    static func audienceClient(rotates: Bool = true) -> FakeAuthorizationServer.ClientRegistration {
+        .init(
+            id: "partner", allowedGrants: [.refreshToken], scope: ["read", "write", "admin"],
+            rotatesRefreshTokens: rotates, accessTokenLifetime: .seconds(60), refreshTokenLifetime: .seconds(7200))
+    }
+
+    static let bystander = FakeAuthorizationServer.ClientRegistration(id: "bystander", allowedGrants: [.refreshToken])
+
+    func exchangeForPartner(_ fixture: Fixture, subject: String, audience: String = "partner") async throws -> Reply {
+        try await fixture.token([
+            ("grant_type", Self.exchangeType), ("subject_token", subject), ("subject_token_type", Self.refreshType),
+            ("requested_token_type", Self.refreshType), ("audience", audience),
+        ])
+    }
+
+    func refresh(_ fixture: Fixture, _ token: String, as client: String = "partner") async throws -> Reply {
+        try await fixture.post(
+            Fixture.tokenURL, [("grant_type", "refresh_token"), ("refresh_token", token)], as: .publicClient(client))
+    }
+
+    @Test("the derived refresh token belongs to the audience client and its own settings")
+    func derivedTokenBelongsToAudience() async throws {
+        let fixture = Fixture([.app(rotates: true), Self.audienceClient()])
+        await fixture.server.configure { $0.scopePolicy = { _, _ in ["read"] } }
+        let root = try await fixture.signIn()
+        let derived = try await exchangeForPartner(fixture, subject: root.refreshToken)
+        #expect(derived.status == 200)
+        #expect(derived["issued_token_type"] == Self.refreshType)
+        let details = try #require(await fixture.server.details(of: derived.accessToken))
+        #expect(details.clientID == "partner")
+        #expect(details.audience == ["partner"])
+        #expect(details.scope == ["read"])
+        #expect(details.subject == (await fixture.server.details(of: root.refreshToken))?.subject)
+
+        let redeemed = try await refresh(fixture, derived.accessToken)
+        #expect(redeemed.status == 200)
+        #expect(redeemed.json["expires_in"] as? Int == 60)
+        #expect(redeemed.refreshToken != derived.accessToken)  // the audience client rotates
+        #expect(await fixture.server.details(of: redeemed.refreshToken)?.clientID == "partner")
+        fixture.wallClock.advance(by: .seconds(7200))
+        #expect(try await refresh(fixture, redeemed.refreshToken).error == "invalid_grant")
+    }
+
+    @Test("only the audience client can redeem the derived token")
+    func boundToAudienceClient() async throws {
+        let fixture = Fixture([.app(), Self.audienceClient(), Self.bystander])
+        let root = try await fixture.signIn()
+        let derived = try await exchangeForPartner(fixture, subject: root.refreshToken)
+        #expect(try await fixture.refresh(derived.accessToken).error == "invalid_grant")
+        #expect(try await refresh(fixture, derived.accessToken, as: "bystander").error == "invalid_grant")
+        #expect(try await refresh(fixture, derived.accessToken).status == 200)
+    }
+
+    @Test("revoking either chain leaves the other one working")
+    func chainsAreIndependent() async throws {
+        let fixture = Fixture([.app(rotates: true), Self.audienceClient()])
+        let root = try await fixture.signIn()
+        let derived = try await exchangeForPartner(fixture, subject: root.refreshToken)
+        let rotatedRoot = derived.refreshToken
+        #expect(!rotatedRoot.isEmpty)
+
+        // Rotating the subject chain does not touch the derived one; revoking the derived one spares the root.
+        #expect(try await fixture.refresh(rotatedRoot).status == 200)
+        await fixture.server.revoke(token: derived.accessToken)
+        #expect(try await refresh(fixture, derived.accessToken).error == "invalid_grant")
+        #expect(try await fixture.refresh(rotatedRoot).error == "invalid_grant")  // retired by the refresh above
+        let signedIn = try await fixture.signIn()
+        let second = try await exchangeForPartner(fixture, subject: signedIn.refreshToken)
+
+        // And the other way round.
+        await fixture.server.revoke(token: second.refreshToken)
+        #expect(try await fixture.refresh(second.refreshToken).error == "invalid_grant")
+        #expect(try await refresh(fixture, second.accessToken).status == 200)
+    }
+
+    @Test("an audience that is not a registered client keeps the requester's grant")
+    func unregisteredAudience() async throws {
+        let fixture = Fixture([.app(), Self.audienceClient()])
+        let root = try await fixture.signIn()
+        let derived = try await exchangeForPartner(fixture, subject: root.refreshToken, audience: "billing")
+        #expect(await fixture.server.details(of: derived.accessToken)?.clientID == "app")
+        await fixture.server.revoke(token: derived.accessToken)
+        #expect(try await fixture.refresh(root.refreshToken).error == "invalid_grant")
+    }
+
+    @Test("an audience client that may not refresh is invalid_target")
+    func audienceWithoutRefreshGrant() async throws {
+        let fixture = Fixture()
+        let root = try await fixture.signIn()
+        let reply = try await exchangeForPartner(fixture, subject: root.refreshToken, audience: "service")
+        #expect(reply.error == "invalid_target")
+    }
+}

@@ -13,6 +13,13 @@ import PassportKit
 ///
 /// Tokens are opaque and deterministic (`access-1`, `refresh-2`, ...). Expiry follows the injected
 /// `WallClock`; per-request delays follow the injected `Clock`.
+///
+/// A token exchange (RFC 8693) with a refresh token subject rotates the subject like a refresh grant. When it asks
+/// for a refresh token (`requested_token_type`) and `audience` names a registered client, the issued token belongs
+/// to that client in a new grant, with its own rotation chain, lifetimes and rotation settings, and the scope
+/// narrowed by ``Controls/scopePolicy``; only that client can redeem it (RFC 6749 §6) and revoking either chain
+/// leaves the other intact. An audience that is not a registered client keeps the issued token in the requester's
+/// grant, and a registered audience client without the refresh token grant is refused with `invalid_target`.
 public actor FakeAuthorizationServer: HTTPTransport {
     /// The issuer identifier, `https://as.example.com`.
     public static let issuer = URL(string: "https://as.example.com")!

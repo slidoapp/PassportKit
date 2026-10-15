@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `PassportKitTesting`: a token exchange with a refresh token subject, `requested_token_type` refresh token and an
+  `audience` that names a registered client issued the refresh token for the requesting client inside the requester's
+  own grant. It is now issued for the audience client in a new grant with its own rotation chain, lifetimes and
+  rotation settings, so that client can redeem it, other clients get `invalid_grant`, and revoking either chain does
+  not revoke the other. An audience that is not a registered client behaves as before, and a registered audience
+  client without the refresh token grant gets `invalid_target`.
+
 ## [0.3.0] - 2026-10-15
 
 ### Changed
