@@ -1,6 +1,8 @@
 # 0005. One lane for refresh-token operations
 
 - Status: accepted
+- Amended by [0007](0007-ordered-store-changes-and-session-lanes.md): the lane
+  is per session, and a revocation sends the newest token
 - Date: 2026-10-07
 
 ## Context

@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-10-12
+- Amended by [0011](0011-apple-platforms-only.md): the Linux notes and the
+  tvOS, watchOS and visionOS builds mentioned below no longer apply
 
 ## Context
 
