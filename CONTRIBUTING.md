@@ -94,6 +94,27 @@ Design background lives in [docs/](docs/): start with
 - Add a `CHANGELOG.md` entry under `Unreleased` for user-visible changes.
 - Pull requests need passing CI and a review from a code owner.
 
+### Releasing
+
+Maintainers release by pushing a tag; the release workflow does the rest.
+
+1. Update `CHANGELOG.md`: rename `Unreleased` to the new version with
+   its date (`## [1.2.3] - YYYY-MM-DD`), add a fresh empty `Unreleased`
+   section, and update the link references at the end of the file. The
+   text of the version's section becomes the release notes.
+2. Commit the change to `main` (through a pull request) and wait for CI
+   to pass.
+3. Create a signed tag named after the version, without a prefix, on
+   that commit: `git tag -s 1.2.3 -m 1.2.3`.
+4. Push the tag: `git push origin 1.2.3`.
+
+The tag triggers `.github/workflows/release.yml`. It runs every job of
+`ci.yml` again for the tag, and only if all of them pass it creates the
+GitHub release with the changelog section as notes. It fails without
+creating a release when the changelog has no section for the tag. A
+failed run is fixed by a new commit and a new tag; delete the old tag
+first if it never produced a release.
+
 ### AI coding agents
 
 Agent instructions live in [AGENTS.md](AGENTS.md). Contributions made
