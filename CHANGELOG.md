@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
 Upgrading from 0.1.0: macOS 14 and iOS 17 are the only supported platforms, `KeychainCredentialStore.init(decodeLegacy:)`
 is gone, and the `ManualClock` waits in `PassportKitTesting` throw. See the **Breaking** entries.
 
@@ -281,5 +283,6 @@ unchanged: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1.
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization request query as form data, so a `+` in
   `scope` is a space.
 
-[Unreleased]: https://github.com/slidoapp/PassportKit/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/slidoapp/PassportKit/compare/0.2.0...HEAD
+[0.2.0]: https://github.com/slidoapp/PassportKit/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/slidoapp/PassportKit/releases/tag/0.1.0
