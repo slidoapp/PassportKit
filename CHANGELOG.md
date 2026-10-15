@@ -7,60 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Upgrading from 0.1.0: macOS 14 and iOS 17 are the only supported platforms, `KeychainCredentialStore.init(decodeLegacy:)`
+is gone, and the `ManualClock` waits in `PassportKitTesting` throw. See the **Breaking** entries.
+
 ### Added
 
-- Documentation of exact scope matching in `RequireAnyScope` and the resource access article: scopes are compared as
-  exact strings and `*` is not a wildcard, with a compiled `.custom` policy that accepts a scope prefix.
-
-- A DocC article, "Migrating stored tokens", on moving users from another OAuth library without signing them out:
-  read the old refresh token, call `signIn(refreshToken:)` under a new account, delete the old item once a token
-  request succeeded.
-
-- A release workflow: pushing a version tag runs the CI workflow (now also callable with `workflow_call`) and,
-  only if every job passes, creates the GitHub release with the tag's changelog section as notes. The procedure is
-  in `CONTRIBUTING.md`.
-
-- `TokenManager.signIn(refreshToken:grantedScope:idToken:) async throws` starts a session from an existing refresh token, for
-  example the one `exchangeRefreshToken(audiences:)` issued for another client. It replaces the session, saves the
-  credential and emits `.signedIn` like `signIn(with:requestedScope:)`, but caches no access token: the first
-  `accessToken(for:)` refreshes.
+- `TokenManager.signIn(refreshToken:grantedScope:idToken:) async throws` starts a session from a refresh token the app
+  already holds, for example the one `exchangeRefreshToken(audiences:)` issued for another client, or one read from
+  the storage of a previous OAuth library. Like `signIn(with:requestedScope:)` it replaces the session, saves the
+  credential and emits `.signedIn`, but it caches no access token: the first `accessToken(for:)` refreshes. It throws
+  `invalidConfiguration` for an empty token and then leaves the current session untouched.
+- A DocC article, "Migrating stored tokens", on moving users from another OAuth library without signing them out: read
+  the old refresh token, call `signIn(refreshToken:)` under a new account, delete the old item once a token request
+  succeeded.
+- `ManualClock.WaitTimeout`, thrown by the waits of `ManualClock` (see Changed).
+- Documentation of exact scope matching: `RequireAnyScope` and the resource access article state that scopes are
+  compared as exact strings and `*` is not a wildcard, with a compiled `.custom` policy that accepts a scope prefix.
+- A release workflow: pushing a version tag runs the CI workflow (now also callable with `workflow_call`) and, only if
+  every job passes, creates the GitHub release with the tag's changelog section as notes. The procedure is in
+  `CONTRIBUTING.md`.
 
 ### Changed
 
+- **Breaking (`PassportKitTesting`):** `ManualClock.waitForSleeper()` and `ManualClock.advanceToNextSleeper()` are
+  `throws`; call them with `try await`. When no task sleeps within 60 seconds of real time (it was 10 seconds) they
+  throw `ManualClock.WaitTimeout` instead of stopping the whole test process, so a slow wake-up on a loaded machine
+  fails only the waiting test. The wait is resumed by the sleeper that arrives instead of polling.
+  `waitForSleeper(timeout:)` is unchanged.
 - `TokenManager.init`: the default of `rejectedTokenCacheDuration` is 5 seconds (it was 30). The window only has to
   absorb tight retry loops, which would otherwise rotate the refresh token on every attempt; a long one makes a
-  permission that was just granted look denied. Pass the old value to keep it.
-
-- **Breaking (`PassportKitTesting`):** `ManualClock.waitForSleeper()` and `ManualClock.advanceToNextSleeper()` are
-  now `throws`; call them with `try await`. When no task sleeps within 60 seconds of real time (it was 10 seconds)
-  they throw the new `ManualClock.WaitTimeout` instead of stopping the whole test process, so a slow wake-up on a
-  loaded machine fails only the waiting test. The wait is resumed by the sleeper that arrives instead of
-  polling. `waitForSleeper(timeout:)` is unchanged.
-
-- `KeychainCredentialStore` sets `kSecAttrSynchronizable` to `false` explicitly when it adds, fetches and deletes
-  an item, instead of relying on the default. Items written before are found as before.
+  permission that was just granted look denied. Pass `.seconds(30)` to keep the old behaviour.
+- The iOS test job boots the simulator first, prints the full test output and uploads the result bundle when it
+  fails.
 
 ### Removed
 
 - **Breaking:** `KeychainCredentialStore.init(decodeLegacy:)` and the migration code behind it. The store reads and
-  writes only its own format, and an item it cannot decode is a `.storageFailure`. An app migrates by reading its
-  old storage itself and calling `TokenManager.signIn(refreshToken:grantedScope:idToken:)`. This also removes the
-  write-back, which replaced the migrated item by deleting and adding it and could lose it. Items written directly
-  as the record JSON by builds before 0.1.0 are no longer read.
-
-- **Breaking:** tvOS, watchOS and visionOS are no longer supported. `Package.swift` declares macOS 14 and iOS 17
-  only, and the platform guards that existed for the other three are gone: `WebAuthenticationSessionUserAgent`,
+  writes only its own format, and an item it cannot decode is a `.storageFailure`. An app migrates by reading its old
+  storage itself and calling `TokenManager.signIn(refreshToken:grantedScope:idToken:)`. This also removes the
+  write-back, which replaced the migrated item by deleting and adding it and could lose it. Items written directly as
+  the record JSON by builds before 0.1.0 are no longer read.
+- **Breaking:** tvOS, watchOS and visionOS are no longer supported. `Package.swift` declares macOS 14 and iOS 17 only,
+  and the platform guards that existed for the other three are gone: `WebAuthenticationSessionUserAgent`,
   `LoopbackRedirectListener` and `LoopbackUserAgent` exist on both supported platforms (ADR 0011, Update).
 
 ### Fixed
 
-- The documentation of `KeychainCredentialStore`, `KeychainCredentialStore.Accessibility` and the security model
-  said accessibility classes and access groups protect the item. On macOS the store uses the file-based login
-  keychain, which enforces neither; they apply on iOS.
+- `KeychainCredentialStore.delete` matches the item by service, account and access group only. It no longer carries
+  the accessibility class, so an item stored with another class is removed on sign-out, and it no longer matches items
+  of other access groups.
+- The documentation of `KeychainCredentialStore`, `KeychainCredentialStore.Accessibility` and the security model said
+  accessibility classes and access groups protect the item. On macOS the store uses the file-based login keychain,
+  which enforces neither; they apply on iOS.
 
-- `KeychainCredentialStore.delete` matches the item by service, account and access group only. It no longer
-  carries the accessibility class, so an item stored with another class is removed on sign-out, and it no
-  longer matches items of other access groups.
+### Security
+
+- `KeychainCredentialStore` sets `kSecAttrSynchronizable` to `false` explicitly when it adds, fetches and deletes an
+  item, instead of relying on the default, so a credential never reaches iCloud Keychain. Items written before are
+  found as before.
 
 ## [0.1.0] - 2026-10-12
 
