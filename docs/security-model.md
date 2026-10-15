@@ -68,7 +68,7 @@ follow the same rules as errors and events:
 | Mix-up attacks | Validate `iss` in the authorization response when present (RFC 9207) |
 | Open redirect / redirect injection | Exact redirect URI matching; loopback listener binds to loopback interfaces only |
 | Web page races or floods the loopback listener | The listener claims only a `GET` for its path with the loopback `Host`, `state` and `code` or `error`, no background `Sec-Fetch-*` metadata and an `accept` match on `state`; at most 8 connections, closed after 5 s, on `cancel()` and on delivery; a released listener stops (RFC 8252 §8.3) |
-| Token sent to an attacker-chosen host | `RequestAuthorizer` sends only over `https` or to loopback; `allowedOrigins` limits the hosts, and must be set when request URLs come from untrusted data; redirects never leave HTTPS and drop credential headers across origins, also for `data(for:target:session:)` |
+| Token sent to an attacker-chosen host | `RequestAuthorizer` sends only over `https` (loopback `http` only with the opt-in `allowsInsecureLoopbackEndpoints`); `allowedOrigins` limits the hosts, and must be set when request URLs come from untrusted data; redirects never leave HTTPS and drop credential headers across origins, also for `data(for:target:session:)` |
 | Header injection through a token | A token that is not a `b64token` (RFC 6750 §2.1) is refused before it reaches a header |
 | Memory growth from many targets | The token cache and the remembered rejections are limited to 256 entries each |
 | Server text shown to a person | Error text is sanitized; a device `user_code` with control or invisible characters, or over 64 characters, is an invalid response; apps show it themselves (RFC 8628 §3.3), and the example executable prints server text through a sanitizer |
@@ -81,9 +81,13 @@ follow the same rules as errors and events:
 
 ## Transport
 
-- HTTPS for all endpoints and for tokens sent to resources. Two loopback exceptions: redirect URIs
-  (RFC 8252 §7.3) and, as a development deviation from RFC 6749 §3.1, §3.2, RFC 7009 §2.1 and RFC 8414 §3,
-  endpoints and resources on a loopback host (`localhost`, `127.0.0.1`, `::1`). The `localhost` name is also
+- HTTPS for every protocol endpoint (authorization, token, device authorization, revocation, discovery and the
+  endpoints in fetched metadata), the issuer and tokens sent to resources (RFC 6749 §3.1, §3.2, RFC 7009 §2.1,
+  RFC 8414 §3). Plain `http` is never implied by a host name: an app that talks to a local development server
+  sets `ClientConfiguration.allowsInsecureLoopbackEndpoints` (and passes it to `Discovery.fetchMetadata`), which
+  admits `http` on `localhost`, `127.0.0.1` and `::1` only; any other `http` URL is refused with or without it
+  (ADR 0012). Redirect URIs are not endpoints: the RFC 8252 §7.3 `http` loopback redirect URI needs no opt-in,
+  because no credential is sent to it. The `localhost` name is also
   accepted in a redirect URI although RFC 8252 §7.3 says NOT RECOMMENDED (RFC 8252 §8.3 prefers the IP literal);
   the library's own listener uses `127.0.0.1`.
 - Token requests do not follow redirects.
@@ -93,7 +97,7 @@ follow the same rules as errors and events:
 - Requests time out after 30 s of silence and 60 s in total (configurable).
 - Additional parameters can never carry `client_id` or `client_secret`
   (RFC 6749 §2.3: one authentication method per request).
-- A verification URI shown to a person must be `https` (or loopback `http`).
+- A verification URI shown to a person must be `https` (loopback `http` only with the opt-in).
 
 ## Known limits
 

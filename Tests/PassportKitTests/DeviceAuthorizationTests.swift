@@ -151,10 +151,18 @@ struct DeviceAuthorizationTests {
         #expect(error?.code == .invalidResponse)
     }
 
-    @Test func startAcceptsLoopbackHTTPAndDropsInsecureCompleteURI() async throws {
+    @Test func startRefusesLoopbackHTTPByDefault() async throws {
+        let body =
+            #"{"device_code":"d","user_code":"u","verification_uri":"http://localhost:8080/device","expires_in":60}"#
+        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
+        let error = await #expect(throws: PassportError.self) { try await client.beginDeviceAuthorization() }
+        #expect(error?.code == .invalidResponse)
+    }
+
+    @Test func startAcceptsLoopbackHTTPWithOptInAndDropsInsecureCompleteURI() async throws {
         let body =
             #"{"device_code":"d","user_code":"u","verification_uri":"http://localhost:8080/device","verification_uri_complete":"http://as.example.com/device?u=1","expires_in":60}"#
-        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
+        let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]), allowsInsecureLoopback: true)
         let authorization = try await client.beginDeviceAuthorization()
         #expect(authorization.verificationURI.absoluteString == "http://localhost:8080/device")
         #expect(authorization.verificationURIComplete == nil)

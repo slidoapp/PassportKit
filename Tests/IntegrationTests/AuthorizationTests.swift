@@ -10,12 +10,20 @@ import Testing
 struct AuthorizationTests {
     @Test func discoversMetadataAtTheRFC8414PathAndBuildsAConfiguration() async throws {
         let issuer = try IntegrationServer.requireIssuer()
-        let metadata = try await Discovery.fetchMetadata(issuer: issuer, style: .oauth, validation: .strict)
+        // The local server speaks http: without the opt-in, discovery refuses its issuer.
+        await #expect(throws: PassportError.self) { try await Discovery.fetchMetadata(issuer: issuer) }
+        let metadata = try await Discovery.fetchMetadata(
+            issuer: issuer, style: .oauth, validation: .strict, allowsInsecureLoopbackEndpoints: true)
         #expect(metadata.issuer == issuer)
         #expect(metadata.authorizationResponseIssParameterSupported == true)
 
         let configuration = try ClientConfiguration(
-            metadata: metadata, authentication: .publicClient(clientID: IntegrationServer.publicClientID))
+            metadata: metadata, authentication: .publicClient(clientID: IntegrationServer.publicClientID),
+            allowsInsecureLoopbackEndpoints: true)
+        #expect(throws: PassportError.self) {
+            try ClientConfiguration(
+                metadata: metadata, authentication: .publicClient(clientID: IntegrationServer.publicClientID))
+        }
         #expect(configuration.issuer == issuer)
         #expect(configuration.requiresIssuerInAuthorizationResponse)
         #expect(configuration.endpoints.deviceAuthorization != nil)

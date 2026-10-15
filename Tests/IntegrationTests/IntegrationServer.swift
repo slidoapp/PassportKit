@@ -29,7 +29,8 @@ enum IntegrationServer {
     }
 
     static func metadata() async throws -> AuthorizationServerMetadata {
-        try await Discovery.fetchMetadata(issuer: try requireIssuer(), validation: .strict)
+        try await Discovery.fetchMetadata(
+            issuer: try requireIssuer(), validation: .strict, allowsInsecureLoopbackEndpoints: true)
     }
 
     static func client(
@@ -39,7 +40,8 @@ enum IntegrationServer {
         let configuration = try ClientConfiguration(
             metadata: try await metadata(),
             authentication: authentication,
-            minimumTokenLifetime: minimumTokenLifetime
+            minimumTokenLifetime: minimumTokenLifetime,
+            allowsInsecureLoopbackEndpoints: true  // the local server speaks http
         )
         return try OAuthClient(configuration: configuration)
     }

@@ -4,21 +4,60 @@ import Testing
 @testable import PassportKit
 
 struct EndpointsTests {
-    private func validates(_ token: String, authorization: String? = nil) -> Bool {
+    private func validates(_ token: String, authorization: String? = nil, allowsInsecureLoopback: Bool = false) -> Bool
+    {
         let endpoints = Endpoints(authorization: authorization.flatMap(URL.init(string:)), token: URL(string: token)!)
-        return (try? endpoints.validate()) != nil
+        return (try? endpoints.validate(allowsInsecureLoopback: allowsInsecureLoopback)) != nil
     }
 
-    @Test(arguments: [
-        "https://as.example.com/token",
-        "HTTPS://as.example.com/token",
+    private static let loopbackEndpoints = [
         "http://localhost/token",
         "http://LOCALHOST:8080/token",
         "http://127.0.0.1:9000/token",
         "http://[::1]:9000/token",
-    ])
-    func acceptsHTTPSAndLoopbackHTTP(url: String) {
+    ]
+
+    @Test(arguments: ["https://as.example.com/token", "HTTPS://as.example.com/token"])
+    func acceptsHTTPS(url: String) {
         #expect(validates(url))
+        #expect(validates(url, allowsInsecureLoopback: true))
+    }
+
+    @Test("RFC 6749 §3.1, §3.2: loopback http endpoints are refused by default", arguments: loopbackEndpoints)
+    func refusesLoopbackHTTPByDefault(url: String) throws {
+        #expect(!validates(url))
+        let endpoints = Endpoints(token: try #require(URL(string: url)))
+        let error = try #require(throws: PassportError.self) { try endpoints.validate() }
+        #expect(error.code == .invalidConfiguration)
+        #expect(error.description.contains("Opt in"))
+    }
+
+    @Test("loopback http endpoints are accepted with the opt-in", arguments: loopbackEndpoints)
+    func acceptsLoopbackHTTPWithOptIn(url: String) {
+        #expect(validates(url, allowsInsecureLoopback: true))
+        #expect(validates("https://as.example.com/token", authorization: url, allowsInsecureLoopback: true))
+    }
+
+    @Test(
+        "a non-loopback http endpoint is refused even with the opt-in",
+        arguments: [
+            "http://as.example.com/token", "http://localhost.example.com/token", "http://127.0.0.2/token",
+        ])
+    func refusesRemoteHTTPWithOptIn(url: String) {
+        #expect(!validates(url, allowsInsecureLoopback: true))
+    }
+
+    @Test func configurationAppliesTheOptInToEndpointsAndIssuer() throws {
+        let local = Endpoints(token: try #require(URL(string: "http://localhost:8080/token")))
+        var configuration = ClientConfiguration(endpoints: local, authentication: .publicClient(clientID: "app"))
+        #expect(throws: PassportError.self) { try configuration.validate() }
+        configuration.allowsInsecureLoopbackEndpoints = true
+        try configuration.validate()
+        configuration.issuer = URL(string: "http://localhost:8080")
+        try configuration.validate()
+        configuration.allowsInsecureLoopbackEndpoints = false
+        configuration.endpoints = Endpoints(token: try #require(URL(string: "https://as.example.com/token")))
+        #expect(throws: PassportError.self) { try configuration.validate() }
     }
 
     @Test(arguments: [

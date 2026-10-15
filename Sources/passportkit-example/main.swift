@@ -5,7 +5,8 @@
 //       --flow device
 //
 // Options: --flow device|code (default device), --prompt <values> (space-delimited) for the code flow (some servers need
-// `consent` to issue a refresh token), --no-browser to print the authorization URL instead of opening it.
+// `consent` to issue a refresh token), --no-browser to print the authorization URL instead of opening it,
+// --allow-insecure-loopback to accept `http` endpoints on localhost (local development servers only).
 
 import Foundation
 import PassportKit
@@ -22,10 +23,11 @@ struct Arguments {
     var flow: Flow
     var prompt: [AuthorizationRequest.Prompt]
     var opensBrowser: Bool
+    var allowsInsecureLoopback: Bool
 
     static let usage = """
         usage: passportkit-example --issuer <url> --client-id <id> --scope "<scopes>" [--flow \(Flow.allCases.map(\.rawValue).joined(separator: "|"))]
-                                   [--prompt <value>] [--no-browser]
+                                   [--prompt <value>] [--no-browser] [--allow-insecure-loopback]
         """
 
     init(_ arguments: [String]) throws {
@@ -34,7 +36,7 @@ struct Arguments {
         var iterator = arguments.makeIterator()
         while let name = iterator.next() {
             switch name {
-            case "--no-browser": flags.insert(name)
+            case "--no-browser", "--allow-insecure-loopback": flags.insert(name)
             case "--issuer", "--client-id", "--scope", "--flow", "--prompt":
                 guard let value = iterator.next() else { throw ExampleError("Missing value for \(name).") }
                 values[name] = value
@@ -53,6 +55,7 @@ struct Arguments {
         self.flow = flow
         self.prompt = (values["--prompt"] ?? "").split(separator: " ").map { .init(rawValue: String($0)) }
         self.opensBrowser = !flags.contains("--no-browser")
+        self.allowsInsecureLoopback = flags.contains("--allow-insecure-loopback")
     }
 }
 
@@ -106,9 +109,11 @@ func run() async throws {
     let arguments = try Arguments(Array(CommandLine.arguments.dropFirst()))
 
     // RFC 8414 discovery; the configuration follows what the server advertises (endpoints, RFC 9207).
-    let metadata = try await Discovery.fetchMetadata(issuer: arguments.issuer)
+    let metadata = try await Discovery.fetchMetadata(
+        issuer: arguments.issuer, allowsInsecureLoopbackEndpoints: arguments.allowsInsecureLoopback)
     let configuration = try ClientConfiguration(
-        metadata: metadata, authentication: .publicClient(clientID: arguments.clientID))
+        metadata: metadata, authentication: .publicClient(clientID: arguments.clientID),
+        allowsInsecureLoopbackEndpoints: arguments.allowsInsecureLoopback)
     print("Discovered \(display(metadata.issuer.absoluteString))")
     let client = try OAuthClient(configuration: configuration)
 

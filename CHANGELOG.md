@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (security, #1):** endpoints are `https` only. Plain `http` on a loopback host (`localhost`, `127.0.0.1`,
+  `::1`) is no longer accepted for the authorization, token, device authorization and revocation endpoints, the issuer,
+  the discovery URL, the endpoints in fetched metadata, device verification URIs and the resource URLs of
+  `RequestAuthorizer`. Local development servers need the new opt-in
+  `ClientConfiguration.allowsInsecureLoopbackEndpoints`, which is also a parameter of
+  `Discovery.fetchMetadata(issuer:…)`, `Endpoints.init(metadata:)` and `ClientConfiguration.init(metadata:…)` (all
+  default `false`). A non-loopback `http` URL is refused even with it. Violations throw `invalidConfiguration` and the
+  message names the opt-in. `http` loopback redirect URIs (RFC 8252 §7.3) are unaffected. See ADR 0012.
+
 ## [0.2.0] - 2026-10-15
 
 Upgrading from 0.1.0: macOS 14 and iOS 17 are the only supported platforms, `KeychainCredentialStore.init(decodeLegacy:)`

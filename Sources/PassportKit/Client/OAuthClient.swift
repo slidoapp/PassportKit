@@ -24,7 +24,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     /// Creates a client.
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when the
-    /// configuration is invalid (an endpoint or the issuer is neither `https` nor loopback `http`), so a misconfigured client never exists.
+    /// configuration is invalid (an endpoint or the issuer is not `https`, or `http` on loopback without ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), so a misconfigured client never exists.
     ///
     /// `logger` receives the library's log lines (see <doc:GettingStarted>). The default is labelled `PassportKit`,
     /// so it uses the `LoggingSystem` the app bootstrapped. Logs never contain tokens, codes, verifiers, URLs or

@@ -180,7 +180,8 @@ public struct Endpoints: Sendable, Hashable {
     public var token: URL
     public var deviceAuthorization: URL?
     public var revocation: URL?
-    public init(metadata: AuthorizationServerMetadata) throws   // throws if the token endpoint is missing or an endpoint is not https
+    public init(metadata: AuthorizationServerMetadata,
+                allowsInsecureLoopbackEndpoints: Bool = false) throws   // throws if the token endpoint is missing or an endpoint is not https
 }
 
 public struct ClientAuthentication: Sendable, Hashable {            // open: factories, not cases
@@ -198,9 +199,10 @@ public struct ClientConfiguration: Sendable {
     public var minimumTokenLifetime: Duration = .seconds(60)   // refresh earlier than this before expiry
     public var defaultTokenLifetime: Duration? = nil           // used when `expires_in` is missing; nil = treat as expired
     public var requiresIssuerInAuthorizationResponse: Bool = false   // RFC 9207 §2.4: a missing `iss` fails; needs `issuer`
+    public var allowsInsecureLoopbackEndpoints: Bool = false         // `http` on a loopback host, local development only
     public init(metadata: AuthorizationServerMetadata, authentication: ClientAuthentication,
                 additionalHeaders: HTTPFields = [:], minimumTokenLifetime: Duration = .seconds(60),
-                defaultTokenLifetime: Duration? = nil) throws
+                defaultTokenLifetime: Duration? = nil, allowsInsecureLoopbackEndpoints: Bool = false) throws
 }
 ```
 
@@ -211,10 +213,19 @@ it takes the endpoints and `issuer` from the metadata and sets
 then validates. Prefer it over assembling a configuration by hand so the
 mix-up defence follows what the server advertises.
 
-An `http` endpoint is rejected unless the host is a loopback address
-(`localhost`, `127.0.0.1`, `::1`). RFC 6749 §3.1, §3.2, RFC 7009 §2.1 and
-RFC 8414 §3 require TLS for these endpoints, so loopback `http` is a
-documented deviation for development servers; it is not a recommendation.
+Every protocol endpoint (authorization, token, device authorization,
+revocation, the endpoints in fetched metadata), the `issuer` and the
+metadata URL must be `https`: RFC 6749 §3.1, §3.2, RFC 7009 §2.1 and
+RFC 8414 §3 require TLS. A deliberate opt-in,
+`allowsInsecureLoopbackEndpoints` (default `false`; `Discovery.fetchMetadata`
+and `ClientConfiguration.init(metadata:…)` take the same parameter), lets
+those URLs use `http` when the host is a loopback address (`localhost`,
+`127.0.0.1`, `::1`), for local development servers only. A non-loopback
+`http` URL is refused with or without the opt-in, always with
+`.invalidConfiguration` (ADR 0012). The opt-in also governs the verification
+URIs of the device flow (§10) and the resource URLs of `RequestAuthorizer`
+(§15). It does not concern redirect URIs: they are not endpoints, and the
+RFC 8252 §7.3 `http` loopback redirect URI works without it.
 `localhost` is also accepted in a redirect URI although RFC 8252 §7.3 says
 NOT RECOMMENDED (registered redirects exist); `LoopbackRedirectListener`
 always uses `127.0.0.1`.
@@ -316,7 +327,8 @@ not an error by itself.
 
 ```swift
 public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
-    /// Throws `.invalidConfiguration` when an endpoint or the issuer is not `https` (or loopback `http`).
+    /// Throws `.invalidConfiguration` when an endpoint or the issuer is not `https`
+    /// (or loopback `http` with `allowsInsecureLoopbackEndpoints`).
     public init(configuration: ClientConfiguration,
                 transport: any HTTPTransport = URLSessionTransport(),
                 wallClock: any WallClock = SystemWallClock(),
@@ -394,7 +406,8 @@ public struct DeviceAuthorization: Sendable {
 }
 ```
 
-The start response must have an `https` (or loopback `http`) verification URI,
+The start response must have an `https` verification URI (loopback `http` only
+with `allowsInsecureLoopbackEndpoints`),
 else `.invalidResponse`; an insecure `verification_uri_complete` is dropped.
 `verification_url` is accepted as an interoperability alias of
 `verification_uri` (some providers shipped it before RFC 8628 settled on
@@ -791,8 +804,9 @@ RFC 6750 §3.1 prescribes no retry; retrying once after `invalid_token`, or
 after a 401 without any challenge (treated like a bare Bearer challenge), is
 library policy.
 
-`sign` throws `.invalidConfiguration` for a URL that is neither `https`
-nor `http` on a loopback host, or whose origin is not in `allowedOrigins`
+`sign` throws `.invalidConfiguration` for a URL that is not `https` (`http`
+on a loopback host is accepted only when the client configuration of the
+manager sets `allowsInsecureLoopbackEndpoints`), or whose origin is not in `allowedOrigins`
 when that is set, before asking for a token. A token that is not a valid
 `b64token` (RFC 6750 §2.1) fails with `.invalidResponse` and is never put
 into a header. The token goes to whatever host the request names unless
@@ -846,8 +860,8 @@ are kept in `additionalFields` and re-encoded. `fetchMetadata` reports
 `Accept: application/json`; terminating slashes of the issuer path are removed
 before the well-known segment is added (`https://as.example.com/t/` gives
 `https://as.example.com/.well-known/oauth-authorization-server/t`). The issuer
-must be `https` (or loopback `http`) without query, fragment or userinfo
-(`.invalidConfiguration`). Non-2xx responses are classified as for any server
+must be `https` (or loopback `http` with `allowsInsecureLoopbackEndpoints`)
+without query, fragment or userinfo (`.invalidConfiguration`). Non-2xx responses are classified as for any server
 error; a body that is not a JSON object with an `issuer` and well-formed known
 members is `.invalidResponse`. `.strict` requires the metadata `issuer` to be
 identical to the requested issuer (RFC 8414 §3.3): a string comparison, so a

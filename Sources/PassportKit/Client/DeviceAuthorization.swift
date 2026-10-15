@@ -91,9 +91,11 @@ extension DeviceAuthorization {
     /// `device_code`, `user_code` (at most 64 characters, without control, line-separator or invisible format
     /// characters), a verification URI and `expires_in` are required. A missing, non-positive
     /// or unparsable `interval` means 5 seconds, an `interval` above one hour is rejected; a `verification_uri_complete` that is unparsable or not `https` is dropped. A verification URI must be `https`
-    /// (or `http` on a loopback host), else the response is invalid.
+    /// (or `http` on a loopback host when `allowsInsecureLoopback` is set), else the response is invalid.
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidResponse``.
-    init(parsing data: Data, wallClock: any WallClock, clock: any Clock<Duration>) throws {
+    init(
+        parsing data: Data, allowsInsecureLoopback: Bool, wallClock: any WallClock, clock: any Clock<Duration>
+    ) throws {
         guard case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: data) else {
             throw PassportError(.invalidResponse, detail: "The device authorization response is not JSON.")
         }
@@ -110,10 +112,11 @@ extension DeviceAuthorization {
             default: nil
             }
         }
-        // The URIs are shown to a person, who is told to type a code there: only https (or http on loopback).
+        // The URIs are shown to a person, who is told to type a code there: only https (or http on loopback with the opt-in).
         func url(_ value: String?) -> URL? {
             guard let value, let url = URL(string: value),
-                (try? Endpoints.validateSecureTransport(of: url, name: "")) != nil
+                (try? Endpoints.validateSecureTransport(
+                    of: url, name: "", allowsInsecureLoopback: allowsInsecureLoopback)) != nil
             else { return nil }
             return url
         }

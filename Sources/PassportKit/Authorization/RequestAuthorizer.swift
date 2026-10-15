@@ -51,8 +51,9 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     /// Throws what ``TokenManager/accessToken(for:)`` throws when no token can be obtained,
     /// ``PassportError/Code-swift.struct/invalidResponse`` when the token is not a valid `b64token`
     /// (RFC 6750 §2.1), and ``PassportError/Code-swift.struct/invalidConfiguration`` when the URL is neither
-    /// `https` nor `http` on a loopback host, so a token never travels in clear text, when its origin is not in
-    /// `allowedOrigins`, or when the token's
+    /// `https` (nor `http` on a loopback host, only when the manager's client sets
+    /// ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), so a token never travels in clear text, when its
+    /// origin is not in `allowedOrigins`, or when the token's
     /// ``AccessToken/tokenType`` is not `Bearer` (compared case-insensitively): other types, such as
     /// sender-constrained `DPoP` tokens, need proof this authorizer cannot produce. Never returns an
     /// unsigned request.
@@ -222,9 +223,14 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
 
     private func requireDestination(_ url: URL?) throws {
         let scheme = url?.scheme?.lowercased()
-        guard scheme == "https" || (scheme == "http" && LoopbackHost.isLoopback(url?.host)) else {
+        let allowsLoopback = manager.client.configuration.allowsInsecureLoopbackEndpoints
+        guard scheme == "https" || (scheme == "http" && allowsLoopback && LoopbackHost.isLoopback(url?.host)) else {
             throw PassportError(
-                .invalidConfiguration, detail: "Bearer tokens are only sent over https or to loopback.")
+                .invalidConfiguration,
+                detail: allowsLoopback
+                    ? "Bearer tokens are only sent over https or to loopback."
+                    : "Bearer tokens are only sent over https. \(Endpoints.optInHint)"
+            )
         }
         if let allowedOrigins, let url, !allowedOrigins.contains(OriginKey(url)) {
             throw PassportError(.invalidConfiguration, detail: "The request URL is not an allowed origin.")

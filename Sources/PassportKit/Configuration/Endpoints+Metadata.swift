@@ -2,8 +2,9 @@ extension Endpoints {
     /// Takes the endpoints from discovered metadata (RFC 8414 §2).
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when the
-    /// metadata has no `token_endpoint`, or an endpoint is not `https`.
-    public init(metadata: AuthorizationServerMetadata) throws {
+    /// metadata has no `token_endpoint`, or an endpoint is not `https`. With `allowsInsecureLoopbackEndpoints`
+    /// an endpoint on a loopback host may also use `http`, for local development only.
+    public init(metadata: AuthorizationServerMetadata, allowsInsecureLoopbackEndpoints: Bool = false) throws {
         guard let token = metadata.tokenEndpoint else {
             throw PassportError(.invalidConfiguration, detail: "The metadata has no token endpoint.")
         }
@@ -13,6 +14,6 @@ extension Endpoints {
             deviceAuthorization: metadata.deviceAuthorizationEndpoint,
             revocation: metadata.revocationEndpoint
         )
-        try validate()
+        try validate(allowsInsecureLoopback: allowsInsecureLoopbackEndpoints)
     }
 }

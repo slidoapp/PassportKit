@@ -28,7 +28,9 @@ extension OAuthClient {
         guard (200..<300).contains(response.status.code) else {
             throw failure(response, body: body, to: request, context: .other)
         }
-        return try DeviceAuthorization(parsing: body, wallClock: wallClock, clock: clock)
+        return try DeviceAuthorization(
+            parsing: body, allowsInsecureLoopback: configuration.allowsInsecureLoopbackEndpoints,
+            wallClock: wallClock, clock: clock)
     }
 
     /// Polls the token endpoint until the user approves, declines or the authorization expires (RFC 8628 §3.4, §3.5).

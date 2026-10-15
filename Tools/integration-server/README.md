@@ -18,6 +18,9 @@ Environment: `PORT`, `ISSUER`, `ACCESS_TOKEN_TTL` (600 s), `REFRESH_TOKEN_TTL` (
 `AUTHORIZATION_CODE_TTL` (60), `DEVICE_CODE_TTL` (600).
 One log line per request (`METHOD path status`), never queries, bodies or tokens.
 
+The server speaks plain `http`, so a client of it sets `allowsInsecureLoopbackEndpoints` (ADR 0012); the
+integration tests do.
+
 ## Endpoints
 
 | Purpose | URL |

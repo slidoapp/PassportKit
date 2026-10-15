@@ -57,7 +57,9 @@ struct DiscoveryTests {
             ),
         ])
     func wellKnownURLConstruction(issuer: String, style: Discovery.Style, expected: String) throws {
-        #expect(try Discovery.metadataURL(for: URL(string: issuer)!, style: style).absoluteString == expected)
+        let url = try Discovery.metadataURL(
+            for: URL(string: issuer)!, style: style, allowsInsecureLoopbackEndpoints: true)
+        #expect(url.absoluteString == expected)
     }
 
     @Test(arguments: [
@@ -71,6 +73,27 @@ struct DiscoveryTests {
         }
         #expect(error.code == .invalidConfiguration)
         #expect(await transport.requests.isEmpty)
+    }
+
+    @Test("RFC 8414 §3: a loopback http issuer needs the opt-in, a remote one is refused regardless")
+    func insecureIssuerNeedsOptIn() async throws {
+        let local = try #require(URL(string: "http://localhost:8080"))
+        let transport = RecordingTransport([.json(200, Self.metadataJSON(issuer: "http://localhost:8080"))])
+        let refused = try await #require(throws: PassportError.self) {
+            try await Discovery.fetchMetadata(issuer: local, transport: transport)
+        }
+        #expect(refused.code == .invalidConfiguration)
+        #expect(await transport.requests.isEmpty)
+        let metadata = try await Discovery.fetchMetadata(
+            issuer: local, allowsInsecureLoopbackEndpoints: true, transport: transport)
+        #expect(metadata.issuer == local)
+        let remote = try await #require(throws: PassportError.self) {
+            try await Discovery.fetchMetadata(
+                issuer: URL(string: "http://as.example.com")!, allowsInsecureLoopbackEndpoints: true,
+                transport: transport)
+        }
+        #expect(remote.code == .invalidConfiguration)
+        #expect(await transport.requests.count == 1)
     }
 
     @Test func fetchesWithGetAndParsesEveryKnownMember() async throws {
@@ -243,5 +266,25 @@ struct DiscoveryTests {
         let insecure = AuthorizationServerMetadata(
             issuer: issuer, tokenEndpoint: URL(string: "http://as.example.com/t")!)
         #expect(throws: PassportError.self) { try Endpoints(metadata: insecure) }
+    }
+
+    @Test("endpoints inside fetched metadata follow the same opt-in")
+    func metadataEndpointsFollowTheOptIn() throws {
+        let local = try #require(URL(string: "http://localhost:8080"))
+        let metadata = AuthorizationServerMetadata(
+            issuer: local, tokenEndpoint: URL(string: "http://localhost:8080/token")!)
+        #expect(throws: PassportError.self) { try Endpoints(metadata: metadata) }
+        #expect(throws: PassportError.self) {
+            try ClientConfiguration(metadata: metadata, authentication: .publicClient(clientID: "app"))
+        }
+        let configuration = try ClientConfiguration(
+            metadata: metadata, authentication: .publicClient(clientID: "app"), allowsInsecureLoopbackEndpoints: true)
+        #expect(configuration.allowsInsecureLoopbackEndpoints)
+        let remote = AuthorizationServerMetadata(
+            issuer: local, tokenEndpoint: URL(string: "http://as.example.com/token")!)
+        #expect(throws: PassportError.self) {
+            try ClientConfiguration(
+                metadata: remote, authentication: .publicClient(clientID: "app"), allowsInsecureLoopbackEndpoints: true)
+        }
     }
 }

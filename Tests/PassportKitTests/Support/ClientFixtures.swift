@@ -27,7 +27,8 @@ enum ClientFixtures {
         revocation: Bool = true,
         authorization: URL? = authorizationURL,
         issuer: URL? = nil,
-        requiresIssuer: Bool = false
+        requiresIssuer: Bool = false,
+        allowsInsecureLoopback: Bool = false
     ) -> ClientConfiguration {
         ClientConfiguration(
             endpoints: Endpoints(
@@ -39,7 +40,8 @@ enum ClientFixtures {
             authentication: authentication,
             issuer: issuer,
             additionalHeaders: additionalHeaders,
-            requiresIssuerInAuthorizationResponse: requiresIssuer
+            requiresIssuerInAuthorizationResponse: requiresIssuer,
+            allowsInsecureLoopbackEndpoints: allowsInsecureLoopback
         )
     }
 
@@ -51,6 +53,7 @@ enum ClientFixtures {
         authorization: URL? = authorizationURL,
         issuer: URL? = nil,
         requiresIssuer: Bool = false,
+        allowsInsecureLoopback: Bool = false,
         clock: any Clock<Duration> = ContinuousClock(),
         random: any RandomSource = SystemRandomSource(),
         observer: (any PassportObserver)? = nil
@@ -62,7 +65,8 @@ enum ClientFixtures {
                 revocation: revocation,
                 authorization: authorization,
                 issuer: issuer,
-                requiresIssuer: requiresIssuer
+                requiresIssuer: requiresIssuer,
+                allowsInsecureLoopback: allowsInsecureLoopback
             ),
             transport: transport,
             clock: clock,

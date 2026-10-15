@@ -32,7 +32,10 @@ public enum Discovery {
     /// `error` or ``PassportError/Code-swift.struct/invalidResponse``). A body that is not a JSON object with
     /// an `issuer` and well-formed members is ``PassportError/Code-swift.struct/invalidResponse``; an issuer
     /// that fails `validation` is ``PassportError/Code-swift.struct/issuerMismatch``. The issuer must be an
-    /// `https` URL (or `http` on loopback) without query or fragment, else `invalidConfiguration`.
+    /// `https` URL without query or fragment, else `invalidConfiguration`; with `allowsInsecureLoopbackEndpoints`
+    /// it may be an `http` URL on a loopback host, for local development only (RFC 8414 §3 requires TLS).
+    /// The endpoints inside the returned metadata are checked when a ``ClientConfiguration`` or ``Endpoints``
+    /// is created from it, with the same opt-in.
     ///
     /// With an `observer`, the request is reported as ``PassportEvent`` values with
     /// ``EndpointKind/metadata``; durations are measured on `clock`. `Retry-After` dates are not interpreted
@@ -42,6 +45,7 @@ public enum Discovery {
         issuer: URL,
         style: Style = .oauth,
         validation: IssuerValidation = .strict,
+        allowsInsecureLoopbackEndpoints: Bool = false,
         transport: any HTTPTransport = URLSessionTransport(),
         observer: (any PassportObserver)? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
@@ -49,7 +53,8 @@ public enum Discovery {
     ) async throws -> AuthorizationServerMetadata {
         let request = HTTPRequest(
             method: .get,
-            url: try metadataURL(for: issuer, style: style),
+            url: try metadataURL(
+                for: issuer, style: style, allowsInsecureLoopbackEndpoints: allowsInsecureLoopbackEndpoints),
             headerFields: [.accept: MediaType.json]
         )
         let response: HTTPResponse
@@ -113,8 +118,11 @@ public enum Discovery {
     /// Terminating slashes of the issuer path are removed first. For `https://as.example.com/tenant/a`
     /// the `oauth` style gives `https://as.example.com/.well-known/oauth-authorization-server/tenant/a` and the
     /// `openIDConnect` style `https://as.example.com/tenant/a/.well-known/openid-configuration`.
-    static func metadataURL(for issuer: URL, style: Style) throws -> URL {
-        try Endpoints.validateSecureTransport(of: issuer, name: "issuer")
+    static func metadataURL(
+        for issuer: URL, style: Style, allowsInsecureLoopbackEndpoints: Bool = false
+    ) throws -> URL {
+        try Endpoints.validateSecureTransport(
+            of: issuer, name: "issuer", allowsInsecureLoopback: allowsInsecureLoopbackEndpoints)
         guard var components = URLComponents(url: issuer, resolvingAgainstBaseURL: false),
             components.query == nil, components.fragment == nil, components.user == nil, components.password == nil
         else {

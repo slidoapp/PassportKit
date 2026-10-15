@@ -34,6 +34,16 @@ enum DocumentationSnippets {
         _ = (data, response)
     }
 
+    // GettingStarted.md, local development servers
+    static func localDevelopment() async throws -> ClientConfiguration {
+        let issuer = URL(string: "http://localhost:8080")!
+        let metadata = try await Discovery.fetchMetadata(issuer: issuer, allowsInsecureLoopbackEndpoints: true)
+        let configuration = try ClientConfiguration(
+            metadata: metadata, authentication: .publicClient(clientID: "my-app"),
+            allowsInsecureLoopbackEndpoints: true)
+        return configuration
+    }
+
     // README.md, quick start
     static func readmeQuickStart() async throws {
         let issuer = URL(string: "https://as.example.com")!

@@ -7,9 +7,11 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct RequestAuthorizerTests {
-    private func authorizer() throws -> RequestAuthorizer {
+    private func authorizer(allowsInsecureLoopback: Bool = false) throws -> RequestAuthorizer {
         let manager = TokenManager(
-            client: try ClientFixtures.client(RecordingTransport()), store: InMemoryCredentialStore(),
+            client: try ClientFixtures.client(
+                RecordingTransport(), allowsInsecureLoopback: allowsInsecureLoopback),
+            store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "unit", account: "user"))
         return RequestAuthorizer(manager: manager)
     }
@@ -80,15 +82,17 @@ struct RequestAuthorizerTests {
     }
 
     @Test(
-        "RFC 6750 §5.3: tokens are sent over https or to loopback only",
+        "RFC 6750 §5.3: tokens are sent over https; http only to loopback with the opt-in",
         arguments: [
-            ("https://api.example.com/x", true), ("HTTPS://api.example.com/x", true),
-            ("http://localhost:8080/x", true), ("http://127.0.0.1/x", true), ("http://[::1]:9/x", true),
-            ("http://api.example.com/x", false), ("http://localhost.example.com/x", false),
-            ("ftp://localhost/x", false), ("file:///tmp/x", false),
+            ("https://api.example.com/x", true, false), ("HTTPS://api.example.com/x", true, false),
+            ("http://localhost:8080/x", false, false), ("http://127.0.0.1/x", false, false),
+            ("http://localhost:8080/x", true, true), ("http://127.0.0.1/x", true, true),
+            ("http://[::1]:9/x", true, true),
+            ("http://api.example.com/x", false, true), ("http://localhost.example.com/x", false, true),
+            ("ftp://localhost/x", false, true), ("file:///tmp/x", false, true),
         ])
-    func schemeRule(_ text: String, _ allowed: Bool) async throws {
-        let authorizer = try authorizer()
+    func schemeRule(_ text: String, _ allowed: Bool, _ optIn: Bool) async throws {
+        let authorizer = try authorizer(allowsInsecureLoopback: optIn)
         let url = try #require(URL(string: text))
         // Signed out: an allowed URL gets as far as the missing token, a rejected one never does.
         let expected: PassportError.Code = allowed ? .notAuthenticated : .invalidConfiguration
@@ -98,10 +102,13 @@ struct RequestAuthorizerTests {
     }
 
     private func signedIn(
-        token: String = "opaque", tokenType: String = "Bearer", allowedOrigins: Set<URL>? = nil
+        token: String = "opaque", tokenType: String = "Bearer", allowedOrigins: Set<URL>? = nil,
+        allowsInsecureLoopback: Bool = false
     ) async throws -> RequestAuthorizer {
         let manager = TokenManager(
-            client: try ClientFixtures.client(RecordingTransport()), store: InMemoryCredentialStore(),
+            client: try ClientFixtures.client(
+                RecordingTransport(), allowsInsecureLoopback: allowsInsecureLoopback),
+            store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "unit", account: "user"))
         try await manager.signIn(
             with: TokenResponse(accessToken: Secret(token), tokenType: tokenType, expiresIn: .seconds(3600)))
@@ -118,7 +125,7 @@ struct RequestAuthorizerTests {
         ])
     func allowedOrigins(_ text: String, _ allowed: Bool) async throws {
         let origins = ["https://api.example.com/ignored/path", "http://localhost:8080"].compactMap { URL(string: $0) }
-        let authorizer = try await signedIn(allowedOrigins: Set(origins))
+        let authorizer = try await signedIn(allowedOrigins: Set(origins), allowsInsecureLoopback: true)
         let url = try #require(URL(string: text))
         let result = await thrownCode { _ = try await authorizer.sign(HTTPRequest(method: .get, url: url)) }
         #expect(result == (allowed ? nil : .invalidConfiguration))

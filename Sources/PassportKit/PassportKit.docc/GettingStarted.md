@@ -27,7 +27,26 @@ discovery, build an ``Endpoints`` value by hand.
 ``OAuthClient/init(configuration:transport:wallClock:clock:random:observer:logger:)``
 throws ``PassportError`` with the code
 ``PassportError/Code-swift.struct/invalidConfiguration`` when an endpoint is
-not `https` (or loopback `http`), so a misconfigured client never exists.
+not `https`, so a misconfigured client never exists.
+
+## Local development servers
+
+Every endpoint, the issuer and the discovery URL must be `https`; a host name such as `localhost` does not make `http`
+acceptable. A server on your own machine that speaks plain `http` needs an explicit opt-in, passed to discovery and
+stored in the configuration:
+
+```swift
+let issuer = URL(string: "http://localhost:8080")!
+let metadata = try await Discovery.fetchMetadata(issuer: issuer, allowsInsecureLoopbackEndpoints: true)
+let configuration = try ClientConfiguration(
+    metadata: metadata, authentication: .publicClient(clientID: "my-app"),
+    allowsInsecureLoopbackEndpoints: true)
+```
+
+The opt-in admits `http` on `localhost`, `127.0.0.1` and `[::1]` only; any other `http` URL is still refused. It also
+applies to the verification URIs of the device flow and to the URLs a ``RequestAuthorizer`` signs. Keep it out of
+release builds. It has nothing to do with redirect URIs: the `http` loopback redirect URI of a native app
+(<doc:NativeAppRedirects>) works without it.
 
 ## Sign in with the device flow
 
@@ -120,7 +139,7 @@ let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
 let (data, response) = try await authorizer.data(for: request, session: session)
 ```
 
-Tokens are only sent over `https` or to a loopback host, to the origins you
+Tokens are only sent over `https` (an `http` loopback URL needs ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), to the origins you
 list in `allowedOrigins`, and only when the token type is `Bearer`. A 403 is delivered to you unchanged: a new token
 would not carry more scope. Read <doc:ResourceAccessAndScopes> before you
 rely on a token for a particular resource.

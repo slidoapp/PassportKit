@@ -20,3 +20,4 @@ public API, adds a dependency or changes a module boundary.
 | [0009](0009-external-dependencies.md) | Which external dependencies are allowed and how they are chosen | accepted; amended by 0011 |
 | [0010](0010-http-types.md) | swift-http-types is the HTTP currency type | accepted; amended by 0011 |
 | [0011](0011-apple-platforms-only.md) | Apple platforms only: one module, CryptoKit, macOS 14 and iOS 17 | accepted |
+| [0012](0012-strict-https-for-endpoints.md) | Endpoints must be `https`; loopback `http` needs the explicit `allowsInsecureLoopbackEndpoints` opt-in | accepted |

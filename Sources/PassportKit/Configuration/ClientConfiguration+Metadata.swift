@@ -10,21 +10,26 @@ extension ClientConfiguration {
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when the
     /// endpoints or the issuer fail validation (not `https`) or the metadata has no `token_endpoint`.
+    /// `allowsInsecureLoopbackEndpoints` is stored in the configuration; see
+    /// ``allowsInsecureLoopbackEndpoints``.
     public init(
         metadata: AuthorizationServerMetadata,
         authentication: ClientAuthentication,
         additionalHeaders: HTTPFields = [:],
         minimumTokenLifetime: Duration = .seconds(60),
-        defaultTokenLifetime: Duration? = nil
+        defaultTokenLifetime: Duration? = nil,
+        allowsInsecureLoopbackEndpoints: Bool = false
     ) throws {
         self.init(
-            endpoints: try Endpoints(metadata: metadata),
+            endpoints: try Endpoints(
+                metadata: metadata, allowsInsecureLoopbackEndpoints: allowsInsecureLoopbackEndpoints),
             authentication: authentication,
             issuer: metadata.issuer,
             additionalHeaders: additionalHeaders,
             minimumTokenLifetime: minimumTokenLifetime,
             defaultTokenLifetime: defaultTokenLifetime,
-            requiresIssuerInAuthorizationResponse: metadata.authorizationResponseIssParameterSupported == true
+            requiresIssuerInAuthorizationResponse: metadata.authorizationResponseIssParameterSupported == true,
+            allowsInsecureLoopbackEndpoints: allowsInsecureLoopbackEndpoints
         )
         try validate()
     }
