@@ -74,6 +74,28 @@ struct KeychainCredentialStoreTests {
         #expect(itemCount() == 0)
     }
 
+    /// The login keychain of macOS does not enforce accessibility classes, so this passes there with or
+    /// without the fix; ``deletionQueryIdentifiesTheItemWithoutItsAccessibility`` pins the query itself.
+    /// Access groups cannot be tested end to end for the same reason: the login keychain ignores them.
+    @Test func deleteRemovesAnItemStoredWithAnotherAccessibility() async throws {
+        defer { cleanUp() }
+        try await KeychainCredentialStore(accessibility: .whenUnlocked).save(credential(), for: account)
+        let store = KeychainCredentialStore(accessibility: .afterFirstUnlockThisDeviceOnly)
+        try await store.delete(account)
+        #expect(itemCount() == 0)
+        #expect(try await store.load(account) == nil)
+    }
+
+    @Test func deletionQueryIdentifiesTheItemWithoutItsAccessibility() {
+        let query = KeychainCredentialStore(accessGroup: "group", accessibility: .whenUnlocked)
+            .deletionQuery(for: account)
+        #expect(query[kSecAttrAccessible as String] == nil)
+        #expect(query[kSecAttrService as String] as? String == account.service)
+        #expect(query[kSecAttrAccount as String] as? String == account.account)
+        #expect(query[kSecAttrAccessGroup as String] as? String == "group")
+        #expect(KeychainCredentialStore().deletionQuery(for: account)[kSecAttrAccessGroup as String] == nil)
+    }
+
     @Test func corruptPayloadIsAStorageFailureWithoutLeakingIt() async throws {
         defer { cleanUp() }
         rawWrite(Data("secret-looking-garbage".utf8))

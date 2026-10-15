@@ -99,7 +99,7 @@ public final class KeychainCredentialStore: CredentialStore {
     public func delete(_ account: CredentialAccount) async throws {
         try await perform {
             do {
-                try self.item(for: account).removeFromKeychain()
+                try Keychain().removeItemWithAttributes(self.deletionQuery(for: account))
             } catch  where Self.isNotFound(error) {
                 return
             } catch {
@@ -188,6 +188,19 @@ public final class KeychainCredentialStore: CredentialStore {
         } catch {
             throw failure(error, operation: "save")
         }
+    }
+
+    /// Matches the item by identity only. SwiftKeychain's own delete query carries `kSecAttrAccessible`, so
+    /// an item stored with another class would survive a sign-out, and omits `kSecAttrAccessGroup`, so it
+    /// would match items of every group.
+    func deletionQuery(for account: CredentialAccount) -> KeychainAttributes {
+        var query: KeychainAttributes = [
+            String(kSecClass): String(kSecClassGenericPassword),
+            String(kSecAttrService): account.service,
+            String(kSecAttrAccount): account.account,
+        ]
+        if let accessGroup { query[String(kSecAttrAccessGroup)] = accessGroup }
+        return query
     }
 
     private func item(for account: CredentialAccount) -> CredentialItem {

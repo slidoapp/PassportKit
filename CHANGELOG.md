@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `KeychainCredentialStore.delete` matches the item by service, account and access group only. It no longer
+  carries the accessibility class, so an item stored with another class is removed on sign-out, and it no
+  longer matches items of other access groups.
+
 ## [0.1.0] - 2026-10-12
 
 First release.
