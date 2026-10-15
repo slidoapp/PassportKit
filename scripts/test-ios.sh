@@ -14,12 +14,21 @@ for runtime in reversed(runtimes):
 sys.exit("No available iPhone simulator.")
 ')
 
-# Boot first, so the tests do not compete with a cold simulator start.
-xcrun simctl bootstatus "$device" -b >/dev/null
+# Boot while building: building needs no booted simulator, and a cold boot takes minutes on CI. The tests
+# start only once the boot finished, so they do not compete with it.
+xcrun simctl bootstatus "$device" -b >/dev/null &
+boot=$!
+
+xcodebuild build-for-testing \
+    -scheme PassportKit-Package \
+    -destination "id=$device" \
+    -derivedDataPath .build/ios
+
+wait "$boot"
 
 results=.build/ios/TestResults.xcresult
 rm -rf "$results"
-xcodebuild test \
+xcodebuild test-without-building \
     -scheme PassportKit-Package \
     -destination "id=$device" \
     -derivedDataPath .build/ios \
