@@ -4,6 +4,8 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
+@testable import PassportKitTesting
+
 @Suite("Testing module: clocks, seams, recording and override hooks")
 struct SeamsAndHooksTests {
     @Test("ManualClock wakes sleepers in deadline order and never sleeps for real")
@@ -14,14 +16,14 @@ struct SeamsAndHooksTests {
             try await clock.sleep(for: .seconds(30))
             await order.append("long")
         }
-        await clock.waitForSleeper()
+        try await clock.waitForSleeper()
         let short = Task {
             try await clock.sleep(for: .seconds(10))
             await order.append("short")
         }
         while clock.sleeperCount < 2 { await Task.yield() }
 
-        #expect(await clock.advanceToNextSleeper() == .seconds(10))
+        #expect(try await clock.advanceToNextSleeper() == .seconds(10))
         try await short.value
         #expect(await order.values == ["short"])
         clock.advance(by: .seconds(20))
@@ -34,7 +36,7 @@ struct SeamsAndHooksTests {
     func manualClockCancellation() async throws {
         let clock = ManualClock()
         let sleeper = Task { try await clock.sleep(for: .seconds(5)) }
-        await clock.waitForSleeper()
+        try await clock.waitForSleeper()
         clock.advance(by: .seconds(-10))
         #expect(clock.now.offset == .zero)
         sleeper.cancel()
@@ -55,8 +57,31 @@ struct SeamsAndHooksTests {
         #expect(await clock.waitForSleeper(timeout: .milliseconds(20)) == false)
         let sleeper = Task { try await clock.sleep(for: .seconds(1)) }
         #expect(await clock.waitForSleeper(timeout: .seconds(10)))
-        await clock.advanceToNextSleeper()
+        try await clock.advanceToNextSleeper()
         try await sleeper.value
+    }
+
+    @Test("a wait that finds no sleeper throws WaitTimeout, which fails only the waiting test")
+    func waitForSleeperThrowsOnTimeout() async throws {
+        let clock = ManualClock()
+        let error = try await #require(throws: ManualClock.WaitTimeout.self) {
+            try await clock.requireSleeper(within: .milliseconds(20))
+        }
+        #expect(error.description.contains("no task slept"))
+    }
+
+    @Test("a waiting caller is resumed by the sleeper that arrives, and by its own cancellation")
+    func waiterIsResumedWithoutPolling() async throws {
+        let clock = ManualClock()
+        let waiter = Task { await clock.waitForSleeper(timeout: .seconds(30)) }
+        let sleeper = Task { try await clock.sleep(for: .seconds(1)) }
+        #expect(await waiter.value)
+        clock.advance(by: .seconds(1))
+        try await sleeper.value
+
+        let cancelled = Task { await clock.waitForSleeper(timeout: .seconds(30)) }
+        cancelled.cancel()
+        #expect(await cancelled.value == false)
     }
 
     @Test("makeClient and userAgent run a whole sign-in, and the token helpers take Secrets")
@@ -135,7 +160,7 @@ struct SeamsAndHooksTests {
             }
         }
         let pending = Task { try await server.exchange(request, body: requestBody) }
-        await clock.advanceToNextSleeper()
+        try await clock.advanceToNextSleeper()
         let response = try await pending.value
         #expect(response.statusCode == 503)
         #expect(response.headerFields[.retryAfter] == "7")
@@ -177,7 +202,7 @@ struct ResponseDelayTests {
             ("grant_type", "refresh_token"), ("refresh_token", "nope"), ("client_id", "app"),
         ])
         let pending = Task { try await server.exchange(request, body: requestBody) }
-        await clock.waitForSleeper()
+        try await clock.waitForSleeper()
         #expect(await server.requests.count == 1)
         clock.advance(by: .seconds(5))
         #expect(try await pending.value.statusCode == 400)

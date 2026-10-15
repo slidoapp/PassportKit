@@ -22,11 +22,11 @@ struct StoreOrderingTests {
             case .exchange: _ = try await manager.exchangeRefreshToken(audiences: ["billing"])
             }
         }
-        await harness.clock.waitForSleeper()
+        try await harness.clock.waitForSleeper()
         let signOut = Task { await manager.signOut() }
         #expect(await waitUntil { await manager.credential == nil })
         // The request sent before sign-out finishes; the revocation request is not delayed.
-        await harness.deliverResponses(1)
+        try await harness.deliverResponses(1)
         let result = await signOut.value
         _ = await thrownError { try await inFlight.value }
 

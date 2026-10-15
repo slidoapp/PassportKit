@@ -54,7 +54,7 @@ struct SeededSessionTests {
             }
         }
         let stale = Task { try await manager.accessToken() }
-        await harness.clock.waitForSleeper()
+        try await harness.clock.waitForSleeper()
 
         let seeded = try #require(try await harness.grant().refreshToken)
         await manager.signIn(refreshToken: seeded, grantedScope: ["read", "write"])

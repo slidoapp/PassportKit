@@ -43,7 +43,7 @@ struct SessionReplacementTests {
             }
         }
         let stale = Task { try await manager.accessToken() }
-        await harness.clock.waitForSleeper()
+        try await harness.clock.waitForSleeper()
         // A revocation queues behind the hung request on the old session's lane.
         let signOut = ending == .signOutThenSignIn ? Task { await manager.signOut(revoke: true) } : nil
         if signOut != nil { #expect(await waitUntil { await manager.credential == nil }) }
@@ -73,7 +73,7 @@ struct SessionReplacementTests {
             }
         }
         let waiter = Task { try await harness.manager.accessToken() }
-        await harness.clock.waitForSleeper()
+        try await harness.clock.waitForSleeper()
         let fresh = try await harness.signInAgain()
         harness.clock.advance(by: .seconds(10))
 

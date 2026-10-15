@@ -5,7 +5,9 @@ import os
 ///
 /// Drive it with ``advance(by:)`` or, to avoid racing the code under test, with
 /// ``advanceToNextSleeper()`` which first waits until a task is sleeping. Sleeping honours task
-/// cancellation (it throws `CancellationError`) and sleepers wake in deadline order.
+/// cancellation (it throws `CancellationError`) and sleepers wake in deadline order. Waiting for a sleeper
+/// is bounded by real time and ends in ``WaitTimeout`` when none arrives, so a test that never reaches
+/// `sleep` fails on its own instead of stopping the test process.
 public final class ManualClock: Clock, Sendable {
     /// A point on the manual timeline, measured from the clock's creation.
     public struct Instant: InstantProtocol, Sendable {
@@ -20,6 +22,26 @@ public final class ManualClock: Clock, Sendable {
         public static func < (lhs: Instant, rhs: Instant) -> Bool { lhs.offset < rhs.offset }
     }
 
+    /// Thrown by ``waitForSleeper()`` and ``advanceToNextSleeper()`` when no task slept within the real-time
+    /// bound: the code under test never reached `sleep`, or the machine was too slow to get there.
+    public struct WaitTimeout: Error, Sendable, CustomStringConvertible {
+        /// The real time that was waited.
+        public let timeout: Duration
+
+        public var description: String {
+            "ManualClock: no task slept within \(timeout) of real time."
+        }
+    }
+
+    /// The real-time bound of ``waitForSleeper()`` and ``advanceToNextSleeper()``. Generous on purpose: a
+    /// loaded CI machine can delay a wake-up by seconds, and a timeout is only a failure, never a hang.
+    static let defaultWaitTimeout = Duration.seconds(60)
+
+    private struct Waiter {
+        let id: Int
+        let continuation: CheckedContinuation<Void, Never>
+    }
+
     private struct Sleeper {
         let id: Int
         let deadline: Instant
@@ -30,6 +52,8 @@ public final class ManualClock: Clock, Sendable {
         var current = Instant(offset: .zero)
         var sleepers: [Sleeper] = []
         var cancelled: Set<Int> = []
+        var waiters: [Waiter] = []
+        var cancelledWaiters: Set<Int> = []
         var nextID = 0
     }
 
@@ -52,13 +76,15 @@ public final class ManualClock: Clock, Sendable {
         }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                let outcome = state.withLock { state -> Result<Void, CancellationError>? in
-                    if state.cancelled.remove(id) != nil { return .failure(CancellationError()) }
-                    if deadline <= state.current { return .success(()) }
+                let (outcome, waiters) = state.withLock { state -> (Result<Void, CancellationError>?, [Waiter]) in
+                    if state.cancelled.remove(id) != nil { return (.failure(CancellationError()), []) }
+                    if deadline <= state.current { return (.success(()), []) }
                     state.sleepers.append(Sleeper(id: id, deadline: deadline, continuation: continuation))
-                    return nil
+                    defer { state.waiters.removeAll() }
+                    return (nil, state.waiters)
                 }
                 if let outcome { continuation.resume(with: outcome.mapError { $0 as any Error }) }
+                for waiter in waiters { waiter.continuation.resume() }
             }
         } onCancel: {
             let sleeper = state.withLock { state -> Sleeper? in
@@ -88,42 +114,72 @@ public final class ManualClock: Clock, Sendable {
 
     /// Waits until at least one task is sleeping, the calling task is cancelled, or `timeout` of real time passes.
     ///
-    /// Returns whether a task is sleeping. The wait yields without sleeping for a while, then polls every
-    /// millisecond, so a code path that never reaches `sleep` ends the wait instead of hanging.
+    /// Returns whether a task is sleeping. The wait is resumed by the sleeper itself, not polled, so it costs
+    /// nothing while the code under test is working; a code path that never reaches `sleep` ends the wait after
+    /// `timeout` instead of hanging.
     public func waitForSleeper(timeout: Duration) async -> Bool {
-        let deadline = ContinuousClock.now.advanced(by: timeout)
-        var spins = 0
-        while sleeperCount == 0 {
-            if Task.isCancelled || ContinuousClock.now >= deadline { return sleeperCount > 0 }
-            if spins < 1_000 {
-                spins += 1
-                await Task.yield()
-            } else {
-                try? await Task.sleep(for: .milliseconds(1))
-            }
+        if sleeperCount > 0 { return true }
+        return await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.untilSleeperRegisters() }
+            group.addTask { try? await ContinuousClock().sleep(for: timeout) }
+            // Whichever ends first (a sleeper, the timeout, or cancellation of the caller) ends the other.
+            await group.next()
+            group.cancelAll()
+            return sleeperCount > 0
         }
-        return true
     }
 
     /// Suspends until at least one task is sleeping or the calling task is cancelled.
     ///
-    /// Stops the process with a clear message when no task slept within 10 seconds of real time: the code under
-    /// test never reached `sleep`, and waiting longer would only hang the test run. Use
-    /// ``waitForSleeper(timeout:)`` to handle that case yourself.
-    public func waitForSleeper() async {
-        let slept = await waitForSleeper(timeout: .seconds(10))
-        precondition(slept || Task.isCancelled, "ManualClock: no task slept within 10 seconds of real time.")
+    /// Throws ``WaitTimeout`` when no task slept within 60 seconds of real time: the code under test never
+    /// reached `sleep`, and waiting longer would only hang the test. The error fails the calling test and
+    /// nothing else. Use ``waitForSleeper(timeout:)`` to choose the bound or to handle that case yourself.
+    public func waitForSleeper() async throws {
+        try await requireSleeper(within: Self.defaultWaitTimeout)
+    }
+
+    func requireSleeper(within timeout: Duration) async throws {
+        guard await waitForSleeper(timeout: timeout) || Task.isCancelled else { throw WaitTimeout(timeout: timeout) }
     }
 
     /// Waits for a sleeper, then advances exactly to the earliest deadline. Returns how long that was.
+    ///
+    /// Throws ``WaitTimeout`` like ``waitForSleeper()``.
     @discardableResult
-    public func advanceToNextSleeper() async -> Duration {
-        await waitForSleeper()
+    public func advanceToNextSleeper() async throws -> Duration {
+        try await waitForSleeper()
         let step = state.withLock { state -> Duration in
             guard let earliest = state.sleepers.map(\.deadline).min() else { return .zero }
             return max(.zero, state.current.duration(to: earliest))
         }
         advance(by: step)
         return step
+    }
+
+    /// Returns once a task is sleeping, or when the calling task is cancelled.
+    private func untilSleeperRegisters() async {
+        let id = state.withLock { state -> Int in
+            state.nextID += 1
+            return state.nextID
+        }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let isReady = state.withLock { state -> Bool in
+                    if !state.sleepers.isEmpty || state.cancelledWaiters.remove(id) != nil { return true }
+                    state.waiters.append(Waiter(id: id, continuation: continuation))
+                    return false
+                }
+                if isReady { continuation.resume() }
+            }
+        } onCancel: {
+            let waiter = state.withLock { state -> Waiter? in
+                guard let index = state.waiters.firstIndex(where: { $0.id == id }) else {
+                    state.cancelledWaiters.insert(id)
+                    return nil
+                }
+                return state.waiters.remove(at: index)
+            }
+            waiter?.continuation.resume()
+        }
     }
 }

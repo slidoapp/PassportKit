@@ -996,9 +996,12 @@ endpoints well enough to run every flow, and is scriptable:
   `details(of:)` take a `Secret` (a `String` overload serves raw response bodies).
 
 `ManualClock` implements `Clock<Duration>`; `sleep` suspends until the
-test advances time. `waitForSleeper()` and `advanceToNextSleeper()` wait for a
-sleeper in real time and stop the process with a clear message after 10 s
-instead of hanging; `waitForSleeper(timeout:)` returns `false` instead. `ManualWallClock` returns a settable `Date` and moves only when told to.
+test advances time. `waitForSleeper()` and `advanceToNextSleeper()` are `throws`:
+they wait for a sleeper in real time (resumed by the sleeper itself, not
+polled) and throw `ManualClock.WaitTimeout` after 60 s instead of hanging, so a
+slow wake-up fails only the waiting test; `waitForSleeper(timeout:)` returns
+`false` instead. Cancelling the waiting task ends the wait without an error.
+`ManualWallClock` returns a settable `Date` and moves only when told to.
 
 ## 15. Quality gates
 

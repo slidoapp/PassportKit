@@ -36,7 +36,7 @@ struct LifecycleTests {
             }
         }
         let stale = Task { try await harness.manager.accessToken() }
-        await harness.clock.waitForSleeper()
+        try await harness.clock.waitForSleeper()
         let fresh = try await harness.signInAgain()
         harness.clock.advance(by: .seconds(10))
 
@@ -58,7 +58,7 @@ struct LifecycleTests {
         harness.expireAccessTokens()
         await harness.delayTokenResponses()
         let inFlight = Task { try await harness.manager.accessToken() }
-        await harness.clock.waitForSleeper()
+        try await harness.clock.waitForSleeper()
 
         let result = await harness.manager.signOut(revoke: false)
         #expect(result == SignOutResult(isStoredCredentialDeleted: true, revocation: .skipped))
@@ -77,14 +77,14 @@ struct LifecycleTests {
         harness.expireAccessTokens()
         await harness.delayTokenResponses()
         let waiter = Task { try await harness.manager.accessToken() }
-        await harness.clock.waitForSleeper()
+        try await harness.clock.waitForSleeper()
         waiter.cancel()
         await #expect(throws: CancellationError.self) { try await waiter.value }
         harness.clock.advance(by: .seconds(10))
 
         // Another target queues behind the finished request, so it must see the rotated token.
         let next = Task { try await harness.manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiA])) }
-        await harness.clock.waitForSleeper()
+        try await harness.clock.waitForSleeper()
         harness.clock.advance(by: .seconds(10))
         _ = try await next.value
 

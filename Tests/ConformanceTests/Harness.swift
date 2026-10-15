@@ -161,8 +161,8 @@ struct Harness {
     }
 
     /// Advances the manual clock to each of the next `count` sleepers, one request answer at a time.
-    func deliverResponses(_ count: Int) async {
-        for _ in 0..<count { await clock.advanceToNextSleeper() }
+    func deliverResponses(_ count: Int) async throws {
+        for _ in 0..<count { try await clock.advanceToNextSleeper() }
     }
 
     /// The next `count` events.

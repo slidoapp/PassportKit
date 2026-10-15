@@ -13,7 +13,7 @@ struct ObserverTests {
         let transport = SlowTransport(clock: clock, delay: .seconds(2), response: .tokens())
         let client = try ClientFixtures.client(transport, clock: clock, observer: observer)
         async let result = client.clientCredentials()
-        await clock.advanceToNextSleeper()
+        try await clock.advanceToNextSleeper()
         _ = try await result
         #expect(
             observer.events == [
@@ -66,7 +66,7 @@ struct ObserverTests {
         let transport = SlowTransport(clock: clock, delay: .seconds(3), response: .fail(URLError(.timedOut)))
         let client = try ClientFixtures.client(transport, clock: clock, observer: observer)
         async let result: TokenResponse = client.clientCredentials()
-        await clock.advanceToNextSleeper()
+        try await clock.advanceToNextSleeper()
         do {
             _ = try await result
             Issue.record("expected a failure")

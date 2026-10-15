@@ -52,7 +52,7 @@ struct TimeLimitTests {
             defer { isDone.raise() }
             return try await withTimeLimit(.seconds(5), clock: clock) { await stubborn.run() }
         }
-        await clock.advanceToNextSleeper()
+        try await clock.advanceToNextSleeper()
         let deadline = ContinuousClock.now.advanced(by: .seconds(2))
         while !isDone.isRaised, ContinuousClock.now < deadline { await Task.yield() }
         #expect(isDone.isRaised, "the limit waited for an operation that ignores cancellation")
@@ -75,7 +75,7 @@ struct TimeLimitTests {
         let clock = ManualClock()
         let stubborn = Stubborn()
         let limited = Task { try await withTimeLimit(.seconds(5), clock: clock) { await stubborn.run() } }
-        await clock.waitForSleeper()
+        try await clock.waitForSleeper()
         limited.cancel()
         await #expect(throws: CancellationError.self) { try await limited.value }
         stubborn.release()

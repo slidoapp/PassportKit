@@ -129,7 +129,7 @@ struct RedactionCanaryTests {
             await rig.renderings.observe { try await client.beginDeviceAuthorization(scope: ["read"]) })
         try await rig.server.approve(userCode: device.userCode)
         async let polled = client.completeDeviceAuthorization(device)
-        _ = await rig.clock.advanceToNextSleeper()
+        _ = try await rig.clock.advanceToNextSleeper()
         rig.renderings.look(try await polled)
 
         // Error paths whose server echoes the secrets it was sent. The mix of short fake tokens and the
@@ -153,7 +153,7 @@ struct RedactionCanaryTests {
         rig.echo("access_denied", of: ["device_code", "client_secret", "basic_secret"])
         let denied = try await client.beginDeviceAuthorization(scope: ["read"])
         async let deniedPoll = rig.renderings.observe { try await client.completeDeviceAuthorization(denied) }
-        _ = await rig.clock.advanceToNextSleeper()
+        _ = try await rig.clock.advanceToNextSleeper()
         _ = await deniedPoll
 
         rig.echo("invalid_grant", of: ["code", "code_verifier", "client_secret", "basic_secret"])

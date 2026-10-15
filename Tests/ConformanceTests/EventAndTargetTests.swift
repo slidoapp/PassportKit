@@ -61,7 +61,7 @@ struct EventAndTargetTests {
             for resources in orders {
                 group.addTask { try await manager.accessToken(for: TokenTarget.refreshGrant(resources: resources)) }
             }
-            await harness.deliverResponses(1)
+            try await harness.deliverResponses(1)
             return try await group.reduce(into: []) { $0.append($1) }
         }
         #expect(Set(tokens.map(\.value)).count == 1)

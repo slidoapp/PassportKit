@@ -15,15 +15,15 @@ struct LaneTests {
             TokenTarget.default, TokenTarget.refreshGrant(resources: [apiA]),
             TokenTarget.refreshGrant(resources: [apiB]),
         ]
-        let results = await withTaskGroup(of: Bool.self) { group in
+        let results = try await withThrowingTaskGroup(of: Bool.self) { group in
             for index in 0..<10 {
                 group.addTask { (try? await manager.accessToken(for: targets[index % 3])) != nil }
             }
             for audience in ["billing", "reports"] {
                 group.addTask { (try? await manager.exchangeRefreshToken(audiences: [audience])) != nil }
             }
-            await harness.deliverResponses(5)
-            return await group.reduce(into: []) { $0.append($1) }
+            try await harness.deliverResponses(5)
+            return try await group.reduce(into: []) { $0.append($1) }
         }
         #expect(results.count == 12)
         #expect(results.allSatisfy { $0 })
@@ -47,7 +47,7 @@ struct LaneTests {
             for _ in 0..<20 {
                 group.addTask { try await manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiA])) }
             }
-            await harness.deliverResponses(1)
+            try await harness.deliverResponses(1)
             return try await group.reduce(into: []) { $0.append($1) }
         }
         #expect(tokens.count == 20)
@@ -55,7 +55,7 @@ struct LaneTests {
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
 
         let other = Task { try await manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiB])) }
-        await harness.deliverResponses(1)
+        try await harness.deliverResponses(1)
         let tokenB = try await other.value
         #expect(tokenB.value != tokens[0].value)
         #expect(await harness.server.details(of: tokenB.value.reveal())?.resources == [apiB])

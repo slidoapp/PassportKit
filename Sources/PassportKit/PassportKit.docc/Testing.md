@@ -71,7 +71,9 @@ the person: it approves, or with `.deny` declines, every authorization request.
 
 `ManualClock` implements `Clock`. Pass it as the client's `clock`, and
 polling intervals, time limits and delays wait until your test advances it.
-`advanceToNextSleeper()` waits for a sleeper and moves time to its deadline.
+`try await advanceToNextSleeper()` waits for a sleeper and moves time to its
+deadline. If nothing sleeps within 60 seconds of real time it throws
+`ManualClock.WaitTimeout`, which fails that test and no other.
 `ManualWallClock` is the calendar clock whose date you set, which decides when
 tokens expire. `SequenceRandomSource` makes `state` and PKCE values
 deterministic.

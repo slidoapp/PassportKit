@@ -110,7 +110,7 @@
             let listener = try await LoopbackRedirectListener.start(clock: clock)
             let port = try #require(listener.redirectURI.port)
             let waiting = Task { try await listener.waitForCallback(timeout: .seconds(300)) }
-            #expect(await clock.advanceToNextSleeper() == .seconds(300))
+            #expect(try await clock.advanceToNextSleeper() == .seconds(300))
             await #expect(throws: PassportError(.timedOut, recovery: .reauthenticate)) { try await waiting.value }
             // The listener is closed afterwards.
             await #expect(throws: (any Error).self) {
@@ -123,7 +123,7 @@
             let listener = try await LoopbackRedirectListener.start(clock: clock)
             let port = try #require(listener.redirectURI.port)
             let waiting = Task { try await listener.waitForCallback() }
-            await clock.waitForSleeper()
+            try await clock.waitForSleeper()
             waiting.cancel()
             await #expect(throws: CancellationError.self) { try await waiting.value }
             await #expect(throws: (any Error).self) {
@@ -155,7 +155,7 @@
             let listener = try await LoopbackRedirectListener.start(clock: clock)
             let waiting = Task { try await listener.waitForCallback { $0.query?.contains("state=expected") == true } }
             let port = try #require(listener.redirectURI.port)
-            await clock.waitForSleeper()  // the predicate is installed before the wait starts sleeping
+            try await clock.waitForSleeper()  // the predicate is installed before the wait starts sleeping
             let refused = try await RawClient.send(
                 "GET /callback?code=1&state=other HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\n\r\n", toPort: port)
             #expect(refused.hasPrefix("HTTP/1.1 400"))

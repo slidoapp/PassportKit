@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking (`PassportKitTesting`):** `ManualClock.waitForSleeper()` and `ManualClock.advanceToNextSleeper()` are
+  now `throws`; call them with `try await`. When no task sleeps within 60 seconds of real time (it was 10 seconds)
+  they throw the new `ManualClock.WaitTimeout` instead of stopping the whole test process, so a slow wake-up on a
+  loaded machine fails only the waiting test. The wait is resumed by the sleeper that arrives instead of
+  polling. `waitForSleeper(timeout:)` is unchanged.
+
 - `KeychainCredentialStore` sets `kSecAttrSynchronizable` to `false` explicitly when it adds, fetches and deletes
   an item, instead of relying on the default. Items written before are found as before.
 

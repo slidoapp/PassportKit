@@ -28,12 +28,12 @@ struct DeviceAuthorizationTests {
         clock: ManualClock,
         sleeps: Int,
         additionalParameters: AdditionalParameters = [:]
-    ) async -> (waits: [Duration], result: Result<TokenResponse, any Error>) {
+    ) async throws -> (waits: [Duration], result: Result<TokenResponse, any Error>) {
         let task = Task {
             try await client.completeDeviceAuthorization(authorization, additionalParameters: additionalParameters)
         }
         var waits: [Duration] = []
-        for _ in 0..<sleeps { waits.append(await clock.advanceToNextSleeper()) }
+        for _ in 0..<sleeps { waits.append(try await clock.advanceToNextSleeper()) }
         return (waits, await task.result)
     }
 
@@ -67,7 +67,7 @@ struct DeviceAuthorizationTests {
         let client = try ClientFixtures.client(
             transport, authentication: .clientSecretBasic(clientID: "app", secret: Secret("s3cret")), clock: clock)
         let authorization = try await client.beginDeviceAuthorization(scope: ["a"])
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 2)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 2)
         #expect(try outcome.result.get().accessToken.reveal() == "done")
         let requests = await transport.requests
         #expect(requests.count == 3)
@@ -187,7 +187,7 @@ struct DeviceAuthorizationTests {
         ])
         let client = try ClientFixtures.client(transport, clock: clock)
         let authorization = try await client.beginDeviceAuthorization()
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 3)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 3)
         #expect(outcome.waits == [.seconds(3598), .seconds(3600), .seconds(3600)])
     }
 
@@ -219,7 +219,7 @@ struct DeviceAuthorizationTests {
         let (client, transport, clock, authorization) = try await start([
             .oauthError("authorization_pending"), .oauthError("authorization_pending"), .tokens("done"),
         ])
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 3)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 3)
         #expect(outcome.waits == [.seconds(7), .seconds(7), .seconds(7)])
         #expect(try outcome.result.get().accessToken.reveal() == "done")
         let polls = Array(await transport.requests.dropFirst())
@@ -235,14 +235,14 @@ struct DeviceAuthorizationTests {
 
     @Test func additionalParametersAreAppendedToPolls() async throws {
         let (client, transport, clock, authorization) = try await start([.tokens()])
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 1, additionalParameters: ["k": "v"])
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 1, additionalParameters: ["k": "v"])
         _ = try outcome.result.get()
         #expect(try #require(await transport.requests.last).form.last.map { "\($0.0)=\($0.1)" } == "k=v")
     }
 
     @Test func collidingAdditionalParameterFailsBeforePolling() async throws {
         let (client, transport, clock, authorization) = try await start([.tokens()])
-        let outcome = await poll(
+        let outcome = try await poll(
             client, authorization, clock: clock, sleeps: 1, additionalParameters: ["device_code": "x"])
         #expect(failure(outcome.result)?.code == .invalidConfiguration)
         #expect(await transport.requests.count == 1)
@@ -252,7 +252,7 @@ struct DeviceAuthorizationTests {
         let (client, _, clock, authorization) = try await start([
             .oauthError("slow_down"), .oauthError("slow_down"), .oauthError("authorization_pending"), .tokens(),
         ])
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 4)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 4)
         #expect(outcome.waits == [.seconds(7), .seconds(12), .seconds(17), .seconds(17)])
         _ = try outcome.result.get()
     }
@@ -264,7 +264,7 @@ struct DeviceAuthorizationTests {
                 .oauthError("authorization_pending"), .fail(URLError(.timedOut)), .tokens(),
             ], clock: ManualClock())
         // Interval 7: waits double from the interval, cap at 30, reset after a server answer.
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 6)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 6)
         #expect(outcome.waits == [7, 14, 28, 30, 7, 14].map { .seconds($0) })
         _ = try outcome.result.get()
     }
@@ -274,7 +274,7 @@ struct DeviceAuthorizationTests {
             .oauthError("temporarily_unavailable", status: 429, headers: [.retryAfter: "60"]),
             .json(503, "", headers: [.retryAfter: "1"]), .tokens(),
         ])
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 3)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 3)
         #expect(outcome.waits == [.seconds(7), .seconds(60), .seconds(28)])
         _ = try outcome.result.get()
     }
@@ -287,7 +287,7 @@ struct DeviceAuthorizationTests {
         ])
         let client = try ClientFixtures.client(transport, clock: clock)
         let authorization = try await client.beginDeviceAuthorization()
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 3)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 3)
         #expect(outcome.waits == [.seconds(5), .seconds(5), .seconds(2)])
         let error = failure(outcome.result)
         #expect(error?.code == .expiredToken)
@@ -299,14 +299,14 @@ struct DeviceAuthorizationTests {
     @Test func alreadyExpiredAuthorizationSendsNothing() async throws {
         let (client, transport, clock, authorization) = try await start([.tokens()])
         clock.advance(by: .seconds(900))
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 0)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 0)
         #expect(failure(outcome.result)?.code == .expiredToken)
         #expect(await transport.requests.count == 1)
     }
 
     @Test func accessDeniedIsTerminalWithoutRecovery() async throws {
         let (client, transport, clock, authorization) = try await start([.oauthError("access_denied"), .tokens()])
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 1)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 1)
         let error = failure(outcome.result)
         #expect(error?.code == .accessDenied)
         #expect(error?.recovery == PassportError.Recovery.noAction)
@@ -315,7 +315,7 @@ struct DeviceAuthorizationTests {
 
     @Test func expiredTokenIsTerminalAndNeedsReauthentication() async throws {
         let (client, transport, clock, authorization) = try await start([.oauthError("expired_token"), .tokens()])
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 1)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 1)
         let error = failure(outcome.result)
         #expect(error?.code == .expiredToken)
         #expect(error?.recovery == .reauthenticate)
@@ -326,7 +326,7 @@ struct DeviceAuthorizationTests {
         let (client, transport, clock, authorization) = try await start([
             .oauthError("invalid_client", status: 401), .tokens(),
         ])
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 1)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 1)
         #expect(failure(outcome.result)?.recovery == .fixConfiguration)
         #expect(await transport.requests.count == 2)
     }
@@ -334,7 +334,7 @@ struct DeviceAuthorizationTests {
     @Test func cancellationDuringSleepStopsImmediately() async throws {
         let (client, transport, clock, authorization) = try await start([.tokens()])
         let task = Task { try await client.completeDeviceAuthorization(authorization) }
-        await clock.waitForSleeper()
+        try await clock.waitForSleeper()
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
         #expect(await transport.requests.count == 1)
@@ -357,7 +357,7 @@ struct DeviceAuthorizationTests {
         let transport = RecordingTransport([.json(200, Self.deviceJSON), .tokens()])
         let client = try ClientFixtures.client(transport, clock: clock, observer: observer)
         let authorization = try await client.beginDeviceAuthorization()
-        let outcome = await poll(client, authorization, clock: clock, sleeps: 1)
+        let outcome = try await poll(client, authorization, clock: clock, sleeps: 1)
         _ = try outcome.result.get()
         let events = observer.events
         #expect(events[0] == .request(endpoint: .deviceAuthorization, grantType: nil))
