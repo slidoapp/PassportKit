@@ -11,9 +11,11 @@ extension OAuthClient {
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when no
     /// authorization endpoint is configured, the endpoint carries a fragment or a query item the request also
-    /// sets, the redirect URI is not absolute, has a fragment, or is plain `http` on a non-loopback host
+    /// sets, no ``ClientConfiguration/issuer`` is configured (the response `iss` could not be checked, RFC 9207
+    /// §2.4), the redirect URI is not absolute, has a fragment, or is plain `http` on a non-loopback host
     /// (RFC 8252 §7.3, §8.3), a resource is invalid, the lifetime is not positive, or an additional parameter collides.
     public func beginAuthorization(_ request: AuthorizationRequest) throws -> PendingAuthorization {
+        _ = try requireIssuer()
         let endpoint = try requireEndpoint(configuration.endpoints.authorization, name: "authorization")
         try Self.validate(redirectURI: request.redirectURI)
         guard request.lifetime > .zero else {
@@ -72,7 +74,8 @@ extension OAuthClient {
 
     /// Validates the redirect and redeems the authorization code (RFC 6749 §4.1.2, §4.1.3, RFC 9207 §2.4).
     ///
-    /// Checks, in order, each failing with ``PassportError``:
+    /// Throws `invalidConfiguration`, before anything else, when no ``ClientConfiguration/issuer`` is configured.
+    /// Then checks, in order, each failing with ``PassportError``:
     /// 1. `pending` was not completed before (`invalidConfiguration`) and has not expired (`timedOut`,
     ///    recovery `reauthenticate`).
     /// 2. `callbackURL` matches the redirect URI in scheme, host, port and path, and no response parameter
@@ -81,8 +84,7 @@ extension OAuthClient {
     ///    pending authorization is consumed.
     /// 4. `iss` equals ``ClientConfiguration/issuer`` by exact string comparison (`issuerMismatch`). It is
     ///    checked before `error` because RFC 9207 §2.4 requires it for error responses too. A missing `iss`
-    ///    fails only when ``ClientConfiguration/requiresIssuerInAuthorizationResponse`` is set. When no issuer is
-    ///    configured, a response `iss` is accepted unchecked.
+    ///    fails only when ``ClientConfiguration/requiresIssuerInAuthorizationResponse`` is set.
     /// 5. An `error` response becomes the matching error (RFC 6749 §4.1.2.1); `access_denied` has recovery `none`.
     /// 6. `code` is present (`invalidResponse`).
     ///
@@ -115,6 +117,7 @@ extension OAuthClient {
     }
 
     private func validate(_ callbackURL: URL, for pending: PendingAuthorization) throws -> Secret {
+        let expectedIssuer = try requireIssuer()
         guard !pending.isConsumed else {
             throw PassportError(
                 .invalidConfiguration,
@@ -145,7 +148,7 @@ extension OAuthClient {
                 detail: "This authorization was already completed; start a new one."
             )
         }
-        try validateIssuer(values[AuthorizationResponseField.issuer])
+        try validateIssuer(values[AuthorizationResponseField.issuer], expected: expectedIssuer)
         if let error = values[AuthorizationResponseField.error], !error.isEmpty {
             guard let code = PassportError.Code.fromServer(error) else {
                 throw PassportError(.invalidResponse, detail: "The authorization error code is malformed.")
@@ -165,7 +168,18 @@ extension OAuthClient {
         return Secret(code)
     }
 
-    private func validateIssuer(_ issuer: String?) throws {
+    /// The expected issuer is the mix-up defence of the code flow, so the flow does not run without one.
+    private func requireIssuer() throws -> URL {
+        guard let issuer = configuration.issuer else {
+            throw PassportError(
+                .invalidConfiguration,
+                detail: "The authorization code flow needs a configured issuer to detect mix-up attacks."
+            )
+        }
+        return issuer
+    }
+
+    private func validateIssuer(_ issuer: String?, expected: URL) throws {
         guard let issuer else {
             guard !configuration.requiresIssuerInAuthorizationResponse else {
                 throw PassportError(
@@ -175,7 +189,7 @@ extension OAuthClient {
             }
             return
         }
-        if let expected = configuration.issuer, issuer != expected.absoluteString {
+        if issuer != expected.absoluteString {
             throw PassportError(
                 .issuerMismatch,
                 detail: "The authorization response came from a different issuer."

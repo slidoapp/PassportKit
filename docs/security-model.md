@@ -65,7 +65,7 @@ follow the same rules as errors and events:
 |---|---|
 | Authorization code interception | PKCE with S256 on every authorization code flow (RFC 7636, RFC 9700) |
 | CSRF on redirect | `state` generated per request and validated exactly |
-| Mix-up attacks | Validate `iss` in the authorization response when present (RFC 9207) |
+| Mix-up attacks | The code flow needs a configured issuer and compares the response `iss` with it exactly (RFC 9207 §2.4); the response parameter is required when the server advertises it. Servers without RFC 9207 need another defence (a distinct redirect URI per authorization server, RFC 9700 §4.4.2); the device flow has no authorization response and is not affected |
 | Open redirect / redirect injection | Exact redirect URI matching; loopback listener binds to loopback interfaces only |
 | Web page races or floods the loopback listener | The listener claims only a `GET` for its path with the loopback `Host`, `state` and `code` or `error`, no background `Sec-Fetch-*` metadata and an `accept` match on `state`; at most 8 connections, closed after 5 s, on `cancel()` and on delivery; a released listener stops (RFC 8252 §8.3) |
 | Token sent to an attacker-chosen host | `RequestAuthorizer` sends only over `https` (loopback `http` only with the opt-in `allowsInsecureLoopbackEndpoints`); `allowedOrigins` limits the hosts, and must be set when request URLs come from untrusted data; redirects never leave HTTPS and drop credential headers across origins, also for `data(for:target:session:)` |

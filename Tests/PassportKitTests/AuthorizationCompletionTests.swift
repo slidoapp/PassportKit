@@ -12,7 +12,7 @@ struct AuthorizationCompletionTests {
     private func start(
         _ steps: [RecordingTransport.Step] = [.tokens("at")],
         authentication: ClientAuthentication = .publicClient(clientID: "app"),
-        issuer: URL? = nil,
+        issuer: URL? = Fixtures.issuer,
         requiresIssuer: Bool = false,
         clock: any Clock<Duration> = ContinuousClock(),
         redirectURI: URL = Fixtures.redirectURI
@@ -203,21 +203,21 @@ struct AuthorizationCompletionTests {
     // MARK: Issuer
 
     @Test func matchingIssuerIsAccepted() async throws {
-        let (client, _, pending) = try start(issuer: Fixtures.issuer)
+        let (client, _, pending) = try start()
         _ = try await client.completeAuthorization(
             pending, callbackURL: code([("iss", "https://as.example.com")], for: pending))
     }
 
     @Test(arguments: ["https://evil.example.com", "https://as.example.com/", "HTTPS://as.example.com", ""])
     func differentIssuerIsRejected(_ issuer: String) async throws {
-        let (client, transport, pending) = try start(issuer: Fixtures.issuer)
+        let (client, transport, pending) = try start()
         let error = await failure(client, pending, code([("iss", issuer)], for: pending))
         #expect(error?.code == .issuerMismatch)
         #expect(await transport.requests.isEmpty)
     }
 
     @Test func issuerIsCheckedBeforeTheErrorParameter() async throws {
-        let (client, _, pending) = try start(issuer: Fixtures.issuer)
+        let (client, _, pending) = try start()
         let callback = Fixtures.callback([
             ("error", "access_denied"), ("state", pending.state.reveal()), ("iss", "https://evil.example.com"),
         ])
@@ -225,17 +225,51 @@ struct AuthorizationCompletionTests {
     }
 
     @Test func missingIssuerFailsOnlyWhenRequired() async throws {
-        let (required, _, pendingRequired) = try start(issuer: Fixtures.issuer, requiresIssuer: true)
+        let (required, _, pendingRequired) = try start(requiresIssuer: true)
         #expect(await failure(required, pendingRequired, code(for: pendingRequired))?.code == .issuerMismatch)
 
-        let (optional, _, pendingOptional) = try start(issuer: Fixtures.issuer)
+        let (optional, _, pendingOptional) = try start()
         _ = try await optional.completeAuthorization(pendingOptional, callbackURL: code(for: pendingOptional))
     }
 
-    @Test func issuerIsAcceptedUncheckedWhenNoneIsConfigured() async throws {
-        let (client, _, pending) = try start()
-        _ = try await client.completeAuthorization(
-            pending, callbackURL: code([("iss", "https://anything.example.com")], for: pending))
+    @Test("RFC 9207 §2.4, RFC 9700 §4.4.2: the code flow needs an expected issuer, before any request")
+    func flowNeedsAConfiguredIssuer() async throws {
+        let transport = RecordingTransport()
+        let client = try ClientFixtures.client(transport, issuer: nil)
+        let begin = try #require(throws: PassportError.self) {
+            try client.beginAuthorization(AuthorizationRequest(redirectURI: Fixtures.redirectURI))
+        }
+        #expect(begin.code == .invalidConfiguration)
+        #expect(begin.description.contains("issuer"))
+
+        // A response that carries an `iss` is not accepted unchecked either: the pending authorization comes
+        // from a client that had an issuer, the completing client has none.
+        let (withIssuer, _, pending) = try start()
+        let callback = code([("iss", "https://as.example.com")], for: pending)
+        let complete = await failure(client, pending, callback)
+        #expect(complete?.code == .invalidConfiguration)
+        #expect(await transport.requests.isEmpty)
+        // Nothing was consumed: the client that has an issuer can still complete it.
+        _ = try await withIssuer.completeAuthorization(pending, callbackURL: callback)
+    }
+
+    @Test func authorizeNeedsAConfiguredIssuer() async throws {
+        let client = try ClientFixtures.client(RecordingTransport(), issuer: nil)
+        let agent = FakeUserAgent(.fail(PassportError(.userCancelled)))
+        let error = await #expect(throws: PassportError.self) {
+            try await client.authorize(AuthorizationRequest(redirectURI: Fixtures.redirectURI), using: agent)
+        }
+        #expect(error?.code == .invalidConfiguration)
+        #expect(await agent.presented.isEmpty)
+    }
+
+    @Test("RFC 9207 §2.4: an absent iss is accepted only when the server does not advertise the parameter")
+    func absentIssuerDependsOnTheRequirement() async throws {
+        let (required, transport, pendingRequired) = try start(requiresIssuer: true)
+        #expect(await failure(required, pendingRequired, code(for: pendingRequired))?.code == .issuerMismatch)
+        #expect(await transport.requests.isEmpty)
+        let (optional, _, pendingOptional) = try start()
+        _ = try await optional.completeAuthorization(pendingOptional, callbackURL: code(for: pendingOptional))
     }
 
     @Test("RFC 6749 §4.1.2: unknown response parameters are ignored")

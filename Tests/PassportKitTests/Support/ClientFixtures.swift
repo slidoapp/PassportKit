@@ -26,7 +26,7 @@ enum ClientFixtures {
         additionalHeaders: HTTPFields = [:],
         revocation: Bool = true,
         authorization: URL? = authorizationURL,
-        issuer: URL? = nil,
+        issuer: URL? = AuthorizationFixtures.issuer,
         requiresIssuer: Bool = false,
         allowsInsecureLoopback: Bool = false
     ) -> ClientConfiguration {
@@ -51,7 +51,7 @@ enum ClientFixtures {
         additionalHeaders: HTTPFields = [:],
         revocation: Bool = true,
         authorization: URL? = authorizationURL,
-        issuer: URL? = nil,
+        issuer: URL? = AuthorizationFixtures.issuer,
         requiresIssuer: Bool = false,
         allowsInsecureLoopback: Bool = false,
         clock: any Clock<Duration> = ContinuousClock(),

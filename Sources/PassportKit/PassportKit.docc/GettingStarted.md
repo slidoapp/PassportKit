@@ -91,6 +91,20 @@ and the `iss` parameter, and exchanges the code.
 ``OAuthClient/completeAuthorization(_:callbackURL:additionalParameters:)``
 split the flow when you present the URL yourself.
 
+### Mix-up protection
+
+A client that talks to more than one authorization server can be tricked into sending a code to the wrong one (a
+mix-up attack). The code flow therefore needs ``ClientConfiguration/issuer``: ``OAuthClient/beginAuthorization(_:)``,
+``OAuthClient/authorize(_:using:)`` and ``OAuthClient/completeAuthorization(_:callbackURL:additionalParameters:)``
+throw ``PassportError/Code-swift.struct/invalidConfiguration`` without one, and the `iss` of the response (RFC 9207)
+must equal it exactly. ``ClientConfiguration/init(metadata:authentication:additionalHeaders:minimumTokenLifetime:defaultTokenLifetime:allowsInsecureLoopbackEndpoints:)``
+sets the issuer, and requires `iss` when the server advertises `authorization_response_iss_parameter_supported`.
+
+A server that does not support RFC 9207 sends no `iss`, so a response without it is accepted and PassportKit cannot tell
+which server answered. Defend against mix-up another way, for example a distinct redirect URI per authorization server,
+registered at each, so a response to the wrong one never matches. The device flow has no authorization response and
+needs none of this.
+
 ## Keep the session
 
 A ``TokenResponse`` is a one-time result. Hand it to a ``TokenManager``,

@@ -194,7 +194,7 @@ public struct ClientAuthentication: Sendable, Hashable {            // open: fac
 public struct ClientConfiguration: Sendable {
     public var endpoints: Endpoints
     public var authentication: ClientAuthentication
-    public var issuer: URL?                          // used for RFC 9207 `iss` checks
+    public var issuer: URL?                          // required by the code flow: the expected `iss` (RFC 9207)
     public var additionalHeaders: HTTPFields = [:]  // sent on every request to the authorization server
     public var minimumTokenLifetime: Duration = .seconds(60)   // refresh earlier than this before expiry
     public var defaultTokenLifetime: Duration? = nil           // used when `expires_in` is missing; nil = treat as expired
@@ -458,8 +458,19 @@ The request URL is the authorization endpoint plus, in order, `response_type`,
 `prompt` and the additional parameters. Existing query items on the endpoint
 are preserved; one that the request also sets is `.invalidConfiguration`, as
 are a missing authorization endpoint and a redirect URI that is relative, has a
-fragment, or is `http` on a non-loopback host (RFC 8252 §7.3, §8.3). A loopback
+fragment, or is `http` on a non-loopback host (RFC 8252 §7.3, §8.3), and when
+no issuer is configured. A loopback
 redirect URI carries the actual port; the callback is compared with it.
+
+**Mix-up protection.** The code flow requires `ClientConfiguration.issuer`:
+`beginAuthorization`, `authorize` and `completeAuthorization` throw
+`.invalidConfiguration` when it is `nil`, before any other check and before any
+request, so a response `iss` is never accepted unchecked (RFC 9207 §2.4,
+RFC 9700 §4.4.2; ADR 0013). A server that does not advertise
+`authorization_response_iss_parameter_supported` may omit `iss`, and the
+library then cannot bind the response to the server: the app needs another
+defence, for example a distinct redirect URI per authorization server. The
+device flow (§10) has no authorization response and is not affected.
 
 `completeAuthorization` checks, in order:
 
@@ -474,9 +485,8 @@ redirect URI carries the actual port; the callback is compared with it.
 3. `state` matches (constant-time comparison), else `.stateMismatch`;
 4. `iss` equals the configured issuer by exact string comparison, else
    `.issuerMismatch` (RFC 9207 §2.4). A missing `iss` fails only when
-   `requiresIssuerInAuthorizationResponse` is set; with no issuer configured a
-   response `iss` is accepted unchecked. This runs before step 5 because RFC
-   9207 §2.4 requires the check for error responses too;
+   `requiresIssuerInAuthorizationResponse` is set. This runs before step 5
+   because RFC 9207 §2.4 requires the check for error responses too;
 5. an `error` parameter becomes a `PassportError` through the authorization
    response context (recovery `.noAction` for `access_denied`);
 6. `code` present, else `.invalidResponse`;

@@ -10,7 +10,9 @@ public struct ClientConfiguration: Sendable, CustomStringConvertible, CustomDebu
     public var endpoints: Endpoints
     /// How the client authenticates.
     public var authentication: ClientAuthentication
-    /// The expected issuer, used for RFC 9207 `iss` checks.
+    /// The expected issuer, compared exactly with the `iss` of an authorization response (RFC 9207 §2.4).
+    /// The authorization code flow throws ``PassportError/Code-swift.struct/invalidConfiguration`` without it;
+    /// the device flow does not use it.
     public var issuer: URL?
     /// Header fields sent on every request to the authorization server. Library-owned fields (`Content-Type`,
     /// `Accept`, `Authorization` for Basic client authentication) replace fields of the same name.

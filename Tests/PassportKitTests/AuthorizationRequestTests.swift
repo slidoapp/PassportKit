@@ -139,7 +139,7 @@ struct AuthorizationRequestTests {
     }
 
     @Test func requiringAnIssuerNeedsOneConfigured() {
-        let configuration = ClientFixtures.configuration(requiresIssuer: true)
+        let configuration = ClientFixtures.configuration(issuer: nil, requiresIssuer: true)
         #expect(throws: PassportError.self) { try OAuthClient(configuration: configuration) }
     }
 }

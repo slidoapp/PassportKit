@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Discovery.fetchMetadata(issuer:…)`, `Endpoints.init(metadata:)` and `ClientConfiguration.init(metadata:…)` (all
   default `false`). A non-loopback `http` URL is refused even with it. Violations throw `invalidConfiguration` and the
   message names the opt-in. `http` loopback redirect URIs (RFC 8252 §7.3) are unaffected. See ADR 0012.
+- **Breaking (security, #2):** the authorization code flow requires `ClientConfiguration.issuer`.
+  `beginAuthorization(_:)`, `authorize(_:using:)` and `completeAuthorization(_:callbackURL:additionalParameters:)`
+  throw `invalidConfiguration`, before any request, when it is `nil`. Before, a response `iss` was accepted unchecked
+  without a configured issuer. Comparison stays exact (RFC 9207 §2.4), and
+  `requiresIssuerInAuthorizationResponse` still follows `authorization_response_iss_parameter_supported` when the
+  configuration comes from metadata. Servers without RFC 9207 need another mix-up defence, such as a distinct redirect
+  URI per authorization server; the device flow is not affected. See ADR 0013.
 
 ## [0.2.0] - 2026-10-15
 
