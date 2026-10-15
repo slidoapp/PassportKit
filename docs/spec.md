@@ -894,7 +894,7 @@ public.
 | `trace` | refresh lane turns, request coalescing, cache hits, discarded results of superseded sessions |
 | `debug` | each request (`endpoint`, `grant_type`, `status`, `error_code`, `duration_ms`), loopback listener internals |
 | `info` | session lifecycle: signed in (`reason`: grant, restored), signed out or session ended (`reason`), refresh token rotated |
-| `notice` | storage failures, acceptance policy rejections, a 401 retry, `insufficient_scope`, legacy credential migration, a loopback redirect that failed validation |
+| `notice` | storage failures, acceptance policy rejections, a 401 retry, `insufficient_scope`, a loopback redirect that failed validation |
 | `warning` | transport failures, failed or timed-out revocation, a renewed token rejected again, Keychain failures (`status`), failed web authentication sessions |
 
 Messages are constant strings and variable data goes in metadata with
@@ -908,7 +908,7 @@ Part of `PassportKit`. Both user agents exist on macOS and iOS; the only
 platform guards are the AppKit/UIKit differences between them (ADR 0011).
 
 
-- `KeychainCredentialStore(accessGroup: String? = nil, accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly, decodeLegacy: (@Sendable (Data) -> Credential?)? = nil, logger: Logger = Logger(label: "PassportKit"))`:
+- `KeychainCredentialStore(accessGroup: String? = nil, accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly, logger: Logger = Logger(label: "PassportKit"))`:
   built on SwiftKeychain (ADR 0009); generic password items, `kSecAttrService` = `account.service`,
   `kSecAttrAccount` = `account.account`; the versioned JSON payload
   (`CredentialCoding`) is one value in SwiftKeychain's archived
@@ -927,15 +927,11 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   access groups, so on macOS `accessibility` and `accessGroup` do not
   restrict access; they are enforced on iOS. `delete` matches the item
   by class, service, account and access group, not by accessibility.
-  Calls
-  block, so each runs on a private serial `DispatchQueue` bridged with a
-  continuation. `decodeLegacy` is the migration hook: it is called only
-  when versioned decoding of the payload fails, and receives the payload
-  bytes (the raw item data when the item is not a SwiftKeychain
-  envelope); a credential it returns is written back in the current
-  format; a failed write-back is ignored, and because SwiftKeychain
-  deletes before it adds, it can leave nothing stored. An item holding the current JSON directly is read and wrapped
-  without the hook. **Known issue (ADR 0009):** SwiftKeychain replaces an
+  Calls block, so each runs on a private serial `DispatchQueue` bridged
+  with a continuation. The store reads and writes only its own format: an
+  item it cannot decode is a `.storageFailure`, and there is no migration
+  hook (apps move credentials from another library with
+  `TokenManager.signIn(refreshToken:)`). **Known issue (ADR 0009):** SwiftKeychain replaces an
   existing item by delete-then-add, so a failed second step loses the
   credential.
 - `WebAuthenticationSessionUserAgent` (`@MainActor`): wraps

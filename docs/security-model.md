@@ -106,9 +106,6 @@ follow the same rules as errors and events:
   is unlocked, and the access group does not separate apps. What protects the item is the keychain's access control
   for the app that created it. On iOS both are enforced. The store sets `kSecAttrSynchronizable` to `false` on every
   operation, so a credential never reaches iCloud Keychain on either platform.
-- **A failed legacy write-back can lose the credential.** The `decodeLegacy` migration writes the converted
-  credential back with the same delete-then-add as any save. The credential is returned for that load, but if the
-  add fails after the delete nothing is stored (ADR 0009).
 - **ID tokens are stored, never validated.** PassportKit is an OAuth 2.0 client, not an OpenID Connect relying
   party: an `id_token` is kept in the credential without checking its signature, issuer, audience or nonce. Do not
   treat it as proof of identity.

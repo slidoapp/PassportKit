@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Breaking:** `KeychainCredentialStore.init(decodeLegacy:)` and the migration code behind it. The store reads and
+  writes only its own format, and an item it cannot decode is a `.storageFailure`. An app migrates by reading its
+  old storage itself and calling `TokenManager.signIn(refreshToken:grantedScope:idToken:)`. This also removes the
+  write-back, which replaced the migrated item by deleting and adding it and could lose it. Items written directly
+  as the record JSON by builds before 0.1.0 are no longer read.
+
 - **Breaking:** tvOS, watchOS and visionOS are no longer supported. `Package.swift` declares macOS 14 and iOS 17
   only, and the platform guards that existed for the other three are gone: `WebAuthenticationSessionUserAgent`,
   `LoopbackRedirectListener` and `LoopbackUserAgent` exist on both supported platforms (ADR 0011, Update).
@@ -43,8 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The documentation of `KeychainCredentialStore`, `KeychainCredentialStore.Accessibility` and the security model
   said accessibility classes and access groups protect the item. On macOS the store uses the file-based login
-  keychain, which enforces neither; they apply on iOS. The note that a failed legacy write-back is retried by the
-  next load is corrected: SwiftKeychain deletes before it adds, so a failed write-back can leave nothing stored.
+  keychain, which enforces neither; they apply on iOS.
 
 - `KeychainCredentialStore.delete` matches the item by service, account and access group only. It no longer
   carries the accessibility class, so an item stored with another class is removed on sign-out, and it no

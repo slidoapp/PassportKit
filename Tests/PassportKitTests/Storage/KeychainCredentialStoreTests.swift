@@ -107,39 +107,6 @@ struct KeychainCredentialStoreTests {
         #expect(!error.description.contains("garbage"))
     }
 
-    @Test func legacyPayloadIsDecodedAndRewrittenInTheCurrentFormat() async throws {
-        defer { cleanUp() }
-        rawWrite(Data("legacy:refresh-9".utf8))
-        let migrated = credential("refresh-9")
-        let store = KeychainCredentialStore(decodeLegacy: { data in
-            let text = String(decoding: data, as: UTF8.self)
-            return text.hasPrefix("legacy:") ? migrated : nil
-        })
-        #expect(try await store.load(account) == migrated)
-        // The next load needs no hook: the payload is a current record now.
-        #expect(try await KeychainCredentialStore().load(account) == migrated)
-        #expect(itemCount() == 1)
-    }
-
-    @Test func recordWrittenDirectlyAsJSONIsReadAndWrappedWithoutAHook() async throws {
-        defer { cleanUp() }
-        rawWrite(try CredentialCoding.encode(credential("refresh-5")))
-        let store = KeychainCredentialStore()
-        #expect(try await store.load(account) == credential("refresh-5"))
-        #expect(try await store.load(account) == credential("refresh-5"))
-        #expect(itemCount() == 1)
-    }
-
-    @Test func legacyHookDoesNotRunForCurrentRecords() async throws {
-        let store = KeychainCredentialStore(decodeLegacy: { _ in
-            Issue.record("The hook must only see payloads the current format rejects.")
-            return nil
-        })
-        defer { cleanUp() }
-        try await store.save(credential(), for: account)
-        #expect(try await store.load(account) == credential())
-    }
-
     @Test func concurrentSavesDoNotFail() async throws {
         let store = KeychainCredentialStore()
         defer { cleanUp() }

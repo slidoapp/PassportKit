@@ -28,11 +28,7 @@ import SwiftKeychain
 /// Known issue: when an item already exists, SwiftKeychain replaces it by deleting it and adding it again
 /// instead of updating it. If the second step fails (device locked, denied prompt, entitlement problem) or
 /// the process dies in between, the stored credential is lost and the user has to sign in again; two
-/// stores writing the same item at once can fail the same way. See ADR 0009. The same applies to the
-/// write-back of a migrated credential: the legacy item is replaced by deleting and adding it, so when the
-/// add fails after the delete, the credential is returned by that ``load(_:)`` and is not stored anywhere.
-/// When the add fails before the delete (for example while the device is locked), the legacy item is intact
-/// and the next load migrates it again.
+/// stores writing the same item at once can fail the same way. See ADR 0009.
 ///
 /// Keychain access is a security boundary of the app, not of the library: an access group needs the
 /// matching entitlement, and without one the Keychain answers `errSecMissingEntitlement`, reported as
@@ -68,7 +64,6 @@ public final class KeychainCredentialStore: CredentialStore {
 
     private let accessGroup: String?
     private let accessibility: Accessibility
-    private let decodeLegacy: (@Sendable (Data) -> Credential?)?
     private let logger: Logger
     private let queue = DispatchQueue(label: "PassportKit.KeychainCredentialStore")
 
@@ -82,22 +77,14 @@ public final class KeychainCredentialStore: CredentialStore {
     ///     uses the app's default group. Enforced on iOS only; the login keychain on macOS ignores it.
     ///   - accessibility: When items become readable. Applied when an item is created, and part of the
     ///     item's identity: an item stored with another class is not found.
-    ///   - decodeLegacy: The migration hook. When a stored payload is not a record `CredentialCoding`
-    ///     reads, the hook gets the payload bytes (the raw item data, or the JSON inside SwiftKeychain's
-    ///     envelope); a credential it returns is used and written back in the current format (a failed
-    ///     write-back is ignored and the credential is still returned; see below). Return `nil` for data it does not
-    ///     recognise, which then fails as a malformed record. The hook runs on the store's private queue
-    ///     and must not block.
-    ///   - logger: Receives storage failures and migrations, never credentials.
+    ///   - logger: Receives storage failures, never credentials.
     public init(
         accessGroup: String? = nil,
         accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly,
-        decodeLegacy: (@Sendable (Data) -> Credential?)? = nil,
         logger: Logger = Logger(label: "PassportKit")
     ) {
         self.accessGroup = accessGroup
         self.accessibility = accessibility
-        self.decodeLegacy = decodeLegacy
         self.logger = logger
     }
 
@@ -134,60 +121,26 @@ public final class KeychainCredentialStore: CredentialStore {
         let payload: Data
         do {
             _ = try item.fetchFromKeychain()
-            guard let stored = item.data[Self.payloadKey] as? Data else { return try migrateRaw(account) }
+            guard let stored = item.data[Self.payloadKey] as? Data else { throw Self.malformed }
             payload = stored
         } catch  where Self.isNotFound(error) {
             return nil
         } catch  where (error as NSError).domain != Self.keychainErrorDomain {
-            // The item is not a SwiftKeychain envelope: a record this library or another wrote directly.
-            return try migrateRaw(account)
+            // Not a SwiftKeychain envelope holding this library's record, whoever wrote it.
+            logger.warning("The stored credential could not be decoded")
+            throw Self.malformed
         } catch {
             throw failure(error, operation: "load")
         }
         do {
             return try CredentialCoding.decode(payload)
         } catch {
-            return try migrate(payload, account: account, original: error)
-        }
-    }
-
-    /// Reads the item as raw bytes, for payloads that are not in SwiftKeychain's envelope.
-    private func migrateRaw(_ account: CredentialAccount) throws -> Credential? {
-        var query = item(for: account).attributes
-        query[String(kSecReturnData)] = true
-        query[String(kSecReturnAttributes)] = true
-        if let accessGroup { query[String(kSecAttrAccessGroup)] = accessGroup }
-        let raw: Data?
-        do {
-            raw = try Keychain().fetchItemWithAttributes(query)?[String(kSecValueData)] as? Data
-        } catch  where Self.isNotFound(error) {
-            return nil
-        } catch {
-            throw failure(error, operation: "load")
-        }
-        guard let raw else { return nil }
-        if let credential = try? CredentialCoding.decode(raw) {
-            rewrite(credential, account: account)
-            return credential
-        }
-        return try migrate(raw, account: account, original: nil)
-    }
-
-    private func migrate(_ payload: Data, account: CredentialAccount, original: (any Error)?) throws -> Credential {
-        guard let credential = decodeLegacy?(payload) else {
             logger.warning("The stored credential could not be decoded")
-            throw original ?? PassportError(.storageFailure, detail: "The stored credential is malformed.")
+            throw error
         }
-        logger.notice("Migrated a legacy stored credential")
-        rewrite(credential, account: account)
-        return credential
     }
 
-    private func rewrite(_ credential: Credential, account: CredentialAccount) {
-        if let current = try? CredentialCoding.encode(credential) {
-            try? saveSynchronously(current, for: account)
-        }
-    }
+    private static let malformed = PassportError(.storageFailure, detail: "The stored credential is malformed.")
 
     private func saveSynchronously(_ data: Data, for account: CredentialAccount) throws {
         var item = item(for: account)
