@@ -494,6 +494,7 @@ public actor TokenManager {
 
     public func load() async throws -> Credential?                 // restores from the store
     public func signIn(with response: TokenResponse, requestedScope: ScopeSet? = nil) async throws  // adopt a grant result; throws .tokenRejected if the policy rejects its access token (the session still exists)
+    public func signIn(refreshToken: Secret, grantedScope: ScopeSet? = nil, idToken: Secret? = nil) async  // start a session from an existing refresh token; no access token is cached, the first accessToken(for:) refreshes
     public var credential: Credential? { get }
 
     public func accessToken(for target: TokenTarget = .default) async throws -> AccessToken
@@ -542,6 +543,16 @@ public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, 
 }
 ```
 
+`signIn(refreshToken:grantedScope:idToken:)` seeds a session from a refresh token
+the app received elsewhere, typically the token `exchangeRefreshToken(audiences:)`
+issued for another client (it arrives in `accessToken`, whatever its type). It
+has the semantics of `signIn(with:)` (replaces the session, emits `.signedIn`,
+saves the credential before returning, reports a store failure as
+`.storageFailed`) except that no access token exists yet and nothing is sent: the
+first refresh also records the grant's scope when `grantedScope` is nil
+(invariant 8). It does not throw, because nothing is validated until the first
+refresh; an invalid token surfaces then, as `invalid_grant` ends the session.
+
 Invariants (each has a conformance test):
 
 1. **One lane.** Every operation that sends the refresh token (refresh
@@ -560,7 +571,8 @@ Invariants (each has a conformance test):
    resources and audiences do not matter. A nil scope and an empty scope
    differ. `signIn` registers the operation for the default target
    before it suspends, so callers during its save and policy check join
-   it instead of refreshing.
+   it instead of refreshing. `signIn(refreshToken:)` caches no token, so
+   the first `accessToken(for:)` after it refreshes with that token.
 3. **Persist before publish.** A rotated refresh token (any response
    carrying `refresh_token`, including token exchanges whose subject is
    the refresh token) is saved to the store before the access token is
@@ -597,8 +609,8 @@ Invariants (each has a conformance test):
    (invariant 6). A grant that issued no refresh token ends the same way,
    with reason `.expiredWithoutRefreshToken`, when its access token has
    expired and a new one is needed.
-6. **Generations.** `signOut`, `signIn` and session end increment the
-   session generation. An operation that completes under an older
+6. **Generations.** `signOut`, both `signIn` overloads and session end
+   increment the session generation. An operation that completes under an older
    generation discards its result and writes nothing. A caller that was
    waiting for such an operation asks again once on the session that
    exists now, if there is one, instead of failing; with none it throws

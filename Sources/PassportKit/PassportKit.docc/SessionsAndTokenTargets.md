@@ -60,6 +60,32 @@ exchanges the refresh token itself, for example to hand a refresh token to
 another component. It is not cached and does not run the acceptance policy;
 the result belongs to your app.
 
+## A session from a refresh token you already hold
+
+``TokenManager/signIn(refreshToken:grantedScope:idToken:)`` starts a session
+from a refresh token that did not come from a grant response. It has the
+semantics of ``TokenManager/signIn(with:requestedScope:)`` (the credential is
+saved before it returns and ``SessionEvent/signedIn`` is emitted), but no
+access token is cached: the first ``TokenManager/accessToken(for:)`` refreshes
+with that token. A typical source is the audience exchange above, which
+derives a refresh token for another client; the issued token arrives in
+`accessToken`, whatever its type:
+
+```swift
+// A manager for the client that the exchanged token was issued to.
+let reports = TokenManager(client: reportsClient, store: reportsStore, account: reportsAccount)
+
+let issued = try await manager.exchangeRefreshToken(audiences: ["reports"])
+await reports.signIn(refreshToken: issued.accessToken, grantedScope: ["reports.read"])
+
+// Refreshes with the issued token; the rotated one is saved for next time.
+let token = try await reports.accessToken()
+```
+
+Nothing is sent when you seed a session, so an invalid or revoked token
+shows up at the first ``TokenManager/accessToken(for:)``: `invalid_grant`
+ends the session as it does for any other.
+
 ## Rotation and the lane
 
 Servers may rotate the refresh token on every use and allow little or no

@@ -180,6 +180,40 @@ public actor TokenManager {
         if case .failure(let error) = result, !(error is SessionSuperseded) { throw error }
     }
 
+    /// Starts a session from a refresh token the app already holds, without a grant response.
+    ///
+    /// It behaves like ``signIn(with:requestedScope:)``: the previous session, if any, is replaced without
+    /// revoking it and its in-flight operations are discarded, ``SessionEvent/signedIn`` is emitted, and the
+    /// credential is saved before this returns (a store failure leaves the session in memory and emits
+    /// ``SessionEvent/storageFailed``). No access token is cached and nothing is sent to the authorization
+    /// server: the first ``accessToken(for:)`` refreshes with `refreshToken` (RFC 6749 §6), and the acceptance
+    /// policy judges the token that returns.
+    ///
+    /// Use it when another party hands over a refresh token, for example the one an audience exchange issued
+    /// for another client (``exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``): sign a manager configured for that client in
+    /// with it. `grantedScope` is what the grant is known to carry; pass `nil` when it is not known, and the
+    /// scope of the first refresh response is recorded instead.
+    ///
+    /// - Parameters:
+    ///   - refreshToken: The refresh token of the client this manager is configured for.
+    ///   - grantedScope: The scope the grant carries, if known.
+    ///   - idToken: An ID token that belongs to the session, if there is one.
+    public func signIn(refreshToken: Secret, grantedScope: ScopeSet? = nil, idToken: Secret? = nil) async {
+        startNewSession()
+        let credential = Credential(
+            clientID: client.configuration.authentication.clientID,
+            issuer: client.configuration.issuer,
+            refreshToken: refreshToken,
+            idToken: idToken,
+            grantedScope: grantedScope,
+            updatedAt: client.wallClock.now()
+        )
+        current = credential
+        eventHub.emit(.signedIn)
+        logger.info("Signed in", metadata: [LogKey.reason: "seeded"])
+        await save(credential)
+    }
+
     /// Marks an access token as unusable, typically after a 401 (RFC 6750 §3.1).
     ///
     /// The cached token of the target is dropped only if it is still `token`, so many concurrent 401s for

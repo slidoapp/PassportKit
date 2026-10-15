@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `TokenManager.signIn(refreshToken:grantedScope:idToken:)` starts a session from an existing refresh token, for
+  example the one `exchangeRefreshToken(audiences:)` issued for another client. It replaces the session, saves the
+  credential and emits `.signedIn` like `signIn(with:requestedScope:)`, but caches no access token: the first
+  `accessToken(for:)` refreshes.
+
 ### Fixed
 
 - `KeychainCredentialStore.delete` matches the item by service, account and access group only. It no longer

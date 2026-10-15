@@ -52,6 +52,20 @@ enum DocumentationSnippets {
         _ = (general, bound, exchanged)
     }
 
+    // SessionsAndTokenTargets.md
+    static func seededSession(
+        manager: TokenManager, reportsClient: OAuthClient, reportsStore: any CredentialStore,
+        reportsAccount: CredentialAccount
+    ) async throws {
+        let reports = TokenManager(client: reportsClient, store: reportsStore, account: reportsAccount)
+
+        let issued = try await manager.exchangeRefreshToken(audiences: ["reports"])
+        await reports.signIn(refreshToken: issued.accessToken, grantedScope: ["reports.read"])
+
+        let token = try await reports.accessToken()
+        _ = token
+    }
+
     // ResourceAccessAndScopes.md
     static func origins(manager: TokenManager) {
         let authorizer = RequestAuthorizer(
