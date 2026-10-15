@@ -33,8 +33,7 @@ DPoP and PAR (see §11).
 
 - `swift-tools-version: 6.2`, Swift 6 language mode, warnings as errors
   in CI.
-- Platforms: macOS 14, iOS 17, tvOS 17, watchOS 10, visionOS 1. Apple
-  platforms only (ADR 0011).
+- Platforms: macOS 14 and iOS 17 only (ADR 0011).
 - Dependencies are limited to well-maintained Apple and Swift project
   packages (ADR 0009): swift-http-types, swift-log (`Logging`) and
   SwiftKeychain in the core. SHA-256 for PKCE comes from CryptoKit.
@@ -905,10 +904,8 @@ client secrets, URLs with queries, headers, bodies or server
 
 ## 13. Apple integrations
 
-Part of `PassportKit`. `ASWebAuthenticationSession` does not exist on tvOS
-and watchOS, so `WebAuthenticationSessionUserAgent` is unavailable there;
-the loopback listener and agent exist on macOS, iOS and visionOS. On tvOS
-and watchOS use the device flow.
+Part of `PassportKit`. Both user agents exist on macOS and iOS; the only
+platform guards are the AppKit/UIKit differences between them (ADR 0011).
 
 
 - `KeychainCredentialStore(accessGroup: String? = nil, accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly, decodeLegacy: (@Sendable (Data) -> Credential?)? = nil, logger: Logger = Logger(label: "PassportKit"))`:

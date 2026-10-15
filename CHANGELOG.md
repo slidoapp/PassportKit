@@ -29,6 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `KeychainCredentialStore` sets `kSecAttrSynchronizable` to `false` explicitly when it adds, fetches and deletes
   an item, instead of relying on the default. Items written before are found as before.
 
+### Removed
+
+- **Breaking:** tvOS, watchOS and visionOS are no longer supported. `Package.swift` declares macOS 14 and iOS 17
+  only, and the platform guards that existed for the other three are gone: `WebAuthenticationSessionUserAgent`,
+  `LoopbackRedirectListener` and `LoopbackUserAgent` exist on both supported platforms (ADR 0011, Update).
+
 ### Fixed
 
 - The documentation of `KeychainCredentialStore`, `KeychainCredentialStore.Accessibility` and the security model

@@ -92,10 +92,10 @@ swift test --filter <Suite>/<test>   # a single test
 - `swift format` decides formatting. Do not hand-format.
 - Inject time, randomness, and HTTP transport. Core code never calls
   `Date()`, `URLSession.shared`, or random APIs directly.
-- Apple platforms only (ADR 0011): no Linux code paths or
-  `canImport(FoundationNetworking)`. Guard only real framework gaps with
-  `#if os(...)`: `ASWebAuthenticationSession` is unavailable on tvOS and
-  watchOS, the loopback listener needs macOS, iOS or visionOS.
+- macOS and iOS only (ADR 0011): no Linux code paths, no tvOS, watchOS or
+  visionOS branches, and no `canImport(FoundationNetworking)`. Guard only
+  real differences between the two with `#if os(macOS)`, such as AppKit
+  versus UIKit.
 - Typed errors that preserve the RFC error code and description.
 - Prefer `async`/`await` and structured concurrency over callbacks and
   unstructured `Task {}`. Every long-running operation honours

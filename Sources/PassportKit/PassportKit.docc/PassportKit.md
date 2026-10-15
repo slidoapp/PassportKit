@@ -11,8 +11,7 @@ device authorization, refresh tokens with rotation, token exchange, resource
 indicators, authorization server metadata, token revocation, and bearer
 token usage.
 
-It supports Apple platforms only (macOS 14, iOS 17, tvOS 17, watchOS 10 and
-visionOS 1) and includes Keychain storage and the user agents that complete a
+It supports macOS 14 and iOS 17 only, and includes Keychain storage and the user agents that complete a
 sign-in in the system browser (see <doc:NativeAppRedirects>).
 
 Two layers fit together:

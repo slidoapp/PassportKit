@@ -7,7 +7,7 @@ types, and you can bring your own.
 
 ## ASWebAuthenticationSession
 
-On iOS, macOS and visionOS use ``WebAuthenticationSessionUserAgent``. It wraps
+On iOS and macOS use ``WebAuthenticationSessionUserAgent``. It wraps
 `ASWebAuthenticationSession`: the system presents a browser sheet that can
 share the person's sign-in with Safari, and returns the redirect without
 leaving your app.
@@ -26,8 +26,7 @@ func signIn(client: OAuthClient) async throws -> TokenResponse {
 ```
 
 Use a private-use URI scheme that you own, written in reverse domain order (RFC 8252 §7.1; the library does not check the form),
-or an `https` claimed URL where the OS supports it (macOS 14.4, iOS 17.4,
-visionOS 1.1). Register the redirect URI at the server exactly as written:
+or an `https` claimed URL where the OS supports it (macOS 14.4, iOS 17.4). Register the redirect URI at the server exactly as written:
 the library compares it exactly. Pass
 `prefersEphemeralWebBrowserSession: true` to skip shared sign-in, so the
 person is always asked to authenticate. If the person dismisses the sheet you
@@ -35,7 +34,7 @@ get ``PassportError/Code-swift.struct/userCancelled``.
 
 ## Loopback redirect
 
-Desktop apps and command-line tools (and, with a browser on the same device, iOS and visionOS apps) can listen on `127.0.0.1` (RFC 8252
+Desktop apps and command-line tools (and, with a browser on the same device, iOS apps) can listen on `127.0.0.1` (RFC 8252
 §7.3). Start the listener first, because the redirect URI carries the port the
 system assigned:
 
@@ -75,9 +74,9 @@ registered for the grant.
 
 | Situation | Use |
 |---|---|
-| iOS, macOS or visionOS app with UI | ``WebAuthenticationSessionUserAgent`` |
+| iOS or macOS app with UI | ``WebAuthenticationSessionUserAgent`` |
 | macOS tool or app without a registered scheme | ``LoopbackUserAgent`` |
-| tvOS, watchOS, headless | Device flow (the two agents above are not available on tvOS and watchOS) |
+| Headless, or no browser on the device | Device flow |
 
 Never present the authorization page in an embedded web view that your app
 can read: the person's credentials would pass through your code.

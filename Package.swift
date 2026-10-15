@@ -13,9 +13,6 @@ let package = Package(
     platforms: [
         .macOS(.v14),
         .iOS(.v17),
-        .tvOS(.v17),
-        .watchOS(.v10),
-        .visionOS(.v1),
     ],
     products: [
         .library(name: "PassportKit", targets: ["PassportKit"]),

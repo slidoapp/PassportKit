@@ -33,9 +33,8 @@ descriptions or errors.
 ## Requirements
 
 - Swift 6.2 or later (Xcode 26 or later).
-- Apple platforms only: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1 ([ADR 0011](docs/decisions/0011-apple-platforms-only.md)).
-  `ASWebAuthenticationSession` is not available on tvOS and watchOS, and the loopback redirect needs macOS, iOS or
-  visionOS; use the device flow elsewhere.
+- macOS 14 and iOS 17 only ([ADR 0011](docs/decisions/0011-apple-platforms-only.md)). tvOS, watchOS and visionOS are
+  not supported for now.
 - Dependencies: [swift-http-types](https://github.com/apple/swift-http-types),
   [swift-log](https://github.com/apple/swift-log) and SwiftKeychain
   ([ADR 0009](docs/decisions/0009-external-dependencies.md)). SHA-256 comes from CryptoKit.

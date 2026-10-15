@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-10-12
+- Updated: 2026-10-15, macOS and iOS only (see Update)
 - Supersedes: the product, Linux and platform parts of
   [0002](0002-package-layout-and-toolchain.md), the Linux criterion and
   swift-crypto row of [0009](0009-external-dependencies.md), and the Linux
@@ -58,3 +59,23 @@ does not need `os` (a mutex from `Synchronization` once macOS 15 is the
 floor, or `NSLock`), and a Linux CI job; the Apple-only types can stay in
 `PassportKit` behind `#if canImport(...)` or move back to a separate
 module. Weigh that cost against a concrete consumer.
+
+## Update: macOS and iOS only (2026-10-15)
+
+The maintainer decided to support only macOS and iOS for now. Nothing in
+the library or its tests ran on tvOS, watchOS or visionOS, and the
+platform floors there only widened what had to stay compilable.
+
+- `Package.swift` declares macOS 14 and iOS 17. The tvOS 17, watchOS 10
+  and visionOS 1 minimums above are withdrawn, which is a breaking change
+  for a package that declared them (see the changelog).
+- The `#if !os(tvOS) && !os(watchOS)` guard around
+  `ASWebAuthenticationSession` and the `os(macOS) || os(iOS) ||
+  os(visionOS)` guard around the loopback listener and agent are gone: both
+  user agents exist on both platforms. The remaining guards separate
+  macOS from iOS (AppKit versus UIKit).
+- The device flow is no longer the answer for tvOS and watchOS. It stays
+  for headless tools and for devices without a browser.
+
+Support for another platform comes back with a decision that names its
+guards, its CI job and its documentation.
