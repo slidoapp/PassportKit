@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Documentation of exact scope matching in `RequireAnyScope` and the resource access article: scopes are compared as
+  exact strings and `*` is not a wildcard, with a compiled `.custom` policy that accepts a scope prefix.
+
 - A DocC article, "Migrating stored tokens", on moving users from another OAuth library without signing them out:
   read the old refresh token, call `signIn(refreshToken:)` under a new account, delete the old item once a token
   request succeeded.

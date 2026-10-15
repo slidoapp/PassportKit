@@ -114,6 +114,19 @@ enum DocumentationSnippets {
         _ = manager
     }
 
+    static func prefixPolicy(client: OAuthClient, account: CredentialAccount) {
+        let manager = TokenManager(
+            client: client, store: InMemoryCredentialStore(), account: account,
+            acceptancePolicy: .custom { context in
+                guard let granted = context.token.grantedScope else {
+                    return .reject(reason: "The granted scope is unknown.")
+                }
+                return granted.scopes.contains { $0.hasPrefix("api:event:") }
+                    ? .accept : .reject(reason: "No event scope was granted.")
+            })
+        _ = manager
+    }
+
     static func customPolicy(client: OAuthClient, account: CredentialAccount) {
         let manager = TokenManager(
             client: client, store: InMemoryCredentialStore(), account: account,
