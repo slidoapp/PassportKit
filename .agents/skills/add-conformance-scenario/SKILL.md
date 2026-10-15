@@ -12,11 +12,16 @@ description: Model a specific authorization server behaviour (including non-stan
    replace every token, code, and secret with obvious placeholders,
    replace hostnames with `as.example.com` / `api.example.com`, and drop
    headers that identify a vendor.
-3. **Add a fixture** under `Tests/Fixtures/` if the exchange is reused.
-   Never modify an existing fixture to make a test pass.
-4. **Script the fake server** in `Tests/ConformanceTests`: scripted
-   responses for each request, and assertions on the requests the client
-   sent (parameters, headers, ordering).
+3. **Script the fake server** in `Tests/ConformanceTests`: the controls of
+   `FakeAuthorizationServer` (`configure`, `override`, `responseDelay`,
+   `omitsScope`, ...) or a `RecordingTransport` script, and assertions on
+   the requests the client sent (parameters, headers, ordering). See
+   `docs/testing.md`. If one captured exchange is reused by several tests,
+   store it under `Tests/Fixtures/`; never modify an existing fixture to
+   make a test pass.
+4. **Use the injected clocks.** No sleeps; `ManualClock` waits throw, so
+   call them with `try await`.
 5. **Assert the client outcome:** returned token or typed error, granted
    scope, what was persisted, and that the session was or was not ended.
-6. Run `make check`.
+6. Add a row or a test reference to `docs/rfc-matrix.md` if the scenario
+   covers an RFC requirement, then run `make check`.

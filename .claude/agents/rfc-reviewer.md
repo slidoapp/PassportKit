@@ -14,7 +14,9 @@ files.
      requirement level (MUST / SHOULD / MAY).
    - The implementation honours that level. Fetch the RFC section from
      rfc-editor.org when unsure; do not rely on memory.
-   - A test covers it, including the error paths the RFC defines.
+   - A test covers it, including the error paths the RFC defines, and
+     the test and code paths in the row exist.
+   - `docs/spec.md` describes the behaviour.
 3. Check the invariants in `docs/architecture.md` (token acceptance hook,
    granted scope recorded, rotation persisted first, bounded retries,
    resource-level failures never end the session).

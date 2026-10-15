@@ -12,17 +12,21 @@ description: Implement or extend support for an OAuth RFC feature in PassportKit
    `docs/decisions/`. If the feature needs a new extension point or
    changes public API shape, write an ADR first (`0000-template.md`).
 3. **Record requirements.** Add one row per client requirement to
-   `docs/rfc-matrix.md` with status `planned`.
+   `docs/rfc-matrix.md` with status `planned`, and add the RFC to its scope
+   table if it is not there.
 4. **Write failing tests.** Unit tests for request building and response
    parsing (use RFC example vectors where they exist), and a conformance
    scenario against the fake authorization server for the end-to-end
    flow, including the error responses the RFC defines.
-5. **Implement.** Core logic in the core module; platform-specific parts
-   only in the Apple adapter module. Inject transport, clock, and
-   randomness.
-6. **Document.** DocC comments on public symbols with the RFC section.
+5. **Implement.** Protocol logic in `Sources/PassportKit` (see the folder
+   map in `docs/architecture.md`); Apple-framework code only in `Storage`
+   or `UserAgents`. Inject transport, clock, and randomness.
+6. **Document.** DocC comments on public symbols with the RFC section;
+   describe the behaviour in `docs/spec.md`; if a DocC article changes,
+   compile its samples in `Tests/ConformanceTests/DocumentationSnippets.swift`
+   and run `make docs`.
 7. **Update** `docs/rfc-matrix.md` rows to `done` with code and test
-   references, and add a `CHANGELOG.md` entry under `Unreleased`.
+   references, and add a `CHANGELOG.md` entry under `[Unreleased]`.
 8. **Verify.** Run `make check`. Then run the `rfc-reviewer` and, if
    tokens, storage, redirects, or logging changed, the
    `security-reviewer` subagent (Claude), or perform the same review

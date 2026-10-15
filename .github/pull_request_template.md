@@ -14,6 +14,7 @@
 
 - [ ] `make check` passes
 - [ ] Tests cover new behaviour
-- [ ] `docs/rfc-matrix.md` updated for protocol changes
+- [ ] `docs/rfc-matrix.md` and `docs/spec.md` updated for protocol or API changes
+- [ ] `make docs` passes if a public symbol or a DocC article changed
 - [ ] `CHANGELOG.md` updated for user-visible changes
 - [ ] No secrets, real hostnames, or vendor-specific details

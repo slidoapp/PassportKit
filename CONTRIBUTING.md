@@ -76,17 +76,21 @@ installs it with `npm ci`, which needs network access. The tests are skipped
 unless the server is running, so `make check` stays offline. `make docs`
 needs Xcode. Changing a public symbol or an article? Run it, and keep the
 article's code samples in sync with
-`Tests/ConformanceTests/DocumentationSnippets.swift`.
+`Tests/ConformanceTests/DocumentationSnippets.swift` (the samples of
+*Native app redirects* are in
+`Tests/PassportKitTests/UserAgents/UserAgentDocumentationSnippets.swift`).
 
 Design background lives in [docs/](docs/): start with
 [architecture.md](docs/architecture.md) and the decision records in
-[docs/decisions/](docs/decisions/).
+[docs/decisions/](docs/decisions/README.md). Open work is in
+[roadmap.md](docs/roadmap.md).
 
 ### Commits and pull requests
 
 - Commit subject: `<type>(<scope>): <summary>` in the imperative mood,
   at most 72 characters. Types: `feat`, `fix`, `refactor`, `test`,
-  `docs`, `chore`.
+  `docs`, `chore`, `build`, `ci`. Sign commits (`git commit -S`); the
+  `commit-msg` hook from `make setup` checks the format.
 - The commit body explains why the change is needed, wrapped at 72
   columns.
 - One intent per commit. Keep behaviour changes separate from

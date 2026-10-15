@@ -1,12 +1,16 @@
 # Retrospective: initial implementation (2026-10-07/08)
 
+A historical record, written when the first implementation finished. The facts below describe that moment: the
+milestone table it mentions was removed from the docs after the work was done, and the platform and dependency
+decisions changed afterwards (ADR 0009 to 0011).
+
 PassportKit 0.x was built in one overnight session by a coding-agent
 orchestrator (Claude Opus) delegating milestones to implementation agents
 (Claude Sonnet), with read-only review agents between milestones.
 
 ## Outcome
 
-- 9 milestones from `docs/plan.md` implemented; 400 offline tests
+- 9 milestones of the implementation plan implemented; 400 offline tests
   (unit, fake-server conformance, Apple adapters) and 16 integration tests
   against an independent, certified authorization server
   (`Tools/integration-server`, panva/oidc-provider).
@@ -63,5 +67,5 @@ orchestrator (Claude Opus) delegating milestones to implementation agents
 
 ## Open items
 
-See `docs/plan.md` → Next, `docs/security-model.md` → Known limits, and
+See `docs/roadmap.md`, `docs/security-model.md` → Known limits, and
 `partial` rows in `docs/rfc-matrix.md`.

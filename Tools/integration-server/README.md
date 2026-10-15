@@ -2,13 +2,14 @@
 
 A local, fully scriptable OAuth 2.0 authorization server for integration-testing PassportKit.
 Built on [`oidc-provider`](https://github.com/panva/node-oidc-provider) (pinned in `package.json`),
-in-memory storage, no browser, no Docker.
+in-memory storage, no browser, no Docker. `make integration` starts it and runs the `IntegrationTests` against it
+(see [docs/testing.md](../../docs/testing.md)); this page is for running it by hand.
 
 ## Run
 
 ```sh
 cd Tools/integration-server
-npm install
+npm ci                    # installs the pinned versions
 node server.js            # http://localhost:9400 (PORT overrides; issuer follows PORT, or set ISSUER)
 ./smoke.sh                # starts its own instance on port 9411 (SMOKE_PORT) and checks every flow
 ```
