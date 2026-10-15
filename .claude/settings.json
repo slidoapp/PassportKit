@@ -44,8 +44,7 @@
       "Bash(gh issue comment:*)",
       "Edit(/.github/**)",
       "Edit(/LICENSE)",
-      "Edit(/Package.swift)",
-      "Edit(/Tests/Fixtures/**)"
+      "Edit(/Package.swift)"
     ],
     "deny": [
       "Bash(git push --force:*)",
