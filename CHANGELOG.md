@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A DocC article, "Migrating stored tokens", on moving users from another OAuth library without signing them out:
+  read the old refresh token, call `signIn(refreshToken:)` under a new account, delete the old item once a token
+  request succeeded.
+
 - A release workflow: pushing a version tag runs the CI workflow (now also callable with `workflow_call`) and,
   only if every job passes, creates the GitHub release with the tag's changelog section as notes. The procedure is
   in `CONTRIBUTING.md`.

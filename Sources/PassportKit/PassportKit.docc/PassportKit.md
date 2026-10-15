@@ -36,6 +36,7 @@ appear in descriptions, errors or events.
 - <doc:ResourceAccessAndScopes>
 - <doc:ErrorHandling>
 - <doc:NativeAppRedirects>
+- <doc:MigratingStoredTokens>
 - <doc:Testing>
 
 ### Configuring a client

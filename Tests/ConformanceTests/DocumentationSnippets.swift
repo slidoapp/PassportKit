@@ -66,6 +66,30 @@ enum DocumentationSnippets {
         _ = token
     }
 
+    // MigratingStoredTokens.md
+    static func loadLegacyRefreshToken() -> String? { nil }
+    static func deleteLegacyItem() {}
+
+    // MigratingStoredTokens.md
+    static func migratedManager(client: OAuthClient) async throws -> TokenManager {
+        // A different service than the old item used.
+        let account = CredentialAccount(service: "com.example.app.passportkit", account: "default")
+        let manager = TokenManager(client: client, store: KeychainCredentialStore(), account: account)
+        _ = try await manager.load()
+
+        guard let legacyRefreshToken = loadLegacyRefreshToken() else { return manager }
+        if await manager.credential == nil {
+            await manager.signIn(refreshToken: Secret(legacyRefreshToken), grantedScope: ["openid", "offline_access"])
+        }
+        do {
+            _ = try await manager.accessToken()
+            deleteLegacyItem()
+        } catch {
+            // Keep the old item: a transient failure must not sign the user out. The next launch tries again.
+        }
+        return manager
+    }
+
     // ResourceAccessAndScopes.md
     static func origins(manager: TokenManager) {
         let authorizer = RequestAuthorizer(
