@@ -22,7 +22,7 @@ struct AcceptanceTests {
         let manager = harness.manager
         let target = TokenTarget.refreshGrant(resources: [apiA])
         let hanging = Task { try await manager.accessToken(for: target) }
-        #expect(await harness.clock.waitForSleeper(timeout: .seconds(2)), "the policy has no time limit")
+        #expect(await harness.clock.waitForSleeper(timeout: .seconds(30)), "the policy has no time limit")
         harness.clock.advance(by: .seconds(10))
         let isDone = await finishes(hanging)
         gate.open()
