@@ -66,7 +66,8 @@ public enum Discovery {
         } catch {
             observer?.record(.transportFailure(endpoint: .metadata, grantType: nil, duration: stopwatch.elapsed))
             if !(error is CancellationError || Task.isCancelled) {
-                logger.warning(
+                logger.log(
+                    level: .level(forTransportFailure: error),
                     "Request to the authorization server failed",
                     metadata: .request(endpoint: .metadata, duration: stopwatch.elapsed))
             }

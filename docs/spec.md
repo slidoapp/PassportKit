@@ -923,8 +923,8 @@ public.
 | `trace` | refresh lane turns, request coalescing, cache hits, discarded results of superseded sessions |
 | `debug` | each request (`endpoint`, `grant_type`, `status`, `error_code`, `duration_ms`), loopback listener internals |
 | `info` | session lifecycle: signed in (`reason`: grant, restored), signed out or session ended (`reason`), refresh token rotated |
-| `notice` | storage failures, acceptance policy rejections, a 401 retry, `insufficient_scope`, a loopback redirect that failed validation |
-| `warning` | transport failures, failed or timed-out revocation, a renewed token rejected again, Keychain failures (`status`), failed web authentication sessions |
+| `notice` | storage failures, acceptance policy rejections, a 401 retry, `insufficient_scope`, a renewed token rejected again (a user without access), a loopback redirect that failed validation, expected connectivity failures: a request that failed offline (`URLError` `notConnectedToInternet`, `networkConnectionLost`, `timedOut`, `cannotFindHost`, `cannotConnectToHost`, `dnsLookupFailed`, `dataNotAllowed`, `internationalRoamingOff`, `callIsActive`), a revocation that failed that way or timed out |
+| `warning` | transport failures that are not connectivity problems (TLS and certificate errors, refused redirects, a response over the size cap), a revocation that failed for another reason, Keychain failures (`status`), failed web authentication sessions |
 
 Messages are constant strings and variable data goes in metadata with
 snake_case keys. Logs never contain tokens, codes, `state`, verifiers,

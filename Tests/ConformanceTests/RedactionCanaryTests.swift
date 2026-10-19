@@ -237,6 +237,12 @@ struct RedactionCanaryTests {
         await rig.renderings.observe { try await authorizer.send(resource) }
         rig.harvest.challenging(false)
 
+        // The resource rejects the renewed token as well, and echoes the token in its challenge.
+        let rejecting = AlwaysRejectingResource()
+        await rig.renderings.observe {
+            try await RequestAuthorizer(manager: manager, transport: rejecting).send(resource)
+        }
+
         // The server rejects the refresh token and echoes it; the session ends.
         rig.wallClock.advance(by: .seconds(100_000))
         rig.echo("invalid_grant", of: ["refresh_token", "client_secret"])
@@ -302,5 +308,14 @@ struct RedactionCanaryTests {
         let ended = try #require(logs.lines.first { $0.message == "Session ended" })
         #expect(ended.metadata["reason"] == "refresh_token_rejected")
         #expect(logs.contains("Started a token request", level: .trace))
+    }
+}
+
+/// A resource that answers 401 `invalid_token` to every request and repeats the bearer token in the challenge.
+private struct AlwaysRejectingResource: HTTPTransport {
+    func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data) {
+        let token = request.headerFields[.authorization]?.dropFirst(7) ?? ""
+        let challenge = #"Bearer error="invalid_token", error_description="the token \#(token) is not valid""#
+        return (HTTPResponse(status: .unauthorized, headerFields: [.wwwAuthenticate: challenge]), Data())
     }
 }

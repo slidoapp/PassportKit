@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Expected failures are logged at `.notice` instead of `.warning`, so apps that forward `.info` and above to remote
+  logging no longer report them: a request to the authorization server that failed for lack of connectivity (offline,
+  timeout, DNS), a revocation on sign-out that failed that way or timed out, and a renewed access token that the
+  resource rejects again. Other transport failures (TLS, certificates, refused redirects, oversized responses) and
+  revocations refused by the server stay at `.warning`. Messages and metadata are unchanged.
+
 ## [0.3.1] - 2026-10-15
 
 ### Fixed

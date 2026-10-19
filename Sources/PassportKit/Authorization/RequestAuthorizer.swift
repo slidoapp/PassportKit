@@ -122,7 +122,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
                 ).redacting([token.value.reveal()]))
         }
         guard attempt == 0 else {
-            manager.client.logger.warning("The resource rejected a renewed access token")
+            manager.client.logger.notice("The resource rejected a renewed access token")
             return .fail(PassportError(.unauthorized, recovery: .resourceDenied, statusCode: statusCode))
         }
         if !challenges.isEmpty, !challenges.contains(where: { AuthenticationScheme.isBearer($0.scheme) }) {

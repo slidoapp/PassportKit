@@ -77,7 +77,8 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
                 .transportFailure(endpoint: request.endpoint, grantType: request.grantType, duration: stopwatch.elapsed)
             )
             if !(error is CancellationError || Task.isCancelled) {
-                logger.warning(
+                logger.log(
+                    level: .level(forTransportFailure: error),
                     "Request to the authorization server failed",
                     metadata: .request(
                         endpoint: request.endpoint, grantType: request.grantType, duration: stopwatch.elapsed))

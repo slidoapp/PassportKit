@@ -1,3 +1,4 @@
+import Foundation
 import Logging
 
 /// Log metadata keys.
@@ -34,5 +35,28 @@ extension Logger.Metadata {
         if let errorCode { metadata[LogKey.errorCode] = "\(errorCode)" }
         if let duration { metadata[LogKey.durationMilliseconds] = "\(duration.wholeMilliseconds)" }
         return metadata
+    }
+}
+
+extension Error {
+    /// Whether the failure is an expected loss of connectivity (offline, no route, timeout) rather than a fault
+    /// worth reporting, such as a TLS or certificate failure. Classifies on the underlying `URLError`, looking
+    /// through ``PassportError`` wrappers.
+    var isConnectivityFailure: Bool {
+        if let error = self as? PassportError { return error.underlying?.isConnectivityFailure ?? false }
+        guard let error = self as? URLError else { return false }
+        switch error.code {
+        case .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost, .cannotConnectToHost,
+            .dnsLookupFailed, .dataNotAllowed, .internationalRoamingOff, .callIsActive:
+            return true
+        default: return false
+        }
+    }
+}
+
+extension Logger.Level {
+    /// `.notice` for an expected loss of connectivity, `.warning` for any other failure.
+    static func level(forTransportFailure error: any Error) -> Logger.Level {
+        error.isConnectivityFailure ? .notice : .warning
     }
 }

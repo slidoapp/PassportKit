@@ -267,8 +267,11 @@ public actor TokenManager {
         }
         switch outcome {
         case .failed(let error):
-            logger.warning("Revoking the refresh token failed", metadata: [LogKey.errorCode: "\(error.code.rawValue)"])
-        case .timedOut: logger.warning("Revoking the refresh token timed out")
+            // An offline sign-out is expected; a server refusal or a TLS failure is not.
+            logger.log(
+                level: error.code == .transportFailure ? .level(forTransportFailure: error) : .warning,
+                "Revoking the refresh token failed", metadata: [LogKey.errorCode: "\(error.code.rawValue)"])
+        case .timedOut: logger.notice("Revoking the refresh token timed out")
         case .revoked: logger.debug("Revoked the refresh token")
         default: break
         }
