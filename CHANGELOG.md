@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-19
+
 ### Changed
 
 - Expected failures are logged at `.notice` instead of `.warning`, so apps that forward `.info` and above to remote
@@ -322,7 +324,8 @@ unchanged: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1.
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization request query as form data, so a `+` in
   `scope` is a space.
 
-[Unreleased]: https://github.com/slidoapp/PassportKit/compare/0.3.1...HEAD
+[Unreleased]: https://github.com/slidoapp/PassportKit/compare/0.3.2...HEAD
+[0.3.2]: https://github.com/slidoapp/PassportKit/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/slidoapp/PassportKit/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/slidoapp/PassportKit/compare/0.2.0...0.3.0
 [0.2.0]: https://github.com/slidoapp/PassportKit/compare/0.1.0...0.2.0
