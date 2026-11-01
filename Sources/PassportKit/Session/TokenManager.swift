@@ -254,6 +254,7 @@ public actor TokenManager {
     /// stored credential is queued ahead of any save a later sign-in makes, and the revocation has its turn on
     /// the ended session's lane. A ``signIn(with:requestedScope:)`` right after it starts a session that the
     /// pending revocation neither waits for nor blocks. See ADR 0014.
+    @discardableResult
     public func beginSignOut(revoke: Bool = true) -> PendingSignOut {
         let endedSession = generation
         let endedLane = lane

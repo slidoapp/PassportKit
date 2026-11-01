@@ -81,7 +81,7 @@ struct StoreOrderingTests {
         var ending: Task<Void, Never>?
         switch end {
         case .signOut:
-            _ = await manager.beginSignOut(revoke: false)
+            await manager.beginSignOut(revoke: false)
         case .refreshTokenRejected:
             await harness.server.revoke(token: try #require(await harness.currentRefreshToken()))
             harness.expireAccessTokens()

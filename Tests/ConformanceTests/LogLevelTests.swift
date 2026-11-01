@@ -151,7 +151,7 @@ struct LogLevelTests {
     func revocationLoggedWithoutReader() async throws {
         let rig = try await Rig()
         rig.fail("/revoke", with: URLError(.notConnectedToInternet))
-        _ = await rig.manager.beginSignOut()
+        await rig.manager.beginSignOut()
         #expect(await waitUntil { rig.levels(of: Self.revocationFailed) == [.notice] })
     }
 
