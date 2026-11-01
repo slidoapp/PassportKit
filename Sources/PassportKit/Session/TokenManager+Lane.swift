@@ -6,14 +6,19 @@ import Logging
 extension TokenManager {
     /// Exchanges the refresh token for tokens of another audience or resource (RFC 8693 §2.1).
     ///
-    /// The subject is the current refresh token. The response is returned as it came: the issued token (for
-    /// the default `requestedTokenType`, a refresh token bound to `audiences`) is in `accessToken`, whatever its
-    /// type. The manager does not cache or judge it. A `refresh_token` in the response is the rotated subject
-    /// and is saved before this returns (persist before publish).
+    /// The subject is the current refresh token. The issued token (for the default `requestedTokenType`, a
+    /// refresh token bound to `audiences`) is in `accessToken` of the returned response, whatever its type; the
+    /// manager does not cache or judge it. A `refresh_token` in the server's response is the session's rotated
+    /// subject: the manager saves it before this returns (persist before publish) and returns the response with
+    /// ``TokenResponse/refreshToken`` set to `nil`, because that token belongs to the session alone. Using it
+    /// elsewhere would present it twice and could make the server revoke the grant (RFC 9700 §4.14.2).
     ///
-    /// Runs in the refresh token lane, so it never overlaps a refresh. Cancelling the caller stops waiting only:
-    /// a request that was sent finishes and its rotated refresh token is saved. `invalid_grant` ends the
-    /// session (RFC 6749 §5.2).
+    /// Runs in the refresh token lane, so it never overlaps a refresh. `invalid_grant` ends the session (RFC
+    /// 6749 §5.2).
+    ///
+    /// - Important: Cancelling the caller stops it waiting, nothing else: a request that was sent finishes and
+    ///   its rotated subject is saved, but the issued token is not returned to anyone. It stays valid at the
+    ///   server until it expires. A caller that must not lose the issued token does not cancel the call.
     ///
     /// - Important: The issued token belongs to the caller, not to the session, so a response the server sent
     ///   is returned even if the session ended or was replaced while the request was in flight (ADR 0015). Its
@@ -45,7 +50,10 @@ extension TokenManager {
                             subjectToken: $0, subjectTokenType: .refreshToken, requestedTokenType: requestedTokenType,
                             audiences: audiences, resources: resources, scope: scope))
                 }
-                completion.complete(.success(response))
+                // The rotated subject stays with the session (persisted above, or handed to its revocation).
+                var issued = response
+                issued.refreshToken = nil
+                completion.complete(.success(issued))
             } catch {
                 completion.complete(.failure(error))
             }

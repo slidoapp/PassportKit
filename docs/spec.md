@@ -648,7 +648,9 @@ Invariants (each has a conformance test):
    expired and a new one is needed.
 6. **Generations.** `signOut`, both `signIn` overloads and session end
    increment the session generation. An operation that completes under an older
-   generation discards its result and writes nothing. A caller that was
+   generation discards its result and writes nothing, except that an
+   answered `exchangeRefreshToken` still returns its issued token to its
+   caller (ADR 0015). A caller that was
    waiting for such an operation asks again once on the session that
    exists now, if there is one, instead of failing; with none it throws
    `.notAuthenticated`. `.signedOut` and `.signedIn` are emitted before
@@ -660,7 +662,9 @@ Invariants (each has a conformance test):
 7. **Cancellation.** Cancelling a caller only stops it waiting. A
    request that was already sent is allowed to finish and its result is
    persisted. A caller that is cancelled before it starts never starts
-   one. A cancelled `signOut` clears the session and reports the
+   one. A cancelled `exchangeRefreshToken` whose request was sent gives
+   up its issued token: nobody receives it, and it stays valid at the
+   server until it expires. A cancelled `signOut` clears the session and reports the
    revocation as `.cancelled`; so does `PendingSignOut.result` for the
    caller that was cancelled. The revocation's time limit runs in a task
    the manager owns, from when the delete finished, whoever waits.
@@ -692,13 +696,15 @@ Invariants (each has a conformance test):
 `exchangeRefreshToken` is not coalesced (each call sends one request) and its
 result is not cached or run through the acceptance policy: the issued token is
 usually a refresh token for another audience and belongs to the application.
-Its `refresh_token`, the rotated subject, is persisted. An exchange the server
+Its `refresh_token`, the rotated subject, is persisted and removed from the
+returned response (`refreshToken` is `nil`): it belongs to the session, and
+presenting it elsewhere could trigger reuse detection. An exchange the server
 answered is returned even if the session ended or was replaced meanwhile (ADR
 0015): its rotated subject then goes to the ended session's revocation and the
 current session is not touched, and a caller that must not use a token of an
 ended session discards it itself. An exchange whose session ended before it was
 sent throws `.notAuthenticated`, as does a failure that arrives late. Revocation in
-`signOut` also takes a lane turn, reserved before `signOut` suspends, so it
+`signOut` also takes a lane turn, reserved by `beginSignOut`, which never suspends, so it
 queues behind operations already sending the old token; the request and the
 wait for it are each limited to `OAuthClient.revocationTimeLimit` (5 s)
 on the client's clock. A time limit gives up
