@@ -104,7 +104,9 @@ follow the same rules as errors and events:
 ## Known limits
 
 - **The macOS login keychain does not enforce accessibility or access groups.** On macOS `KeychainCredentialStore`
-  uses the file-based login keychain, because SwiftKeychain cannot target the data protection keychain. There
+  uses the file-based login keychain, because the data protection keychain on macOS needs a keychain access group
+  entitlement (`keychain-access-groups` or `application-identifier`) of the hosting process, which plug-ins loaded
+  into another app, command-line tools and `swift test` do not have (ADR 0009). There
   `Accessibility` and `accessGroup` are accepted but not enforced: an item is readable whenever the login keychain
   is unlocked, and the access group does not separate apps. What protects the item is the keychain's access control
   for the app that created it. On iOS both are enforced. The store sets `kSecAttrSynchronizable` to `false` on every

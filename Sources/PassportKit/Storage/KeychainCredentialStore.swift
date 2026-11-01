@@ -9,17 +9,19 @@ import SwiftKeychain
 /// The item's service and account are the `CredentialAccount`'s `service` and `account`; the library has
 /// no defaults for either. The payload is the versioned JSON of `CredentialCoding`, kept as one value inside
 /// SwiftKeychain's archived dictionary; the store makes the Keychain calls itself, matching the item by
-/// class, service, account and access group. Items are never
-/// synchronizable: a refresh token is a bearer secret for one device and must not travel through iCloud
-/// Keychain. The store sets `kSecAttrSynchronizable` to `false` when it adds, fetches and deletes an item,
-/// and there is no option to change it.
+/// class, service, account, synchronizable and access group. Items are never synchronizable: a refresh token is
+/// a bearer secret for one device and must not travel through iCloud Keychain. The store sets
+/// `kSecAttrSynchronizable` to `false` on the item it adds and in the query it finds, updates and deletes the item
+/// with, and there is no option to change it.
 ///
 /// ## Platform differences
 ///
 /// On iOS the items live in the data protection keychain, which enforces ``Accessibility`` and the access
-/// group. On macOS the store uses the file-based login keychain, because SwiftKeychain cannot target the
-/// data protection keychain, and there neither is enforced: an item is readable whenever the login keychain
-/// is unlocked, whatever its accessibility class, and the access group does not partition items. Access to
+/// group. On macOS the store uses the file-based login keychain, and there neither is enforced: an item is
+/// readable whenever the login keychain is unlocked, whatever its accessibility class, and the access group does
+/// not partition items. The data protection keychain on macOS needs a keychain access group entitlement
+/// (`keychain-access-groups` or `application-identifier`) of the hosting process, which plug-ins loaded into
+/// another app, command-line tools and `swift test` do not have (ADR 0009). Access to
 /// an item is then decided by the keychain's own access control for the app that created it. Do not rely on
 /// ``Accessibility`` or `accessGroup` to protect or share a credential on macOS.
 ///
@@ -37,7 +39,7 @@ public final class KeychainCredentialStore: CredentialStore {
     ///
     /// The `…ThisDeviceOnly` classes keep the item out of backups and device migration. Prefer them for
     /// refresh tokens. The class is enforced on iOS only: the login keychain that the store uses on macOS
-    /// does not enforce it, because SwiftKeychain cannot target the data protection keychain.
+    /// does not enforce it (see "Platform differences" above).
     ///
     /// Cases may be added in a minor release, as the Keychain gains classes: the enumeration is not frozen, so a
     /// `switch` over it needs a `default`.

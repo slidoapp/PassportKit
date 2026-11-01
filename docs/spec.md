@@ -978,13 +978,15 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   status number in the description, never item data);
   `errSecInteractionNotAllowed` (device locked) has recovery
   `.retryLater(after: nil)`. `delete` treats "not found" as success.
-  Items are never synchronizable (the item type sets
-  `kSecAttrSynchronizable: false` on add, fetch and delete; no option): a
-  refresh token must not sync between devices.
+  Items are never synchronizable (`kSecAttrSynchronizable: false` is set
+  on the added item and in the identity query used to find, update and
+  delete it; no option): a refresh token must not sync between devices.
   `accessibility` is `kSecAttrAccessible`; the store uses the file-based
-  login keychain on macOS (SwiftKeychain cannot target the data
-  protection keychain, so there is no `useDataProtectionKeychain`
-  option). That keychain enforces neither accessibility classes nor
+  login keychain on macOS, because the data protection keychain there
+  needs a keychain access group (`keychain-access-groups` or
+  `application-identifier`) entitlement of the hosting process, which
+  plug-ins loaded into another app, command-line tools and `swift test`
+  lack (ADR 0009); there is no option for it. That keychain enforces neither accessibility classes nor
   access groups, so on macOS `accessibility` and `accessGroup` do not
   restrict access; they are enforced on iOS. `load`, `save` and `delete`
   match the item by class, service, account and access group, not by
