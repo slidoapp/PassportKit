@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `IssuerValidation`, `Discovery.Style`, `KeychainCredentialStore.Accessibility` and the enumerations of
   `PassportKitTesting` may gain cases in a minor release, so a `switch` over them needs a `default`.
 
+### Removed
+
+- **Breaking:** `Credential.additionalFields` and the matching initializer parameter. Nothing in the library set or
+  read it, and `TokenManager` offered no way to fill it. Stored records that carry the field still decode; the field
+  is ignored.
+
 ### Fixed
 
 - `LoopbackUserAgent` installs its `state` filter before it opens the browser, so a request with another `state`

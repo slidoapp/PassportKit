@@ -18,8 +18,7 @@ struct KeychainCredentialStoreTests {
     private func credential(_ token: String = "refresh-1", updatedAt: TimeInterval = 1_700_000_000) -> Credential {
         Credential(
             clientID: "app", issuer: URL(string: "https://as.example.com"), refreshToken: Secret(token),
-            grantedScope: ["read"], updatedAt: Date(timeIntervalSince1970: updatedAt),
-            additionalFields: ["tenant": .string("t1")])
+            grantedScope: ["read"], updatedAt: Date(timeIntervalSince1970: updatedAt))
     }
 
     private func itemCount() -> Int {

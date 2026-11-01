@@ -2,7 +2,7 @@ import Foundation
 
 /// The root grant of a session: what is persisted between launches. Access tokens are never part of it.
 ///
-/// Descriptions and reflection never show token values or the values of ``additionalFields``.
+/// Descriptions and reflection never show token values.
 public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, CustomDebugStringConvertible,
     CustomReflectable
 {
@@ -18,8 +18,6 @@ public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, 
     public var grantedScope: ScopeSet?
     /// When the credential was last written.
     public var updatedAt: Date
-    /// Application data stored with the credential, preserved without interpretation.
-    public var additionalFields: [String: JSONValue]
 
     /// Creates a credential.
     public init(
@@ -28,8 +26,7 @@ public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, 
         refreshToken: Secret? = nil,
         idToken: Secret? = nil,
         grantedScope: ScopeSet? = nil,
-        updatedAt: Date,
-        additionalFields: [String: JSONValue] = [:]
+        updatedAt: Date
     ) {
         self.clientID = clientID
         self.issuer = issuer
@@ -37,7 +34,6 @@ public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, 
         self.idToken = idToken
         self.grantedScope = grantedScope
         self.updatedAt = updatedAt
-        self.additionalFields = additionalFields
     }
 
     /// A summary that names present members only.
@@ -47,7 +43,6 @@ public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, 
         if refreshToken != nil { parts.append("refreshToken: <redacted>") }
         if idToken != nil { parts.append("idToken: <redacted>") }
         if let grantedScope { parts.append("grantedScope: \(grantedScope)") }
-        if !additionalFields.isEmpty { parts.append("additionalFields: \(additionalFields.keys.sorted())") }
         return "Credential(\(parts.joined(separator: ", ")))"
     }
 

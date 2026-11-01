@@ -573,7 +573,6 @@ public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, 
     public var idToken: Secret?
     public var grantedScope: ScopeSet?
     public var updatedAt: Date
-    public var additionalFields: [String: JSONValue]
 }
 ```
 
