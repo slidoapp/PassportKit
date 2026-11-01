@@ -19,23 +19,23 @@ import Foundation
 /// ```
 public struct LoopbackUserAgent: AuthorizationUserAgent {
     private let listener: LoopbackRedirectListener
-    private let timeout: Duration
+    private let timeLimit: Duration
     private let openURL: @Sendable (URL) async throws -> Void
 
     /// Creates an agent for a listener that is already running.
     ///
     /// - Parameters:
     ///   - listener: The listener whose ``LoopbackRedirectListener/redirectURI`` the request uses.
-    ///   - timeout: How long to wait for the redirect after the browser was opened.
+    ///   - timeLimit: How long to wait for the redirect after the browser was opened.
     ///   - openURL: Opens a URL in the user's browser. The default uses `NSWorkspace` on macOS and
     ///     `UIApplication` on iOS.
     public init(
         listener: LoopbackRedirectListener,
-        timeout: Duration = .seconds(300),
+        timeLimit: Duration = .seconds(300),
         openURL: @escaping @Sendable (URL) async throws -> Void = LoopbackUserAgent.openInSystemBrowser
     ) {
         self.listener = listener
-        self.timeout = timeout
+        self.timeLimit = timeLimit
         self.openURL = openURL
     }
 
@@ -51,6 +51,16 @@ public struct LoopbackUserAgent: AuthorizationUserAgent {
                 detail: "The redirect URI is not the loopback listener's."
             )
         }
+        // Only a redirect that carries this request's `state` may end the wait; the client checks it again.
+        // Installed before the browser opens, so an early request cannot be accepted by the default filter.
+        let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { $0.name == AuthorizationResponseField.state }?.value
+        let accept: @Sendable (URL) -> Bool = { callback in
+            guard let state else { return true }
+            return URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems?
+                .contains { $0.name == AuthorizationResponseField.state && $0.value == state } ?? false
+        }
+        listener.install(accept: accept)
         do {
             try await openURL(url)
         } catch {
@@ -62,14 +72,7 @@ public struct LoopbackUserAgent: AuthorizationUserAgent {
                 underlying: error
             )
         }
-        // Only a redirect that carries this request's `state` may end the wait; the client checks it again.
-        let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
-            .first { $0.name == AuthorizationResponseField.state }?.value
-        return try await listener.waitForCallback(timeout: timeout) { callback in
-            guard let state else { return true }
-            return URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems?
-                .contains { $0.name == AuthorizationResponseField.state && $0.value == state } ?? false
-        }
+        return try await listener.waitForCallback(timeLimit: timeLimit, accept: accept)
     }
 
     /// Opens `url` with the platform's default browser.

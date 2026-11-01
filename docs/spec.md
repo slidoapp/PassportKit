@@ -167,7 +167,10 @@ header names only. A request or response handed back to the caller (the signed
 request of `RequestAuthorizer.sign`, the response of `send`) is the caller's
 value and prints like any `HTTPTypes` value; apps must not log it. The library
 sets `Authorization` with `indexingStrategy = .disallow` (never indexed in
-HPACK or QPACK, RFC 7541 §7.1.3).
+HPACK or QPACK, RFC 7541 §7.1.3). The marking reaches the wire only through an
+`HTTPTransport` that keeps the indexing strategy of `HTTPFields`;
+`URLSessionTransport` converts to `URLRequest`, which has none, so `URLSession`
+decides how to encode the field.
 
 Form bodies follow RFC 6749 Appendix B: UTF-8, every character except
 unreserved ones percent-encoded, space as `+`, `+` as `%2B`.
@@ -252,12 +255,12 @@ public struct PassportError: LocalizedError, Sendable, Equatable, CustomStringCo
         case fixConfiguration
         case noAction
     }
-    public var code: Code
-    public var recovery: Recovery
-    public var statusCode: Int?
-    public var detail: String?    // server `error_description` or the library's explanation, redacted and truncated to 200 characters; never used for logic
-    public var errorURI: URL?
-    public var underlying: (any Error & Sendable)?
+    public internal(set) var code: Code
+    public internal(set) var recovery: Recovery
+    public internal(set) var statusCode: Int?
+    public internal(set) var detail: String?    // server `error_description` or the library's explanation, redacted and truncated to 200 characters; never used for logic
+    public internal(set) var errorURI: URL?
+    public internal(set) var underlying: (any Error & Sendable)?
 }
 ```
 
@@ -349,6 +352,11 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     public func exchange(_ request: TokenExchangeRequest) async throws -> TokenResponse
     // RFC 7009
     public func revoke(_ token: Secret, typeHint: TokenTypeHint? = nil) async throws
+    // RFC 7009, best effort: never throws; .skipped without a revocation endpoint, .timedOut after
+    // `timeLimit` on the client's clock, .cancelled when the caller is cancelled (both cancel the request)
+    public func revokeBestEffort(_ token: Secret, typeHint: TokenTypeHint? = nil,
+                                 timeLimit: Duration = OAuthClient.revocationTimeLimit) async -> RevocationOutcome
+    public static let revocationTimeLimit: Duration   // 5 s, the limit TokenManager applies on sign-out
     // RFC 8628
     public func beginDeviceAuthorization(scope: ScopeSet? = nil, resources: [URL] = [],
                                          additionalParameters: AdditionalParameters = [:]) async throws -> DeviceAuthorization
@@ -458,8 +466,9 @@ The request URL is the authorization endpoint plus, in order, `response_type`,
 `prompt` and the additional parameters. Existing query items on the endpoint
 are preserved; one that the request also sets is `.invalidConfiguration`, as
 are a missing authorization endpoint and a redirect URI that is relative, has a
-fragment, or is `http` on a non-loopback host (RFC 8252 §7.3, §8.3), and when
-no issuer is configured. A loopback
+fragment, or is `http` on a non-loopback host (RFC 8252 §7.3, §8.3), a
+`prompt` that combines `none` with another value (OpenID Connect Core
+§3.1.2.1), and when no issuer is configured. A loopback
 redirect URI carries the actual port; the callback is compared with it.
 
 **Mix-up protection.** The code flow requires `ClientConfiguration.issuer`:
@@ -526,7 +535,8 @@ public actor TokenManager {
     public func invalidate(_ token: AccessToken)                    // after a 401 with this token
     public func exchangeRefreshToken(audiences: [String] = [], resources: [URL] = [], scope: ScopeSet? = nil,
                                      requestedTokenType: TokenTypeIdentifier = .refreshToken) async throws -> TokenResponse
-    public func signOut(revoke: Bool = true) async -> SignOutResult
+    public func signOut(revoke: Bool = true) async -> SignOutResult   // beginSignOut(revoke:) then await result
+    public func beginSignOut(revoke: Bool = true) -> PendingSignOut   // clears local state without suspending (ADR 0014)
 
     public nonisolated var events: AsyncStream<SessionEvent> { get }   // multiple subscribers supported
 }
@@ -564,7 +574,6 @@ public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, 
     public var idToken: Secret?
     public var grantedScope: ScopeSet?
     public var updatedAt: Date
-    public var additionalFields: [String: JSONValue]
 }
 ```
 
@@ -606,7 +615,9 @@ Invariants (each has a conformance test):
    token is returned, and `SessionEvent.storageFailed` is emitted.
    Saves and deletes of the stored credential are applied one after the
    other in the order the manager decided them, whatever the store's
-   speed, so a late save never undoes a sign-out. If a delete fails the
+   speed, so a late save never undoes a sign-out. `load()` reads the
+   store only after the saves and deletes decided before it, so it cannot
+   restore a session whose delete is still running. If a delete fails the
    stored credential survives and `load()` would restore it:
    `SignOutResult.isStoredCredentialDeleted` is false and
    `.storageFailed` is emitted.
@@ -637,16 +648,26 @@ Invariants (each has a conformance test):
    expired and a new one is needed.
 6. **Generations.** `signOut`, both `signIn` overloads and session end
    increment the session generation. An operation that completes under an older
-   generation discards its result and writes nothing. A caller that was
+   generation discards its result and writes nothing, except that an
+   answered `exchangeRefreshToken` still returns its issued token to its
+   caller (ADR 0015). A caller that was
    waiting for such an operation asks again once on the session that
    exists now, if there is one, instead of failing; with none it throws
    `.notAuthenticated`. `.signedOut` and `.signedIn` are emitted before
    the manager first suspends, so their order is the order of the calls.
+   `beginSignOut` does not suspend at all: when it returns, the session is
+   cleared, `.signedOut` was emitted, the delete of the stored credential is
+   queued and the revocation has its lane turn. `signOut` is `beginSignOut`
+   followed by `await PendingSignOut.result`.
 7. **Cancellation.** Cancelling a caller only stops it waiting. A
    request that was already sent is allowed to finish and its result is
    persisted. A caller that is cancelled before it starts never starts
-   one. A cancelled `signOut` clears the session and reports the
-   revocation as `.cancelled`.
+   one. A cancelled `exchangeRefreshToken` whose request was sent gives
+   up its issued token: nobody receives it, and it stays valid at the
+   server until it expires. A cancelled `signOut` clears the session and reports the
+   revocation as `.cancelled`; so does `PendingSignOut.result` for the
+   caller that was cancelled. The revocation's time limit runs in a task
+   the manager owns, from when the delete finished, whoever waits.
 8. **Expiry.** A cached token is used while
    `expiresAt - minimumTokenLifetime > now`. Tokens without expiry use
    `defaultTokenLifetime`, or are refreshed on every use when nil.
@@ -675,10 +696,21 @@ Invariants (each has a conformance test):
 `exchangeRefreshToken` is not coalesced (each call sends one request) and its
 result is not cached or run through the acceptance policy: the issued token is
 usually a refresh token for another audience and belongs to the application.
-Its `refresh_token`, the rotated subject, is persisted. Revocation in
-`signOut` also takes a lane turn, reserved before `signOut` suspends, so it
+Its `refresh_token`, the rotated subject, is persisted and removed from the
+returned response (`refreshToken` is `nil`): it belongs to the session, and
+presenting it elsewhere could trigger reuse detection. A server whose
+exchange response carries a refresh token for the issued token's context
+(RFC 8693 §2.2.1) instead of the rotated subject is not supported by
+`exchangeRefreshToken`; use `OAuthClient.exchange(_:)` (ADR 0015). An exchange the server
+answered is returned even if the session ended or was replaced meanwhile (ADR
+0015): its rotated subject then goes to the ended session's revocation and the
+current session is not touched, and a caller that must not use a token of an
+ended session discards it itself. An exchange whose session ended before it was
+sent throws `.notAuthenticated`, as does a failure that arrives late. Revocation in
+`signOut` also takes a lane turn, reserved by `beginSignOut`, which never suspends, so it
 queues behind operations already sending the old token; the request and the
-wait for it are each limited to 5 s on the client's clock. A time limit gives up
+wait for it are each limited to `OAuthClient.revocationTimeLimit` (5 s)
+on the client's clock. A time limit gives up
 on an operation that ignores cancellation, which then runs on in the background.
 
 ```swift
@@ -712,11 +744,14 @@ extension TokenAcceptancePolicy where Self == ClosureTokenAcceptancePolicy {
     public static func custom(_ body: @escaping @Sendable (TokenAcceptanceContext) async -> TokenAcceptance) -> ClosureTokenAcceptancePolicy
 }
 
+public struct PendingSignOut: Sendable {           // copies share one sign-out
+    public var result: SignOutResult { get async }   // the same outcome for every reader; a cancelled reader gets .cancelled
+}
+public enum RevocationOutcome: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut, cancelled }
 public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected, expiredWithoutRefreshToken }
 public struct SignOutResult: Sendable, Equatable {
-    public enum Revocation: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut, cancelled }
     public var isStoredCredentialDeleted: Bool     // memory is always cleared
-    public var revocation: Revocation              // .skipped: not requested, no refresh token or no revocation endpoint
+    public var revocation: RevocationOutcome              // .skipped: not requested, no refresh token or no revocation endpoint
 }
 
 public enum SessionEvent: Sendable, Hashable {
@@ -946,23 +981,31 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   status number in the description, never item data);
   `errSecInteractionNotAllowed` (device locked) has recovery
   `.retryLater(after: nil)`. `delete` treats "not found" as success.
-  Items are never synchronizable (the item type sets
-  `kSecAttrSynchronizable: false` on add, fetch and delete; no option): a
-  refresh token must not sync between devices.
+  Items are never synchronizable (`kSecAttrSynchronizable: false` is set
+  on the added item and in the identity query used to find, update and
+  delete it; no option): a refresh token must not sync between devices.
   `accessibility` is `kSecAttrAccessible`; the store uses the file-based
-  login keychain on macOS (SwiftKeychain cannot target the data
-  protection keychain, so there is no `useDataProtectionKeychain`
-  option). That keychain enforces neither accessibility classes nor
+  login keychain on macOS, because the data protection keychain there
+  needs a keychain access group (`keychain-access-groups` or
+  `application-identifier`) entitlement of the hosting process, which
+  plug-ins loaded into another app, command-line tools and `swift test`
+  lack (ADR 0009); there is no option for it. That keychain enforces neither accessibility classes nor
   access groups, so on macOS `accessibility` and `accessGroup` do not
-  restrict access; they are enforced on iOS. `delete` matches the item
-  by class, service, account and access group, not by accessibility.
+  restrict access; they are enforced on iOS. `load`, `save` and `delete`
+  match the item by class, service, account and access group, not by
+  accessibility; `save` sets the configured accessibility on an existing
+  item too. With `accessGroup: nil` the query names no group, so on iOS it
+  matches the item in any access group the app can reach; new items go to
+  the app's default group.
   Calls block, so each runs on a private serial `DispatchQueue` bridged
   with a continuation. The store reads and writes only its own format: an
   item it cannot decode is a `.storageFailure`, and there is no migration
   hook (apps move credentials from another library with
-  `TokenManager.signIn(refreshToken:)`, see the "Migrating stored tokens" article). **Known issue (ADR 0009):** SwiftKeychain replaces an
-  existing item by delete-then-add, so a failed second step loses the
-  credential.
+  `TokenManager.signIn(refreshToken:)`, see the "Migrating stored tokens" article). `save` updates an
+  existing item's value in place (`SecItemUpdate`) and adds an item only
+  on `errSecItemNotFound`, so a failed save leaves the previous
+  credential stored and stores writing one item at once do not lose it
+  (ADR 0009).
 - `WebAuthenticationSessionUserAgent` (`@MainActor`): wraps
   `ASWebAuthenticationSession` with a presentation-anchor provider and
   `prefersEphemeralWebBrowserSession`; private-use-scheme callbacks on all
@@ -971,7 +1014,7 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
 - `LoopbackRedirectListener`: `static func start(path: String = "/callback", clock:, logger:)`
   binds an `NWListener` to `127.0.0.1` on an ephemeral port and returns
   once it is ready; `redirectURI` carries the real port (RFC 8252 §7.3).
-  `waitForCallback(timeout:accept:)` claims the first `GET` for the path on
+  `waitForCallback(timeLimit:accept:)` claims the first `GET` for the path on
   the loopback `Host` whose query has `state` and `code` or `error`, that
   `Sec-Fetch-Mode`/`Sec-Fetch-Dest` do not mark as a background fetch (400
   otherwise) and that `accept` allows (default: all); other requests get an
@@ -982,10 +1025,10 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   releasing a listener cancels it. The
   listener is started first so that its `redirectURI` goes into the
   `AuthorizationRequest`.
-- `LoopbackUserAgent(listener:timeout:openURL:)`: a `AuthorizationUserAgent` for a
+- `LoopbackUserAgent(listener:timeLimit:openURL:)`: a `AuthorizationUserAgent` for a
   running listener; opens the URL through an injected
   `@Sendable (URL) async throws -> Void` (default `NSWorkspace` /
-  `UIApplication`), then `waitForCallback(timeout:accept:)` (default 5 minutes).
+  `UIApplication`), then `waitForCallback(timeLimit:accept:)` (default 5 minutes).
   It rejects a request whose `redirectURI` is not the listener's and passes
   an `accept` that matches the `state` of the authorization URL.
 

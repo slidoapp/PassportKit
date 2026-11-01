@@ -22,13 +22,6 @@ public final class ManualWallClock: WallClock, Sendable {
     }
 }
 
-extension Duration {
-    /// The duration in seconds, for calendar arithmetic.
-    var timeInterval: TimeInterval {
-        Double(components.seconds) + Double(components.attoseconds) / 1e18
-    }
-}
-
 /// A `RandomSource` that returns a fixed byte pattern, repeated as often as needed.
 public final class SequenceRandomSource: RandomSource, Sendable {
     private let pattern: [UInt8]

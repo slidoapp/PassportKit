@@ -6,7 +6,7 @@ import Logging
 /// ## Concurrency
 ///
 /// The manager is an actor, and every operation that takes time (a request to the authorization server, a
-/// store call, the acceptance policy) suspends it, so other calls run in between. Three rules keep that safe:
+/// store call, the acceptance policy) suspends it, so other calls run in between. Four rules keep that safe:
 ///
 /// - Bookkeeping that other callers must see (registering an in-flight operation, reserving a lane turn,
 ///   bumping the generation) happens synchronously, before the first `await` of the call.
@@ -17,9 +17,6 @@ import Logging
 /// - Changes to the store are queued in the order they are decided (`changeStore(_:)`), and each session has
 ///   a lane of its own, so what one session's slow operations do never reorders or blocks another's.
 public actor TokenManager {
-    /// The longest `signOut(revoke:)` waits for the revocation request, and the request itself runs.
-    static let revocationTimeLimit = Duration.seconds(5)
-
     /// Thrown inside the manager when work finds that its session ended or was replaced. The public methods
     /// never let it escape: they resolve again on the session that exists now, or report ``superseded``.
     struct SessionSuperseded: Error {}
@@ -51,7 +48,7 @@ public actor TokenManager {
     var lastStoreChange: Task<Bool, Never>?
     /// For each session that ended with a sign-out that revokes: the newest refresh token known to belong to
     /// it. The revocation reads it when its lane turn starts, so it sends the token that is live then, not the
-    /// one that was live when the user signed out (see ``spendRefreshToken(turn:session:adoptsIDToken:send:)``).
+    /// one that was live when the user signed out (see ``spendRefreshToken(turn:session:adoptsIDToken:adoptsScope:returnsAnsweredResponse:send:)``).
     var revocableTokens: [Int: Secret] = [:]
 
     /// Creates a manager with no session. Call ``load()`` to restore one from `store`.
@@ -110,12 +107,15 @@ public actor TokenManager {
     /// Restores the session from the store.
     ///
     /// A stored credential for another client or issuer is ignored and left in place (specification §9). Does
-    /// nothing when a session is already active. Throws ``PassportError`` with code
-    /// ``PassportError/Code-swift.struct/storageFailure`` when the store fails.
+    /// nothing when a session is already active. The store is read after every save and delete decided before
+    /// this call, so a sign-out whose delete is still running cannot be undone by a load. Throws
+    /// ``PassportError`` with code ``PassportError/Code-swift.struct/storageFailure`` when the store fails.
     public func load() async throws -> Credential? {
         let session = generation
+        let pendingChange = lastStoreChange
         let stored: Credential?
         do {
+            _ = await pendingChange?.value
             stored = try await store.load(account)
         } catch {
             logger.warning(
@@ -231,51 +231,71 @@ public actor TokenManager {
         cache.forgetRejection(of: token.target)
     }
 
-    /// Ends the session: clears local state, then revokes the refresh token at the server (RFC 7009).
+    /// Ends the session: clears local state, then revokes the refresh token at the server (RFC 7009 §2).
     ///
     /// Local state is cleared first and always, whatever happens to the revocation, which is best effort and
-    /// limited to five seconds. In-flight operations of the ended session are discarded, but the revocation
-    /// targets the newest refresh token the session was issued, including one rotated by a request that was
-    /// already in flight. If the store cannot delete the credential, ``SignOutResult/isStoredCredentialDeleted``
-    /// is false, ``SessionEvent/storageFailed`` is emitted, and ``load()`` would restore the session.
+    /// limited to ``OAuthClient/revocationTimeLimit``. In-flight operations of the ended session are
+    /// discarded, but the revocation targets the newest refresh token the session was issued, including one
+    /// rotated by a request that was already in flight. If the store cannot delete the credential,
+    /// ``SignOutResult/isStoredCredentialDeleted`` is false, ``SessionEvent/storageFailed`` is emitted, and
+    /// ``load()`` would restore the session.
+    ///
+    /// Returns once the delete and the revocation finished. To carry on as soon as local state is cleared, use
+    /// ``beginSignOut(revoke:)``; this method is that call followed by ``PendingSignOut/result``.
     public func signOut(revoke: Bool = true) async -> SignOutResult {
+        await beginSignOut(revoke: revoke).result
+    }
+
+    /// Ends the session like ``signOut(revoke:)`` but returns as soon as local state is cleared, with a handle
+    /// to await the store delete and the revocation (RFC 7009 §2).
+    ///
+    /// Nothing here suspends the manager, so when this returns the session is gone: ``credential`` is `nil`,
+    /// ``SessionEvent/signedOut(reason:)`` with ``SignOutReason/userInitiated`` was emitted, the delete of the
+    /// stored credential is queued ahead of any save a later sign-in makes, and the revocation has its turn on
+    /// the ended session's lane. A ``signIn(with:requestedScope:)`` right after it starts a session that the
+    /// pending revocation neither waits for nor blocks. See ADR 0014.
+    @discardableResult
+    public func beginSignOut(revoke: Bool = true) -> PendingSignOut {
         let endedSession = generation
         let endedLane = lane
         let snapshot = current?.refreshToken
         startNewSession()
         current = nil
-        // Reported before the first suspension, so a slow store cannot order it after the events of a sign-in
+        // Reported before anything is awaited, so a slow store cannot order it after the events of a sign-in
         // that follows.
         eventHub.emit(.signedOut(reason: .userInitiated))
         logger.info(
             "Signed out",
             metadata: [LogKey.reason: "\(SignOutReason.userInitiated.logValue)", LogKey.revoke: "\(revoke)"])
-        // Reserved now, before any suspension, so the revocation queues behind operations that are
-        // already sending the old refresh token.
+        // Reserved now, so the revocation queues behind operations that are already sending the old refresh
+        // token.
         let revocation =
             revoke ? snapshot.flatMap { startRevocation(of: $0, session: endedSession, lane: endedLane) } : nil
-        let isDeleted = await deleteStoredCredential()
-        guard let revocation else { return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: .skipped) }
-        let outcome: SignOutResult.Revocation
-        do {
-            outcome =
-                try await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) { try await revocation.wait() }
-                ?? .timedOut
-        } catch {
-            // Only the caller's cancellation can end the wait early; the revocation itself carries on.
-            outcome = .cancelled
+        let deletion = requestDeletion()
+        guard let revocation else { return PendingSignOut(deletion: deletion, revocation: nil) }
+        let outcome = Completion<RevocationOutcome>()
+        let clock = client.clock
+        let logger = self.logger
+        // Owned by the manager and never cancelled, so the limit and the log line do not depend on who waits.
+        Task {
+            _ = await deletion.value
+            let result =
+                (try? await withTimeLimit(OAuthClient.revocationTimeLimit, clock: clock) {
+                    try await revocation.wait()
+                }) ?? .timedOut
+            switch result {
+            case .failed(let error):
+                // An offline sign-out is expected; a server refusal or a TLS failure is not.
+                logger.log(
+                    level: error.code == .transportFailure ? .level(forTransportFailure: error) : .warning,
+                    "Revoking the refresh token failed", metadata: [LogKey.errorCode: "\(error.code.rawValue)"])
+            case .timedOut: logger.notice("Revoking the refresh token timed out")
+            case .revoked: logger.debug("Revoked the refresh token")
+            default: break
+            }
+            outcome.complete(.success(result))
         }
-        switch outcome {
-        case .failed(let error):
-            // An offline sign-out is expected; a server refusal or a TLS failure is not.
-            logger.log(
-                level: error.code == .transportFailure ? .level(forTransportFailure: error) : .warning,
-                "Revoking the refresh token failed", metadata: [LogKey.errorCode: "\(error.code.rawValue)"])
-        case .timedOut: logger.notice("Revoking the refresh token timed out")
-        case .revoked: logger.debug("Revoked the refresh token")
-        default: break
-        }
-        return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: outcome)
+        return PendingSignOut(deletion: deletion, revocation: outcome)
     }
 
     /// Replaces the session: stale work is discarded, cached tokens and in-flight operations are forgotten.
@@ -320,9 +340,14 @@ public actor TokenManager {
 
     @discardableResult
     func deleteStoredCredential() async -> Bool {
+        await requestDeletion().value
+    }
+
+    /// Queues the delete of the stored credential and returns it without waiting.
+    func requestDeletion() -> Task<Bool, Never> {
         let store = self.store
         let account = self.account
-        return await changeStore("delete") { try await store.delete(account) }.value
+        return changeStore("delete") { try await store.delete(account) }
     }
 
     static func storageError(_ error: any Error) -> PassportError {

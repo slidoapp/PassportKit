@@ -1,6 +1,6 @@
 # 0007. Ordered store changes, a lane per session, revocation of the newest token
 
-- Status: accepted
+- Status: accepted; amended by [0015](0015-answered-exchange-belongs-to-the-caller.md)
 - Date: 2026-10-08
 
 ## Context

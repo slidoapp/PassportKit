@@ -43,6 +43,7 @@ final class StubURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct URLSessionTransportTests {
     private let transport: URLSessionTransport
 

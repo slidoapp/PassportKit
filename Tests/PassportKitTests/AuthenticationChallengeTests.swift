@@ -115,6 +115,11 @@ struct AuthenticationChallengeTests {
                 .init(scheme: "bearer", parameters: ["realm": "a", "scope": "b"]),
                 .init(scheme: "basic", parameters: ["realm": "c"]),
             ]),
+        // RFC 9110 §11.2: auth-param = token BWS "=" BWS ( token / quoted-string ).
+        make(
+            "whitespace around equals",
+            [#"Bearer error = "insufficient_scope", scope ="a""#],
+            [.init(scheme: "bearer", parameters: ["error": "insufficient_scope", "scope": "a"])]),
         make(
             "unicode in quoted string",
             [#"Bearer error_description="Zugriff verweigert: ä€""#],

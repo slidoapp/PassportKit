@@ -15,14 +15,6 @@ enum LogKey {
     static let port = "port"
 }
 
-extension Duration {
-    /// Whole milliseconds, for log metadata.
-    var wholeMilliseconds: Int {
-        let (seconds, attoseconds) = components
-        return Int(seconds) * 1000 + Int(attoseconds / 1_000_000_000_000_000)
-    }
-}
-
 extension Logger.Metadata {
     /// The metadata of one request to an authorization server endpoint: never a URL, header or body.
     static func request(

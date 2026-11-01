@@ -6,14 +6,29 @@ import Logging
 extension TokenManager {
     /// Exchanges the refresh token for tokens of another audience or resource (RFC 8693 §2.1).
     ///
-    /// The subject is the current refresh token. The response is returned as it came: the issued token (for
-    /// the default `requestedTokenType`, a refresh token bound to `audiences`) is in `accessToken`, whatever its
-    /// type. The manager does not cache or judge it. A `refresh_token` in the response is the rotated subject
-    /// and is saved before this returns (persist before publish).
+    /// The subject is the current refresh token. The issued token (for the default `requestedTokenType`, a
+    /// refresh token bound to `audiences`) is in `accessToken` of the returned response, whatever its type; the
+    /// manager does not cache or judge it. A `refresh_token` in the server's response is the session's rotated
+    /// subject: the manager saves it before this returns (persist before publish) and returns the response with
+    /// ``TokenResponse/refreshToken`` set to `nil`, because that token belongs to the session alone. Using it
+    /// elsewhere would present it twice and could make the server revoke the grant (RFC 9700 §4.14.2).
     ///
-    /// Runs in the refresh token lane, so it never overlaps a refresh. Cancelling the caller stops waiting only:
-    /// a request that was sent finishes and its rotated refresh token is saved. `invalid_grant` ends the
-    /// session (RFC 6749 §5.2).
+    /// Runs in the refresh token lane, so it never overlaps a refresh. `invalid_grant` ends the session (RFC
+    /// 6749 §5.2).
+    ///
+    /// - Important: Cancelling the caller stops it waiting, nothing else: a request that was sent finishes and
+    ///   its rotated subject is saved, but the issued token is not returned to anyone. It stays valid at the
+    ///   server until it expires. A caller that must not lose the issued token does not cancel the call.
+    ///
+    /// - Important: The issued token belongs to the caller, not to the session, so a response the server sent
+    ///   is returned even if the session ended or was replaced while the request was in flight (ADR 0015). Its
+    ///   rotated subject is then not stored: it goes to the ended session's revocation, if it has one, and the
+    ///   current session is not touched. A caller that must not use a token of an ended session checks its own
+    ///   state when this returns and discards the token, revoking it as the client it was issued to (RFC 7009
+    ///   §2.1); this manager cannot, because the token's audience need not be a client of its configuration.
+    ///   A call whose session ended before its request was sent throws
+    ///   ``PassportError/Code-swift.struct/notAuthenticated``, and a failure that arrives after the session
+    ///   ended is reported the same way, so it never ends a newer session.
     public func exchangeRefreshToken(
         audiences: [String] = [],
         resources: [URL] = [],
@@ -27,13 +42,18 @@ extension TokenManager {
         let completion = Completion<TokenResponse>()
         Task {
             do {
-                let response = try await spendRefreshToken(turn: turn, session: session, adoptsIDToken: false) {
+                let response = try await spendRefreshToken(
+                    turn: turn, session: session, adoptsIDToken: false, returnsAnsweredResponse: true
+                ) {
                     try await self.client.exchange(
                         TokenExchangeRequest(
                             subjectToken: $0, subjectTokenType: .refreshToken, requestedTokenType: requestedTokenType,
                             audiences: audiences, resources: resources, scope: scope))
                 }
-                completion.complete(.success(response))
+                // The rotated subject stays with the session (persisted above, or handed to its revocation).
+                var issued = response
+                issued.refreshToken = nil
+                completion.complete(.success(issued))
             } catch {
                 completion.complete(.failure(error))
             }
@@ -49,12 +69,14 @@ extension TokenManager {
     ///
     /// The token is read when the turn starts, so it is whatever the previous turn persisted. Throws
     /// ``superseded`` instead of sending, or instead of returning, when the session changed meanwhile; a stale
-    /// `invalid_grant` therefore never ends a newer session.
+    /// `invalid_grant` therefore never ends a newer session. With `returnsAnsweredResponse`, a response that
+    /// arrived after the session changed is returned instead, without being persisted (ADR 0015).
     func spendRefreshToken(
         turn: RefreshLane.Turn,
         session: Int,
         adoptsIDToken: Bool,
         adoptsScope: Bool = false,
+        returnsAnsweredResponse: Bool = false,
         send: (Secret) async throws -> TokenResponse
     ) async throws -> TokenResponse {
         logger.trace("Waiting for a refresh lane turn")
@@ -90,12 +112,16 @@ extension TokenManager {
             throw error
         }
         guard session == generation else {
-            logger.trace("Discarded the result of a superseded session")
             handOverRotation(of: response, session: session)
+            if returnsAnsweredResponse {
+                logger.trace("Returned the result of a superseded session to its caller")
+                return response
+            }
+            logger.trace("Discarded the result of a superseded session")
             throw SessionSuperseded()
         }
         await persistRotation(from: response, adoptsIDToken: adoptsIDToken, adoptsScope: adoptsScope)
-        guard session == generation else { throw SessionSuperseded() }
+        guard session == generation || returnsAnsweredResponse else { throw SessionSuperseded() }
         return response
     }
 
@@ -137,31 +163,22 @@ extension TokenManager {
     /// Starts revoking the refresh token of the ended session `session`, which is `refreshToken` as of now, in
     /// its own lane turn, and returns what will become of it.
     ///
-    /// The turn is reserved before this returns; the token is read when the turn starts. The request is limited to `revocationTimeLimit` on the
-    /// client's clock so a hung server cannot hold the lane.
+    /// The turn is reserved before this returns; the token is read when the turn starts. The request is limited
+    /// to `OAuthClient.revocationTimeLimit` on the client's clock so a hung server cannot hold the lane.
     func startRevocation(of refreshToken: Secret, session: Int, lane: RefreshLane) -> Completion<
-        SignOutResult.Revocation
+        RevocationOutcome
     >? {
         guard client.configuration.endpoints.revocation != nil else { return nil }
         revocableTokens[session] = refreshToken
         // The lane of the ended session: behind its in-flight requests, and not holding up the next session.
         let turn = lane.reserve()
-        let completion = Completion<SignOutResult.Revocation>()
+        let completion = Completion<RevocationOutcome>()
         Task {
             await turn.start()
             defer { turn.finish() }
-            let client = self.client
             let refreshToken = revocableTokens.removeValue(forKey: session) ?? refreshToken
-            let outcome: SignOutResult.Revocation
-            do {
-                let finished = try await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) {
-                    try await client.revoke(refreshToken, typeHint: .refreshToken)
-                    return true
-                }
-                outcome = finished == nil ? .timedOut : .revoked
-            } catch {
-                outcome = .failed(error as? PassportError ?? PassportError(.transportFailure, underlying: error))
-            }
+            // The task is never cancelled, so the outcome is never `cancelled`.
+            let outcome = await client.revokeBestEffort(refreshToken, typeHint: .refreshToken)
             completion.complete(.success(outcome))
         }
         return completion

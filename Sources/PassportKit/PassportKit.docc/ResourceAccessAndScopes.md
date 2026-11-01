@@ -165,8 +165,10 @@ let (response, body) = try await authorizer.send(request, body: Data(#"{"name":"
 A signed `HTTPRequest` carries the token in its `Authorization` field, and
 `HTTPFields` and `HTTPRequest` print their header fields and the URL with its
 query. Treat a signed request as a credential: do not log it, dump it or attach
-it to a crash report. The library sets the field so that HTTP/2 and HTTP/3
-never index it (RFC 7541 §7.1.3).
+it to a crash report. The library marks the field never indexed for HTTP/2 and
+HTTP/3 (RFC 7541 §7.1.3); the marking reaches the wire only through a transport
+that keeps the indexing strategy of `HTTPFields`. ``URLSessionTransport``
+converts to `URLRequest`, which drops it.
 
 Resource-level failures never end the session. Only an invalid refresh token
 does.

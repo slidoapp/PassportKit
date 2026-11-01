@@ -6,6 +6,8 @@
   [0002](0002-package-layout-and-toolchain.md)
 - Amended by [0011](0011-apple-platforms-only.md): the Linux criterion and
   the swift-crypto row are removed
+- Amended 2026-11-01: the SwiftKeychain write-path issue is fixed inside
+  PassportKit, without an upstream change (see "Resolution" below)
 
 ## Context
 
@@ -40,7 +42,7 @@ Each dependency is linked only into the target that needs it.
 | ~~swift-crypto~~ | ~~`Crypto`~~ | removed | Replaced by CryptoKit, which ships with the OS, in [0011](0011-apple-platforms-only.md). SHA-256 for PKCE S256 (RFC 7636 §4.2) uses it directly; the fake authorization server calls it too but not PassportKit's code path, so it still checks the client independently. |
 | [swift-http-types](https://github.com/apple/swift-http-types) `from: "1.5.0"` | `HTTPTypes`, `HTTPTypesFoundation` | `PassportKit` (both), `PassportKitTesting` (`HTTPTypes`) | The HTTP currency types of `HTTPTransport` and `RequestAuthorizer` (`HTTPRequest`, `HTTPResponse`, `HTTPFields`) and the `URLSession` conversions, in place of hand-written ones. It prints header values, so no public type that stores them may print them (ADR 0010). |
 | [swift-log](https://github.com/apple/swift-log) `from: 1.6.0` | `Logging` | `PassportKit` | The `logger:` parameters. A logger labelled `PassportKit` uses whatever `LoggingSystem.bootstrap` the host configured. `PassportObserver` stays the channel for typed events. |
-| [SwiftKeychain](https://github.com/slidoapp/SwiftKeychain) `.upToNextMinor(from: "2.1.0")` | `SwiftKeychain` | `PassportKit` | The Keychain wrapper the Slido OAuth stack already uses; `KeychainCredentialStore` is built on it. Adopted with a known issue, below. |
+| [SwiftKeychain](https://github.com/slidoapp/SwiftKeychain) `.upToNextMinor(from: "2.1.0")` | `SwiftKeychain` | `PassportKit` | A maintained Keychain wrapper for generic password items; `KeychainCredentialStore` is built on it. Adopted with a known issue, resolved since (see "Resolution" below). |
 
 `SystemRandomSource` stays: `SystemRandomNumberGenerator` is the standard
 library's cryptographically secure generator on every supported platform,
@@ -65,6 +67,27 @@ Planned fix: an upstream change that updates first and adds only on
 `errSecItemNotFound`, with typed errors. Until then the single-store
 write path (serialized by the store's queue) is the supported use, and
 the issue is listed under Known limits in the security model.
+
+Resolution (2026-11-01): no upstream change was needed. SwiftKeychain's
+`saveInKeychain(_:)` takes any `KeychainServiceType`, so
+`KeychainCredentialStore` passes its own. Every call of it matches the item
+by identity (class, service, account, `kSecAttrSynchronizable` and the
+access group, never `kSecAttrAccessible`). Its insert calls `SecItemUpdate`
+with `kSecValueData` and `kSecAttrAccessible` to change and calls
+`SecItemAdd` only on `errSecItemNotFound` (and updates again if another
+store added the item meanwhile), so a changed accessibility class moves the
+item instead of hiding it. A missing payload, which SwiftKeychain's `try?`
+archiving would produce, is refused with `errSecParam` instead of being
+stored. The race test of eight stores is a regular test again.
+
+The limit that remains is the store's own choice, not SwiftKeychain's: it
+keeps the file-based login keychain on macOS and does not set
+`kSecUseDataProtectionKeychain`. The data protection keychain on macOS
+needs a keychain access group (`keychain-access-groups` or
+`application-identifier`) entitlement of the hosting process, which
+plug-ins loaded into another app's process, command-line tools and
+`swift test` do not have; the store must work in all of them. An opt-in
+can be added later without breaking the API.
 
 ### Rejected candidates
 

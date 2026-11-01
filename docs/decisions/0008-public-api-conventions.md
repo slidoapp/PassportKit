@@ -25,7 +25,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   closed outcome the caller must handle stays an enum and is documented
   as not frozen, so callers switch with a `default`: `Recovery`,
   `RetryDecision`, `SessionEvent`, `SignOutReason`,
-  `SignOutResult.Revocation`.
+  `RevocationOutcome`.
 - **Factories and names that cannot collide.** A case that would be
   called `none` is named for what it does: `.publicClient(clientID:)`,
   `.noAction`, `.noInteraction` (the wire value `none`). Creating a value

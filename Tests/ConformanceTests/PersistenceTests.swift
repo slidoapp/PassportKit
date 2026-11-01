@@ -49,7 +49,9 @@ struct PersistenceTests {
         #expect(await harness.server.details(of: issued)?.audience == ["billing"])
         let stored = await harness.storedRefreshToken()
         #expect(stored != before && stored != issued)
-        #expect(stored == response.refreshToken?.reveal())
+        // The rotated subject is the session's: it is saved, not handed to the caller.
+        #expect(response.refreshToken == nil)
+        #expect(await stored == harness.newestIssuedRefreshToken())
         // The rotated subject is the one the next operation spends.
         harness.expireAccessTokens()
         _ = try await harness.manager.accessToken()

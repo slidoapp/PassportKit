@@ -29,7 +29,7 @@ struct ValueTests {
             additionalFields: ["extra": .string(Self.canaries[3])])
         let credential = Credential(
             clientID: "app", refreshToken: Secret(Self.canaries[1]), idToken: Secret(Self.canaries[2]),
-            updatedAt: Date(timeIntervalSince1970: 0), additionalFields: ["extra": .string(Self.canaries[3])])
+            updatedAt: Date(timeIntervalSince1970: 0))
         var outputs: [String] = []
         outputs += [String(describing: token), String(reflecting: token), "\(token)"]
         outputs += [String(describing: credential), String(reflecting: credential), "\(credential)"]
@@ -49,8 +49,7 @@ struct ValueTests {
         let credential = Credential(
             clientID: "app", issuer: URL(string: "https://as.example.com"), refreshToken: Secret("rt"),
             idToken: Secret("id"), grantedScope: ["read", "write"],
-            updatedAt: Date(timeIntervalSince1970: 1_700_000_000.5),
-            additionalFields: ["note": .string("x")])
+            updatedAt: Date(timeIntervalSince1970: 1_700_000_000.5))
         let data = try CredentialCoding.encode(credential)
         let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(object["version"] as? Int == 1)
@@ -64,6 +63,11 @@ struct ValueTests {
         }
         #expect(error?.code == .storageFailure)
         #expect(throws: PassportError.self) { try CredentialCoding.decode(Data("[]".utf8)) }
+
+        // A record written by 0.3, which could carry application fields, still decodes; the fields are ignored.
+        var older = object
+        older["additionalFields"] = ["note": "x"]
+        #expect(try CredentialCoding.decode(JSONSerialization.data(withJSONObject: older)) == credential)
     }
 
     @Test("a scope policy needs one of its scopes only for the targets it applies to")

@@ -46,6 +46,8 @@ Tests mirror this: `PassportKitTests` (units), `PassportKitTestingTests` (the fa
 - A rotated refresh token is persisted before the new access token is handed out. Every change of the stored
   credential goes through one FIFO, so a slow store cannot apply an older save after a newer delete.
 - A result that arrives after the session was cleared or replaced is discarded (generation check), never written back.
+  The one exception is the issued token of an answered refresh token exchange, which belongs to the caller and is
+  returned without touching the session (ADR 0015).
   Each session has its own lane, so a stuck request of an ended session cannot block the next one. A sign-out's
   revocation runs on the ended session's lane and sends the newest refresh token it learned of, including one issued
   to a request that finished after the sign-out (ADR 0007).

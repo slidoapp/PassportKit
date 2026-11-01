@@ -15,7 +15,8 @@ struct StoreOrderingTests {
         let manager = harness.manager
         let original = try #require(await harness.currentRefreshToken())
         harness.expireAccessTokens()
-        await harness.delayTokenResponses()
+        // Shorter than the revocation's time limit, so the revocation can still finish after the request.
+        await harness.delayTokenResponses(by: .seconds(2))
         let inFlight = Task {
             switch operation {
             case .refresh: _ = try await manager.accessToken()
@@ -26,7 +27,7 @@ struct StoreOrderingTests {
         let signOut = Task { await manager.signOut() }
         #expect(await waitUntil { await manager.credential == nil })
         // The request sent before sign-out finishes; the revocation request is not delayed.
-        try await harness.deliverResponses(1)
+        harness.clock.advance(by: .seconds(2))
         let result = await signOut.value
         _ = await thrownError { try await inFlight.value }
 
@@ -35,6 +36,68 @@ struct StoreOrderingTests {
         let rotated = try #require(await harness.newestIssuedRefreshToken())
         #expect(rotated != original)
         #expect(revoked == [rotated], "the refresh token issued by the in-flight request stays valid")
+    }
+
+    @Test(
+        "ADR 0015: an exchange answered after sign-out returns its token; the rotation goes to the ended session"
+    )
+    func exchangeAnsweredAfterSignOut() async throws {
+        let harness = try await Harness()
+        let manager = harness.manager
+        let original = try #require(await harness.currentRefreshToken())
+        // Shorter than the revocation's time limit, so the revocation can still finish after the exchange.
+        await harness.delayTokenResponses(by: .seconds(2))
+        let exchange = Task { try await manager.exchangeRefreshToken(audiences: ["billing"]) }
+        try await harness.clock.waitForSleeper()
+
+        let pending = await manager.beginSignOut()
+        try await harness.signInAgain()
+        let newSession = try #require(await harness.currentRefreshToken())
+        harness.clock.advance(by: .seconds(2))
+
+        let response = try await exchange.value
+        #expect(!response.accessToken.reveal().isEmpty)
+        #expect(response.refreshToken == nil)
+        // The exchange answered last, so its rotated subject is the newest refresh token issued.
+        let rotated = try #require(await harness.newestIssuedRefreshToken())
+        #expect(rotated != original && rotated != newSession)
+        #expect(await pending.result.revocation == .revoked)
+        let revoked = await harness.server.requests(to: "/revoke").compactMap { $0.value("token") }
+        #expect(revoked == [rotated], "the ended session's revocation targets the rotated subject")
+        #expect(await harness.currentRefreshToken() == newSession)
+        #expect(await harness.storedRefreshToken() == newSession)
+    }
+
+    enum SessionEnd: CaseIterable { case signOut, refreshTokenRejected }
+
+    @Test(
+        "invariant 3: a load while the delete of an ended session is still running does not restore it",
+        arguments: SessionEnd.allCases)
+    func loadWaitsForPendingDelete(end: SessionEnd) async throws {
+        let store = GatedStore()
+        let harness = try await Harness(store: store)
+        let manager = harness.manager
+        await store.hold(.delete)
+        var ending: Task<Void, Never>?
+        switch end {
+        case .signOut:
+            await manager.beginSignOut(revoke: false)
+        case .refreshTokenRejected:
+            await harness.server.revoke(token: try #require(await harness.currentRefreshToken()))
+            harness.expireAccessTokens()
+            ending = Task { _ = await thrownError { try await manager.accessToken() } }
+        }
+        #expect(await waitUntil { await store.suspendedCount(.delete) == 1 })
+
+        let load = Task { try await manager.load() }
+        await store.release(.delete)
+        #expect(try await load.value == nil)
+        await ending?.value
+        #expect(await manager.credential == nil)
+        #expect(try await store.load(harness.account) == nil)
+        let events = await Harness.take(2, from: harness.events)
+        #expect(events.first == .signedIn)
+        if case .signedOut? = events.last {} else { Issue.record("Expected the session to end, got \(events)") }
     }
 
     @Test("invariant 3: a save that finishes after a later sign-out cannot bring the session back")

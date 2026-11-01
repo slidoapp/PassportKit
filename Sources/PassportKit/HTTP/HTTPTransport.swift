@@ -14,6 +14,7 @@ public protocol HTTPTransport: Sendable {
     /// and must let `CancellationError` propagate unchanged.
     ///
     /// Header fields can carry credentials, and `HTTPTypes` prints them: never log `request`, `HTTPFields` or
-    /// a response from inside a transport.
+    /// a response from inside a transport. The library marks `Authorization` never indexed (RFC 7541 §7.1.3)
+    /// through `HTTPField.indexingStrategy`; a transport that encodes HPACK or QPACK itself should honour it.
     func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data)
 }

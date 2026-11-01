@@ -66,7 +66,14 @@ exchange when your server requires it.
 ``TokenManager/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``
 exchanges the refresh token itself, for example to hand a refresh token to
 another component. It is not cached and does not run the acceptance policy;
-the result belongs to your app.
+the result belongs to your app. The returned response has no `refreshToken`:
+the rotated refresh token of the session is saved by the manager and is not
+yours to use elsewhere. Once the server answered, the result is returned even
+if the session ended or was replaced meanwhile. If your app must not use a
+token of an ended session, check your own state when the call returns and
+discard the token, revoking it as the client it was issued to. Cancelling the
+call after its request was sent gives up the issued token, which stays valid
+until it expires.
 
 ## A session from a refresh token you already hold
 
@@ -110,7 +117,10 @@ You do not manage the lane. The consequences for you:
   burst of requests cannot burn a rotating token.
 - Cancelling a caller only stops it waiting. A request that was sent
   finishes and its rotated token is saved.
-- Results that arrive after a sign-out or a new sign-in are discarded.
+- Results that arrive after a sign-out or a new sign-in are discarded,
+  except the issued token of an answered
+  ``TokenManager/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``,
+  which is still returned to you.
   Each session has its own lane, so a request that never answers cannot
   block the next session.
 
@@ -126,6 +136,12 @@ that concern one resource never end it; see <doc:ResourceAccessAndScopes>.
 revokes the newest refresh token (RFC 7009) with a time limit. The
 ``SignOutResult`` reports whether the stored credential was deleted and what
 happened to the revocation; the in-memory session is always cleared.
+
+``TokenManager/beginSignOut(revoke:)`` does the same but returns as soon as
+the session is cleared, before the store or the server answer. Await
+``PendingSignOut/result`` for the ``SignOutResult`` when you need it, or
+never. A sign-in may follow at once: the pending revocation neither waits for
+it nor touches the new session.
 
 ## After a 401
 

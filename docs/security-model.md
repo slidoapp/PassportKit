@@ -26,7 +26,9 @@ HTTP header values can carry credentials (`Authorization`, `Cookie`, API keys), 
 query. Public PassportKit types that store header fields (`ClientConfiguration`, `RecordedRequest` and the scripted
 responses of `PassportKitTesting`) therefore have redacting descriptions and mirrors that show header names only.
 A signed `HTTPRequest` or a response that the library returns is the caller's value and prints like any
-`HTTPTypes` value: do not log it. The library marks `Authorization` as never indexed (RFC 7541 §7.1.3).
+`HTTPTypes` value: do not log it. The library marks `Authorization` as never indexed (RFC 7541 §7.1.3); the marking
+reaches the wire only through an `HTTPTransport` that keeps the indexing strategy of `HTTPFields`.
+`URLSessionTransport` converts to `URLRequest`, which has no indexing strategy, so there `URLSession` decides.
 
 A server can make a library repeat what it was sent, for example by echoing
 a token in `error_description`. Every credential of a request (refresh,
@@ -101,14 +103,10 @@ follow the same rules as errors and events:
 
 ## Known limits
 
-- **The Keychain write path can lose the credential.** `KeychainCredentialStore` is built on SwiftKeychain, which
-  replaces an existing item by deleting it and adding it again. If the add fails (device locked, denied prompt,
-  entitlement problem) or the process dies in between, the stored credential is gone; with refresh token rotation the
-  replaced token is already invalid, so the user must sign in again. Stores writing one item at once can fail the
-  same way, and the payload is archived with `try?`. See ADR 0009; the fix is an upstream
-  update-then-add change (`docs/roadmap.md`).
 - **The macOS login keychain does not enforce accessibility or access groups.** On macOS `KeychainCredentialStore`
-  uses the file-based login keychain, because SwiftKeychain cannot target the data protection keychain. There
+  uses the file-based login keychain, because the data protection keychain on macOS needs a keychain access group
+  entitlement (`keychain-access-groups` or `application-identifier`) of the hosting process, which plug-ins loaded
+  into another app, command-line tools and `swift test` do not have (ADR 0009). There
   `Accessibility` and `accessGroup` are accepted but not enforced: an item is readable whenever the login keychain
   is unlocked, and the access group does not separate apps. What protects the item is the keychain's access control
   for the app that created it. On iOS both are enforced. The store sets `kSecAttrSynchronizable` to `false` on every

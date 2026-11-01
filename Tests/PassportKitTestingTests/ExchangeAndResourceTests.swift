@@ -4,7 +4,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("Fake server: token exchange, resource indicators and the protected resource")
+@Suite("Fake server: token exchange, resource indicators and the protected resource", .timeLimit(.minutes(1)))
 struct ExchangeAndResourceTests {
     static let exchangeType = "urn:ietf:params:oauth:grant-type:token-exchange"
     static let accessType = "urn:ietf:params:oauth:token-type:access_token"
@@ -193,7 +193,7 @@ struct ExchangeAndResourceTests {
     }
 }
 
-@Suite("Fake server: refresh token exchange for an audience client")
+@Suite("Fake server: refresh token exchange for an audience client", .timeLimit(.minutes(1)))
 struct AudienceExchangeTests {
     static let exchangeType = "urn:ietf:params:oauth:grant-type:token-exchange"
     static let refreshType = "urn:ietf:params:oauth:token-type:refresh_token"

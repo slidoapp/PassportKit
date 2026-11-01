@@ -2,6 +2,7 @@ import Foundation
 import HTTPTypes
 import PassportKitTesting
 import Testing
+import os
 
 @testable import PassportKit
 
@@ -289,6 +290,93 @@ struct OAuthClientTests {
         let error = await #expect(throws: PassportError.self) { try await client.revoke(Secret("a")) }
         #expect(error?.code == .invalidClient)
         #expect(error?.recovery == .fixConfiguration)
+    }
+
+    /// A transport that answers only after a minute on `clock`, and counts the requests that were cancelled.
+    private final class HangingTransport: HTTPTransport, Sendable {
+        let clock: ManualClock
+        private let cancellations = OSAllocatedUnfairLock(initialState: 0)
+        var cancelledRequests: Int { cancellations.withLock { $0 } }
+
+        init(clock: ManualClock) { self.clock = clock }
+
+        /// Waits in real time, without sleeping on `clock`, until `count` requests were cancelled.
+        func waitForCancellations(_ count: Int) async throws {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+            while cancelledRequests < count {
+                try #require(ContinuousClock.now < deadline, "Expected \(count) cancelled requests.")
+                await Task.yield()
+            }
+        }
+
+        func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data) {
+            do {
+                try await clock.sleep(for: .seconds(60))
+            } catch {
+                cancellations.withLock { $0 += 1 }
+                throw error
+            }
+            return (HTTPResponse(status: .ok), Data())
+        }
+    }
+
+    @Test("RFC 7009 §2: the best-effort revoke reports revoked and failed without throwing")
+    func bestEffortRevokeOutcomes() async throws {
+        let revoked = try ClientFixtures.client(RecordingTransport([.json(200, "")]))
+        #expect(await revoked.revokeBestEffort(Secret("a"), typeHint: .refreshToken) == .revoked)
+
+        let failing = try ClientFixtures.client(RecordingTransport([.json(503, "", headers: [.retryAfter: "3"])]))
+        guard case .failed(let error) = await failing.revokeBestEffort(Secret("a")) else {
+            Issue.record("Expected a failure")
+            return
+        }
+        #expect(error.recovery == .retryLater(after: .seconds(3)))
+
+        let offline = try ClientFixtures.client(RecordingTransport([.fail(URLError(.notConnectedToInternet))]))
+        guard case .failed(let transportError) = await offline.revokeBestEffort(Secret("a")) else {
+            Issue.record("Expected a failure")
+            return
+        }
+        #expect(transportError.code == .transportFailure)
+    }
+
+    @Test("RFC 7009 §2: the best-effort revoke is skipped without an endpoint")
+    func bestEffortRevokeWithoutEndpoint() async throws {
+        let transport = RecordingTransport()
+        let client = try ClientFixtures.client(transport, revocation: false)
+        #expect(await client.revokeBestEffort(Secret("a")) == .skipped)
+        #expect(await transport.requests.isEmpty)
+    }
+
+    @Test("the best-effort revoke gives up after its limit on the client's clock and cancels the request")
+    func bestEffortRevokeTimesOut() async throws {
+        let clock = ManualClock()
+        let transport = HangingTransport(clock: clock)
+        let client = try ClientFixtures.client(transport, clock: clock)
+        let timed = Task { await client.revokeBestEffort(Secret("a"), timeLimit: .seconds(2)) }
+        // The limit and the transport.
+        try await clock.waitForSleepers(2)
+        clock.advance(by: .seconds(2))
+        #expect(await timed.value == .timedOut)
+        try await transport.waitForCancellations(1)
+
+        // The default limit is the one sign-out uses.
+        let defaulted = Task { await client.revokeBestEffort(Secret("a")) }
+        try await clock.waitForSleepers(2)
+        clock.advance(by: OAuthClient.revocationTimeLimit)
+        #expect(await defaulted.value == .timedOut)
+    }
+
+    @Test("cancelling the caller of the best-effort revoke reports cancelled and cancels the request")
+    func bestEffortRevokeCancelled() async throws {
+        let clock = ManualClock()
+        let transport = HangingTransport(clock: clock)
+        let client = try ClientFixtures.client(transport, clock: clock)
+        let cancelled = Task { await client.revokeBestEffort(Secret("a")) }
+        try await clock.waitForSleepers(2)
+        cancelled.cancel()
+        #expect(await cancelled.value == .cancelled)
+        try await transport.waitForCancellations(1)
     }
 
     @Test func revokeWithoutEndpointIsInvalidConfiguration() async throws {

@@ -43,7 +43,7 @@ extension TokenManager {
             throw PassportError(
                 .invalidConfiguration, detail: "A refresh grant target cannot name audiences.")
         }
-        let minimumLifetime = client.configuration.minimumTokenLifetime.seconds
+        let minimumLifetime = client.configuration.minimumTokenLifetime.timeInterval
         if let token = cache.usableToken(for: target, now: client.wallClock.now(), minimumLifetime: minimumLifetime) {
             logger.trace("Served an access token from the cache")
             return token
@@ -159,7 +159,7 @@ extension TokenManager {
         notAfter: Date? = nil
     ) -> AccessToken {
         let lifetime = response.expiresIn ?? client.configuration.defaultTokenLifetime
-        var expiresAt = lifetime.map { client.wallClock.now().addingTimeInterval($0.seconds) }
+        var expiresAt = lifetime.map { client.wallClock.now().addingTimeInterval($0.timeInterval) }
         if let limit = notAfter, let own = expiresAt, limit < own { expiresAt = limit }
         return AccessToken(
             value: response.accessToken,
@@ -188,7 +188,7 @@ extension TokenManager {
         let error = PassportError(.tokenRejected, recovery: .resourceDenied, detail: reason)
         cache.reject(
             target: token.target, error: error,
-            until: client.wallClock.now().addingTimeInterval(rejectedTokenCacheDuration.seconds),
+            until: client.wallClock.now().addingTimeInterval(rejectedTokenCacheDuration.timeInterval),
             now: client.wallClock.now())
         eventHub.emit(.tokenRejected(target: token.target, grantedScope: token.grantedScope))
         logger.notice("The acceptance policy rejected an access token")

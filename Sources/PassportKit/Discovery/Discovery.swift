@@ -3,6 +3,8 @@ import HTTPTypes
 import Logging
 
 /// How the metadata `issuer` is checked against the issuer that was requested (RFC 8414 §3.3).
+///
+/// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
 public enum IssuerValidation: Sendable {
     /// The metadata `issuer` must be identical to the requested issuer: a string comparison, so a trailing
     /// slash difference is a mismatch.
@@ -18,6 +20,8 @@ public enum IssuerValidation: Sendable {
 /// Authorization server metadata discovery (RFC 8414).
 public enum Discovery {
     /// Where the well-known document is looked up.
+    ///
+    /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
     public enum Style: Sendable {
         /// RFC 8414 §3.1: `/.well-known/oauth-authorization-server` inserted between host and path.
         case oauth
@@ -82,7 +86,7 @@ public enum Discovery {
             .response(
                 endpoint: .metadata,
                 statusCode: response.status.code,
-                errorCode: OAuthClient.errorCode(statusCode: response.status.code, body: body),
+                errorCode: OAuthClient.errorCode(status: response.status, body: body),
                 duration: stopwatch.elapsed
             )
         )
@@ -90,9 +94,9 @@ public enum Discovery {
             "Request completed",
             metadata: .request(
                 endpoint: .metadata, status: response.status.code,
-                errorCode: OAuthClient.errorCode(statusCode: response.status.code, body: body),
+                errorCode: OAuthClient.errorCode(status: response.status, body: body),
                 duration: stopwatch.elapsed))
-        guard (200..<300).contains(response.status.code) else {
+        guard response.status.kind == .successful else {
             throw PassportError.fromErrorResponse(
                 statusCode: response.status.code,
                 headers: response.headerFields,

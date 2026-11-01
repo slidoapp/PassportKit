@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-01
+
+The first stable release: from here on, a breaking change to the public API of `PassportKit` or `PassportKitTesting`
+needs a new major version.
+
+### Added
+
+- `OAuthClient.revokeBestEffort(_:typeHint:timeLimit:)` revokes a token best effort (RFC 7009) and returns a
+  `RevocationOutcome` instead of throwing: `revoked`, `failed`, `timedOut` after the limit on the client's clock,
+  `cancelled`, or `skipped` without a revocation endpoint. It is for a token that never became a session, such as a
+  refresh token the app obtained but did not adopt. The limit defaults to `OAuthClient.revocationTimeLimit` (5
+  seconds), the limit `TokenManager` applies on sign-out, so apps need not copy it.
+- `TokenManager.beginSignOut(revoke:)` clears the session without suspending and returns a `PendingSignOut`, whose
+  `result` (`get async`, like `Task.value`) waits for the store delete and the revocation (RFC 7009) and returns the
+  `SignOutResult`. Apps no longer need to watch for `.signedOut(.userInitiated)` to learn that the session is gone
+  (ADR 0014).
+
+### Changed
+
+- **Breaking:** `OAuthClient.beginAuthorization(_:)` throws `.invalidConfiguration` when `prompt` combines
+  `.noInteraction` (`none`) with another value, which OpenID Connect Core §3.1.2.1 forbids. Such a request used to be
+  sent.
+- **Breaking:** `LoopbackRedirectListener.waitForCallback(timeout:accept:)` is `waitForCallback(timeLimit:accept:)`
+  and `LoopbackUserAgent(listener:timeout:openURL:)` is `LoopbackUserAgent(listener:timeLimit:openURL:)`, matching
+  the `timeLimit` of the other APIs that give up after a duration on the injected clock.
+- **Breaking:** the members of `PassportError` (`code`, `recovery`, `statusCode`, `errorURI`, `underlying`) are
+  read-only outside the library, like `detail` already was. Create an error with the initializers instead of
+  changing one.
+- **Breaking:** `SignOutResult.Revocation` is the top-level `RevocationOutcome`, shared by sign-out and
+  `OAuthClient.revokeBestEffort(_:typeHint:timeLimit:)`; `SignOutResult.revocation` has that type. Its cases are
+  unchanged.
+- **Breaking:** `TokenManager.exchangeRefreshToken` returns the response when the server answered, even if the
+  session ended or was replaced while the request was in flight; it used to throw `.notAuthenticated` and drop the
+  issued token, which stayed valid at the server. The rotated subject still goes to the ended session's revocation
+  and the new session is not touched. Callers that must not use a token of an ended session check their own state
+  and revoke it as the audience client (ADR 0015).
+- **Breaking:** the response of `TokenManager.exchangeRefreshToken` has `refreshToken` set to `nil`. The rotated
+  refresh token belongs to the session, which saves it; handing it out invited presenting it twice.
+- `TokenManager.signOut(revoke:)` is `beginSignOut(revoke:)` followed by `await result`. The revocation's time
+  limit and its log line now run in a task the manager owns, so a revocation outcome is logged even when the caller
+  of `signOut` was cancelled. Results are unchanged.
+- Every public enumeration states whether it is frozen. `TokenAcceptance` and `JSONValue` are frozen; `PassportEvent`,
+  `IssuerValidation`, `Discovery.Style`, `KeychainCredentialStore.Accessibility` and the enumerations of
+  `PassportKitTesting` may gain cases in a minor release, so a `switch` over them needs a `default`.
+
+### Removed
+
+- **Breaking:** `Credential.additionalFields` and the matching initializer parameter. Nothing in the library set or
+  read it, and `TokenManager` offered no way to fill it. Stored records that carry the field still decode; the field
+  is ignored.
+
+### Fixed
+
+- A `Retry-After` in the obsolete RFC 850 date form with a two-digit year up to 50 years ahead is read as a future
+  date (RFC 9110 §5.6.7); years 46 to 76 used to be read as the 20th century, which made the delay zero.
+- `LoopbackUserAgent` installs its `state` filter before it opens the browser, so a request with another `state`
+  that reaches the listener while the browser opens is refused instead of being taken as the redirect.
+- `TokenManager.load()` reads the store only after every save and delete decided before it, so a load that runs
+  while the delete of a signed-out or rejected session is still in progress no longer restores that session.
+- `KeychainCredentialStore` updates an existing item in place instead of deleting it and adding it again, so a save
+  that fails (device locked, denied prompt) or a process that dies mid-save no longer loses the stored credential,
+  and stores writing the same item at once no longer fail with `errSecDuplicateItem`. A save whose payload could not
+  be archived fails with `.storageFailure` instead of storing an item without data.
+- `KeychainCredentialStore` finds, replaces and deletes its item by class, service, account and access group, never
+  by accessibility class. An app that changes `accessibility` keeps its stored credential (on iOS it was no longer
+  found), and the next save moves the item to the new class.
+- The documentation of `RequestAuthorizer.sign(_:for:)` for `HTTPRequest` and of `URLSessionTransport` states that
+  the never-indexed marking of `Authorization` (RFC 7541 §7.1.3) reaches the wire only through a transport that keeps
+  the indexing strategy of `HTTPFields`. `URLSessionTransport` converts to `URLRequest`, which drops it.
+- `DeviceAuthorization.expiresAt` keeps the fractional part of a fractional `expires_in` instead of truncating it to
+  whole seconds.
+
 ## [0.3.2] - 2026-10-19
 
 ### Changed
@@ -324,7 +396,8 @@ unchanged: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1.
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization request query as form data, so a `+` in
   `scope` is a space.
 
-[Unreleased]: https://github.com/slidoapp/PassportKit/compare/0.3.2...HEAD
+[Unreleased]: https://github.com/slidoapp/PassportKit/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/slidoapp/PassportKit/compare/0.3.2...1.0.0
 [0.3.2]: https://github.com/slidoapp/PassportKit/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/slidoapp/PassportKit/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/slidoapp/PassportKit/compare/0.2.0...0.3.0

@@ -72,10 +72,3 @@ struct TokenCache {
         rejections[target] = nil
     }
 }
-
-extension Duration {
-    /// The duration in seconds.
-    var seconds: TimeInterval {
-        Double(components.seconds) + Double(components.attoseconds) / 1e18
-    }
-}

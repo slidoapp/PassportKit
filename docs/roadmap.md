@@ -6,11 +6,10 @@ features left out on purpose are `not planned` rows in `docs/rfc-matrix.md`.
 
 ## Follow-ups
 
-- **Fix the SwiftKeychain write path upstream.** `KeychainCredentialStore` can lose the credential because
-  SwiftKeychain replaces an item by deleting and adding it (ADR 0009, `docs/security-model.md`). The fix replaces
-  delete-then-add with `SecItemUpdate`, then adds on `errSecItemNotFound`, and throws typed errors instead of archiving
-  with `try?`. Afterwards restore the multi-store race test (a known issue now) and consider the data protection
-  keychain.
+- **An opt-in for the data protection keychain on macOS.** `KeychainCredentialStore` uses the login keychain on macOS,
+  where `Accessibility` and `accessGroup` are not enforced, because the data protection keychain needs a keychain
+  access group entitlement that not every hosting process has (ADR 0009, `docs/security-model.md`). An opt-in for
+  processes that have one can be added without breaking the API.
 - **Client credentials target in `TokenManager`.** Cache and coalesce machine-to-machine tokens (RFC 6749 §4.4) the way
   user tokens are, with a target derivation of its own and no refresh token or session.
 - **`OAuthClient(issuer:)`.** An asynchronous convenience that runs discovery (RFC 8414) and builds the configuration,

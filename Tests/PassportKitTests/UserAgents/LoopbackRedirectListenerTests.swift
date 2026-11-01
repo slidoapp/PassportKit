@@ -108,7 +108,7 @@ struct LoopbackRedirectListenerTests {
         let clock = ManualClock()
         let listener = try await LoopbackRedirectListener.start(clock: clock)
         let port = try #require(listener.redirectURI.port)
-        let waiting = Task { try await listener.waitForCallback(timeout: .seconds(300)) }
+        let waiting = Task { try await listener.waitForCallback(timeLimit: .seconds(300)) }
         #expect(try await clock.advanceToNextSleeper() == .seconds(300))
         await #expect(throws: PassportError(.timedOut, recovery: .reauthenticate)) { try await waiting.value }
         // The listener is closed afterwards.
@@ -230,6 +230,21 @@ struct LoopbackUserAgentTests {
             _ = try await URLSession(configuration: .ephemeral).data(from: redirect)
         }
         let authorization = try #require(URL(string: "https://as.example.com/authorize"))
+        #expect(try await agent.present(authorization, redirectURI: listener.redirectURI) == redirect)
+    }
+
+    @Test("a request with another state that arrives while the browser opens is refused, not taken as the callback")
+    func filtersStateBeforeTheBrowserOpens() async throws {
+        let listener = try await LoopbackRedirectListener.start()
+        let base = listener.redirectURI.absoluteString
+        let stray = try #require(URL(string: base + "?code=stray&state=other"))
+        let redirect = try #require(URL(string: base + "?code=abc&state=xyz"))
+        let agent = LoopbackUserAgent(listener: listener) { _ in
+            let (_, response) = try await URLSession(configuration: .ephemeral).data(from: stray)
+            #expect((response as? HTTPURLResponse)?.statusCode == 400)
+            _ = try await URLSession(configuration: .ephemeral).data(from: redirect)
+        }
+        let authorization = try #require(URL(string: "https://as.example.com/authorize?state=xyz"))
         #expect(try await agent.present(authorization, redirectURI: listener.redirectURI) == redirect)
     }
 

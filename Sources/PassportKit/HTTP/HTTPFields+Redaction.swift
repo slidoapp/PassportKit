@@ -1,8 +1,12 @@
 import HTTPTypes
 
 extension HTTPFields {
-    /// Replaces every line named `name` with one that HPACK and QPACK never index, nor let intermediaries index
-    /// (RFC 7541 §7.1.3). For credentials such as `Authorization`.
+    /// Replaces every line named `name` with one marked never indexed (RFC 7541 §7.1.3), for credentials such as
+    /// `Authorization`.
+    ///
+    /// The marking reaches the wire only through an ``HTTPTransport`` that keeps the `indexingStrategy` of
+    /// `HTTPFields` when it encodes HPACK or QPACK. ``URLSessionTransport`` does not: `URLRequest` has no
+    /// indexing strategy, so `URLSession` decides how to encode the field.
     package mutating func setSensitive(_ name: HTTPField.Name, _ value: String) {
         self[name] = nil
         var field = HTTPField(name: name, value: value)

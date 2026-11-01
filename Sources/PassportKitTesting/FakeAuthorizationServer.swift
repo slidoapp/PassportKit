@@ -98,6 +98,8 @@ public actor FakeAuthorizationServer: HTTPTransport {
     }
 
     /// What a refresh does when it names an unauthorized resource.
+    ///
+    /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
     public enum RefreshForUnauthorizedResource: Sendable {
         /// 200 with a fresh access token whose `scope` is ``Controls/narrowedScope``.
         case narrowScope200
@@ -106,6 +108,8 @@ public actor FakeAuthorizationServer: HTTPTransport {
     }
 
     /// What a token exchange does when it names an unauthorized resource.
+    ///
+    /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
     public enum ExchangeForUnauthorizedResource: Sendable {
         /// 401 `access_denied`.
         case accessDenied401
@@ -114,6 +118,8 @@ public actor FakeAuthorizationServer: HTTPTransport {
     }
 
     /// What the `iss` parameter of an authorization response (RFC 9207) carries.
+    ///
+    /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
     public enum IssuerParameter: Sendable {
         /// The real issuer.
         case issuer

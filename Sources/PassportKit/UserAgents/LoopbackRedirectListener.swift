@@ -8,13 +8,13 @@ import os
 ///
 /// The redirect URI must carry the port the listener actually got, so the flow has two steps: start
 /// the listener, put ``redirectURI`` into the `AuthorizationRequest`, then let a ``LoopbackUserAgent``
-/// (or your own code) call ``waitForCallback(timeout:accept:)``.
+/// (or your own code) call ``waitForCallback(timeLimit:accept:)``.
 ///
 /// The listener binds `127.0.0.1` on an ephemeral port only. It answers every request itself and
 /// returns the first `GET` request for ``redirectURI``'s path whose `Host` is the loopback address on
 /// this port, whose query has `state` and `code` or `error`, that no `Sec-Fetch-Mode` or `Sec-Fetch-Dest`
 /// header marks as a background request, and that the `accept` predicate of
-/// ``waitForCallback(timeout:accept:)`` allows. Other requests get an error status and the listener keeps
+/// ``waitForCallback(timeLimit:accept:)`` allows. Other requests get an error status and the listener keeps
 /// waiting, so a stray request from a web page cannot use up the redirect. At most 8 connections are open
 /// at once and each is closed after 5 seconds on the injected clock. A listener is single use: it stops
 /// after the callback, a timeout, a failure, or ``cancel()``, which also closes open connections.
@@ -37,7 +37,7 @@ public final class LoopbackRedirectListener: Sendable {
     ///
     /// - Parameters:
     ///   - path: The redirect path, such as `/callback`. It must start with `/` and have no query.
-    ///   - clock: Times ``waitForCallback(timeout:accept:)``.
+    ///   - clock: Times ``waitForCallback(timeLimit:accept:)``.
     ///   - logger: Receives listener events, never request URLs or their queries.
     /// - Throws: `PassportError` with `.invalidConfiguration` for an invalid `path`, and
     ///   `.transportFailure` when the socket cannot be opened.
@@ -149,14 +149,14 @@ public final class LoopbackRedirectListener: Sendable {
     /// The listener is stopped when this returns or throws. Call it once.
     ///
     /// - Parameters:
-    ///   - timeout: How long to wait, measured on the injected clock.
+    ///   - timeLimit: How long to wait, measured on the injected clock.
     ///   - accept: Decides whether a request that has the shape of an authorization response is the one
     ///     the flow expects, for example by comparing its `state`. A request it refuses gets status 400
     ///     and the listener keeps waiting. It runs on a background queue.
-    /// - Throws: `PassportError` with `.timedOut` when `timeout` passes on the injected clock, or
+    /// - Throws: `PassportError` with `.timedOut` when `timeLimit` passes on the injected clock, or
     ///   `CancellationError` when the task is cancelled or ``cancel()`` is called first.
     public func waitForCallback(
-        timeout: Duration = .seconds(300),
+        timeLimit: Duration = .seconds(300),
         accept: @escaping @Sendable (URL) -> Bool = { _ in true }
     ) async throws -> URL {
         acceptor.withLock { $0 = accept }
@@ -171,7 +171,7 @@ public final class LoopbackRedirectListener: Sendable {
                     throw CancellationError()
                 }
                 group.addTask {
-                    try await clock.sleep(for: timeout)
+                    try await clock.sleep(for: timeLimit)
                     logger.notice("The loopback redirect did not arrive in time")
                     throw PassportError(
                         .timedOut,
@@ -186,6 +186,11 @@ public final class LoopbackRedirectListener: Sendable {
         } onCancel: {
             cancel()
         }
+    }
+
+    /// Makes `accept` decide which requests may be the callback from now on, before anyone waits.
+    func install(accept: @escaping @Sendable (URL) -> Bool) {
+        acceptor.withLock { $0 = accept }
     }
 
     /// Stops the listener and closes open connections. Pending and later waits end with

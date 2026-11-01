@@ -38,7 +38,8 @@ public struct AuthorizationRequest: Sendable, Hashable {
     /// `login_hint`, a hint for the authentication step (OpenID Connect Core §3.1.2.1).
     public var loginHint: String?
     /// `prompt` values (OpenID Connect Core §3.1.2.1), sent as one space-delimited parameter in the given order;
-    /// omitted when empty. ``Prompt/noInteraction`` must not be combined with other values.
+    /// omitted when empty. ``Prompt/noInteraction`` must not be combined with other values:
+    /// ``OAuthClient/beginAuthorization(_:)`` throws `invalidConfiguration` for such a list.
     public var prompt: [Prompt]
     /// Extension parameters appended after the standard ones; a colliding name is an `invalidConfiguration` error.
     public var additionalParameters: AdditionalParameters

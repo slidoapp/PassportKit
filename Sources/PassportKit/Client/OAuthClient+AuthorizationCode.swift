@@ -13,13 +13,18 @@ extension OAuthClient {
     /// authorization endpoint is configured, the endpoint carries a fragment or a query item the request also
     /// sets, no ``ClientConfiguration/issuer`` is configured (the response `iss` could not be checked, RFC 9207
     /// §2.4), the redirect URI is not absolute, has a fragment, or is plain `http` on a non-loopback host
-    /// (RFC 8252 §7.3, §8.3), a resource is invalid, the lifetime is not positive, or an additional parameter collides.
+    /// (RFC 8252 §7.3, §8.3), a resource is invalid, the lifetime is not positive, ``AuthorizationRequest/Prompt/noInteraction``
+    /// is combined with another `prompt` value (OpenID Connect Core §3.1.2.1), or an additional parameter collides.
     public func beginAuthorization(_ request: AuthorizationRequest) throws -> PendingAuthorization {
         _ = try requireIssuer()
         let endpoint = try requireEndpoint(configuration.endpoints.authorization, name: "authorization")
         try Self.validate(redirectURI: request.redirectURI)
         guard request.lifetime > .zero else {
             throw PassportError(.invalidConfiguration, detail: "The authorization lifetime must be positive.")
+        }
+        // OpenID Connect Core §3.1.2.1: `none` must not be combined with any other value.
+        guard !request.prompt.contains(.noInteraction) || request.prompt.count == 1 else {
+            throw PassportError(.invalidConfiguration, detail: "The prompt none cannot be combined with other values.")
         }
         guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false), components.fragment == nil
         else {
