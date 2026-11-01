@@ -167,7 +167,10 @@ header names only. A request or response handed back to the caller (the signed
 request of `RequestAuthorizer.sign`, the response of `send`) is the caller's
 value and prints like any `HTTPTypes` value; apps must not log it. The library
 sets `Authorization` with `indexingStrategy = .disallow` (never indexed in
-HPACK or QPACK, RFC 7541 §7.1.3).
+HPACK or QPACK, RFC 7541 §7.1.3). The marking reaches the wire only through an
+`HTTPTransport` that keeps the indexing strategy of `HTTPFields`;
+`URLSessionTransport` converts to `URLRequest`, which has none, so `URLSession`
+decides how to encode the field.
 
 Form bodies follow RFC 6749 Appendix B: UTF-8, every character except
 unreserved ones percent-encoded, space as `+`, `+` as `%2B`.

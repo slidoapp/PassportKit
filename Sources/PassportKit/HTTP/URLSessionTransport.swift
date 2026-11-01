@@ -12,6 +12,8 @@ import HTTPTypesFoundation
 ///   request header except a small set of standard ones is dropped, so credentials never travel to another origin.
 /// - Caps response bodies at 1 MiB; a larger body fails with ``PassportError/Code-swift.struct/invalidResponse``.
 /// - Reports transport errors as ``PassportError/Code-swift.struct/transportFailure`` with the underlying error.
+/// - Drops the never-indexed marking of `Authorization` (RFC 7541 §7.1.3): `URLRequest` has no indexing strategy,
+///   so `URLSession` decides how HPACK and QPACK encode the field.
 public struct URLSessionTransport: HTTPTransport {
     /// The largest accepted response body, in bytes.
     static let maximumBodySize = 1_048_576

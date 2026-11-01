@@ -73,8 +73,9 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
 
     /// Adds `Authorization: Bearer <token>` (RFC 6750 §2.1) and returns the token that was used.
     ///
-    /// Same rules as the `URLRequest` overload. The `Authorization` field is marked never-indexed (RFC 7541
-    /// §7.1.3).
+    /// Same rules as the `URLRequest` overload. The `Authorization` field is marked never indexed (RFC 7541
+    /// §7.1.3). The marking reaches the wire only if the code that sends the request keeps the `indexingStrategy`
+    /// of `HTTPFields`; converting to `URLRequest`, as ``URLSessionTransport`` does, drops it.
     ///
     /// The signed request is your value: `HTTPTypes.HTTPRequest` prints its method, URL with query and, under
     /// `dump`, every header field including `Authorization`. Never log a signed request.
