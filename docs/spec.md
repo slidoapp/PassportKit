@@ -34,7 +34,9 @@ DPoP and PAR (see §11).
 
 ## 2. Package
 
-- `swift-tools-version: 6.2`, Swift 6 language mode, warnings are errors.
+- `swift-tools-version: 6.2`, Swift 6 language mode. Warnings are errors in this repository's builds (`make build`,
+  `make test`), not in `Package.swift`: an app that depends on the package builds it with warnings suppressed, and
+  Xcode refuses both flags together.
 - Platforms: macOS 14 and iOS 17 only (ADR 0011).
 - Dependencies are limited to well-maintained Apple and Swift project
   packages (ADR 0009): swift-http-types, swift-log (`Logging`) and

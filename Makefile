@@ -2,6 +2,9 @@
 
 INTEGRATION_SERVER := Tools/integration-server
 SWIFT_FORMAT_PATHS := $(wildcard Sources Tests Package.swift)
+# Warnings are errors for this repository's own builds only. Package.swift does not say so, because an app that
+# depends on PassportKit builds it with warnings suppressed, and Xcode refuses that combination.
+WARNINGS_AS_ERRORS := -Xswiftc -warnings-as-errors
 
 .PHONY: setup format lint build test test-ios check integration docs
 
@@ -16,10 +19,10 @@ lint:
 	scripts/check-determinism.sh
 
 build:
-	swift build --build-tests
+	swift build --build-tests $(WARNINGS_AS_ERRORS)
 
 test:
-	swift test --parallel
+	swift test --parallel $(WARNINGS_AS_ERRORS)
 
 # Runs the tests on an iPhone simulator. Needs Xcode with an iOS runtime. Not part of `check`.
 test-ios:

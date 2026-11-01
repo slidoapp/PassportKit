@@ -5,7 +5,6 @@ import PackageDescription
 let swiftSettings: [SwiftSetting] = [
     .enableUpcomingFeature("ExistentialAny"),
     .enableUpcomingFeature("MemberImportVisibility"),
-    .treatAllWarnings(as: .error),
 ]
 
 let package = Package(
