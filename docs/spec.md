@@ -352,6 +352,11 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     public func exchange(_ request: TokenExchangeRequest) async throws -> TokenResponse
     // RFC 7009
     public func revoke(_ token: Secret, typeHint: TokenTypeHint? = nil) async throws
+    // RFC 7009, best effort: never throws; .skipped without a revocation endpoint, .timedOut after
+    // `timeLimit` on the client's clock, .cancelled when the caller is cancelled (both cancel the request)
+    public func revoke(_ token: Secret, typeHint: TokenTypeHint? = nil,
+                       timeLimit: Duration) async -> SignOutResult.Revocation
+    public static let defaultRevocationTimeLimit: Duration   // 5 s, the limit signOut uses
     // RFC 8628
     public func beginDeviceAuthorization(scope: ScopeSet? = nil, resources: [URL] = [],
                                          additionalParameters: AdditionalParameters = [:]) async throws -> DeviceAuthorization
@@ -681,7 +686,8 @@ usually a refresh token for another audience and belongs to the application.
 Its `refresh_token`, the rotated subject, is persisted. Revocation in
 `signOut` also takes a lane turn, reserved before `signOut` suspends, so it
 queues behind operations already sending the old token; the request and the
-wait for it are each limited to 5 s on the client's clock. A time limit gives up
+wait for it are each limited to `OAuthClient.defaultRevocationTimeLimit` (5 s)
+on the client's clock. A time limit gives up
 on an operation that ignores cancellation, which then runs on in the background.
 
 ```swift

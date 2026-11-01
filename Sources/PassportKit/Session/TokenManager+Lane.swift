@@ -137,7 +137,7 @@ extension TokenManager {
     /// Starts revoking the refresh token of the ended session `session`, which is `refreshToken` as of now, in
     /// its own lane turn, and returns what will become of it.
     ///
-    /// The turn is reserved before this returns; the token is read when the turn starts. The request is limited to `revocationTimeLimit` on the
+    /// The turn is reserved before this returns; the token is read when the turn starts. The request is limited to `OAuthClient.defaultRevocationTimeLimit` on the
     /// client's clock so a hung server cannot hold the lane.
     func startRevocation(of refreshToken: Secret, session: Int, lane: RefreshLane) -> Completion<
         SignOutResult.Revocation
@@ -150,18 +150,10 @@ extension TokenManager {
         Task {
             await turn.start()
             defer { turn.finish() }
-            let client = self.client
             let refreshToken = revocableTokens.removeValue(forKey: session) ?? refreshToken
-            let outcome: SignOutResult.Revocation
-            do {
-                let finished = try await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) {
-                    try await client.revoke(refreshToken, typeHint: .refreshToken)
-                    return true
-                }
-                outcome = finished == nil ? .timedOut : .revoked
-            } catch {
-                outcome = .failed(error as? PassportError ?? PassportError(.transportFailure, underlying: error))
-            }
+            // The task is never cancelled, so the outcome is never `cancelled`.
+            let outcome = await client.revoke(
+                refreshToken, typeHint: .refreshToken, timeLimit: OAuthClient.defaultRevocationTimeLimit)
             completion.complete(.success(outcome))
         }
         return completion

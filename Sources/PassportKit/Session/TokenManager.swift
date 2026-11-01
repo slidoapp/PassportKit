@@ -17,9 +17,6 @@ import Logging
 /// - Changes to the store are queued in the order they are decided (`changeStore(_:)`), and each session has
 ///   a lane of its own, so what one session's slow operations do never reorders or blocks another's.
 public actor TokenManager {
-    /// The longest `signOut(revoke:)` waits for the revocation request, and the request itself runs.
-    static let revocationTimeLimit = Duration.seconds(5)
-
     /// Thrown inside the manager when work finds that its session ended or was replaced. The public methods
     /// never let it escape: they resolve again on the session that exists now, or report ``superseded``.
     struct SessionSuperseded: Error {}
@@ -259,7 +256,9 @@ public actor TokenManager {
         let outcome: SignOutResult.Revocation
         do {
             outcome =
-                try await withTimeLimit(Self.revocationTimeLimit, clock: client.clock) { try await revocation.wait() }
+                try await withTimeLimit(OAuthClient.defaultRevocationTimeLimit, clock: client.clock) {
+                    try await revocation.wait()
+                }
                 ?? .timedOut
         } catch {
             // Only the caller's cancellation can end the wait early; the revocation itself carries on.

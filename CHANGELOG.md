@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `OAuthClient.revoke(_:typeHint:timeLimit:)` revokes a token best effort (RFC 7009) and returns a
+  `SignOutResult.Revocation` instead of throwing: `revoked`, `failed`, `timedOut` after the limit on the client's
+  clock, `cancelled`, or `skipped` without a revocation endpoint. It is for a token that never became a session, such
+  as a refresh token the app obtained but did not adopt. `OAuthClient.defaultRevocationTimeLimit` (5 seconds) is the
+  limit `TokenManager.signOut(revoke:)` uses, so apps need not copy it.
+
 ### Fixed
 
 - The documentation of `RequestAuthorizer.sign(_:for:)` for `HTTPRequest` and of `URLSessionTransport` states that

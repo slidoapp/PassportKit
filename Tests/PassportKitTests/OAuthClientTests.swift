@@ -291,6 +291,60 @@ struct OAuthClientTests {
         #expect(error?.recovery == .fixConfiguration)
     }
 
+    /// A transport that answers only after a minute on `clock`, and stops when cancelled.
+    private struct HangingTransport: HTTPTransport {
+        let clock: ManualClock
+        func send(_ request: HTTPRequest, body: Data?) async throws -> (HTTPResponse, Data) {
+            try await clock.sleep(for: .seconds(60))
+            return (HTTPResponse(status: .ok), Data())
+        }
+    }
+
+    @Test("RFC 7009 §2: the time-limited revoke reports revoked and failed without throwing")
+    func timeLimitedRevokeOutcomes() async throws {
+        let revoked = try ClientFixtures.client(RecordingTransport([.json(200, "")]))
+        #expect(await revoked.revoke(Secret("a"), typeHint: .refreshToken, timeLimit: .seconds(5)) == .revoked)
+
+        let failing = try ClientFixtures.client(RecordingTransport([.json(503, "", headers: [.retryAfter: "3"])]))
+        guard case .failed(let error) = await failing.revoke(Secret("a"), timeLimit: .seconds(5)) else {
+            Issue.record("Expected a failure")
+            return
+        }
+        #expect(error.recovery == .retryLater(after: .seconds(3)))
+
+        let offline = try ClientFixtures.client(RecordingTransport([.fail(URLError(.notConnectedToInternet))]))
+        guard case .failed(let transportError) = await offline.revoke(Secret("a"), timeLimit: .seconds(5)) else {
+            Issue.record("Expected a failure")
+            return
+        }
+        #expect(transportError.code == .transportFailure)
+    }
+
+    @Test("RFC 7009 §2: the time-limited revoke is skipped without an endpoint")
+    func timeLimitedRevokeWithoutEndpoint() async throws {
+        let transport = RecordingTransport()
+        let client = try ClientFixtures.client(transport, revocation: false)
+        #expect(await client.revoke(Secret("a"), timeLimit: .seconds(5)) == .skipped)
+        #expect(await transport.requests.isEmpty)
+    }
+
+    @Test("the time-limited revoke gives up after the limit on the client's clock, or when its caller is cancelled")
+    func timeLimitedRevokeTimesOut() async throws {
+        let clock = ManualClock()
+        let client = try ClientFixtures.client(HangingTransport(clock: clock), clock: clock)
+        // The limit and the transport sleep.
+        let timed = Task { await client.revoke(Secret("a"), timeLimit: .seconds(5)) }
+        // The limit and the transport.
+        try await clock.waitForSleepers(2)
+        clock.advance(by: .seconds(5))
+        #expect(await timed.value == .timedOut)
+
+        let cancelled = Task { await client.revoke(Secret("a"), timeLimit: .seconds(5)) }
+        try await clock.waitForSleepers(2)
+        cancelled.cancel()
+        #expect(await cancelled.value == .cancelled)
+    }
+
     @Test func revokeWithoutEndpointIsInvalidConfiguration() async throws {
         let transport = RecordingTransport()
         let client = try ClientFixtures.client(transport, revocation: false)

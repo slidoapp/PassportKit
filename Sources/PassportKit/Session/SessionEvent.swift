@@ -28,7 +28,7 @@ public enum SessionEvent: Sendable, Hashable {
 
 /// What ``TokenManager/signOut(revoke:)`` did.
 public struct SignOutResult: Sendable, Equatable {
-    /// The outcome of revoking the refresh token (RFC 7009).
+    /// The outcome of revoking a token (RFC 7009), at sign-out or with ``OAuthClient/revoke(_:typeHint:timeLimit:)``.
     ///
     /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
     public enum Revocation: Sendable, Equatable {
@@ -40,8 +40,9 @@ public struct SignOutResult: Sendable, Equatable {
         case failed(PassportError)
         /// The request did not finish within the time box. It may still complete in the background.
         case timedOut
-        /// The task that called ``TokenManager/signOut(revoke:)`` was cancelled while it waited. The revocation
-        /// continues in the background and may still succeed; the session is cleared either way.
+        /// The calling task was cancelled while it waited. After ``TokenManager/signOut(revoke:)`` the revocation
+        /// continues in the background and may still succeed, and the session is cleared either way. After
+        /// ``OAuthClient/revoke(_:typeHint:timeLimit:)`` the request is cancelled.
         case cancelled
     }
 
