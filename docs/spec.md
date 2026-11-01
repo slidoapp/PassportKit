@@ -690,7 +690,12 @@ Invariants (each has a conformance test):
 `exchangeRefreshToken` is not coalesced (each call sends one request) and its
 result is not cached or run through the acceptance policy: the issued token is
 usually a refresh token for another audience and belongs to the application.
-Its `refresh_token`, the rotated subject, is persisted. Revocation in
+Its `refresh_token`, the rotated subject, is persisted. An exchange the server
+answered is returned even if the session ended or was replaced meanwhile (ADR
+0015): its rotated subject then goes to the ended session's revocation and the
+current session is not touched, and a caller that must not use a token of an
+ended session discards it itself. An exchange whose session ended before it was
+sent throws `.notAuthenticated`, as does a failure that arrives late. Revocation in
 `signOut` also takes a lane turn, reserved before `signOut` suspends, so it
 queues behind operations already sending the old token; the request and the
 wait for it are each limited to `OAuthClient.defaultRevocationTimeLimit` (5 s)

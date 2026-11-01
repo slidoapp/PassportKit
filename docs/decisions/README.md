@@ -15,7 +15,7 @@ public API, adds a dependency or changes a module boundary.
 | [0004](0004-granted-scope-and-acceptance-policy.md) | Expose the granted scope; an acceptance policy decides before a token becomes current | accepted |
 | [0005](0005-refresh-token-lane.md) | Operations that send the refresh token run one at a time | accepted; amended by 0007 |
 | [0006](0006-injected-clocks.md) | Durations on an injected clock, not instants | accepted |
-| [0007](0007-ordered-store-changes-and-session-lanes.md) | Ordered store changes, a lane per session, revocation of the newest token | accepted |
+| [0007](0007-ordered-store-changes-and-session-lanes.md) | Ordered store changes, a lane per session, revocation of the newest token | accepted; amended by 0015 |
 | [0008](0008-public-api-conventions.md) | Public API conventions: open structs for growing sets, factories, labels, `Duration`, `Secret` | accepted |
 | [0009](0009-external-dependencies.md) | Which external dependencies are allowed and how they are chosen | accepted; amended by 0011 |
 | [0010](0010-http-types.md) | swift-http-types is the HTTP currency type | accepted; amended by 0011 |
@@ -23,3 +23,4 @@ public API, adds a dependency or changes a module boundary.
 | [0012](0012-strict-https-for-endpoints.md) | Endpoints must be `https`; loopback `http` needs the explicit `allowsInsecureLoopbackEndpoints` opt-in | accepted |
 | [0013](0013-code-flow-requires-an-issuer.md) | The authorization code flow requires a configured issuer, so `iss` is never accepted unchecked | accepted |
 | [0014](0014-begin-sign-out.md) | `beginSignOut` returns once local state is cleared, with a `PendingSignOut` to await the delete and the revocation | accepted |
+| [0015](0015-answered-exchange-belongs-to-the-caller.md) | An exchange the server answered returns its token even if the session ended meanwhile | accepted |

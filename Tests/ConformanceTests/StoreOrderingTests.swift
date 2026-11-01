@@ -37,6 +37,34 @@ struct StoreOrderingTests {
         #expect(revoked == [rotated], "the refresh token issued by the in-flight request stays valid")
     }
 
+    @Test(
+        "ADR 0015: an exchange answered after sign-out returns its token; the rotation goes to the ended session"
+    )
+    func exchangeAnsweredAfterSignOut() async throws {
+        let harness = try await Harness()
+        let manager = harness.manager
+        let original = try #require(await harness.currentRefreshToken())
+        // Shorter than the revocation's time limit, so the revocation can still finish after the exchange.
+        await harness.delayTokenResponses(by: .seconds(2))
+        let exchange = Task { try await manager.exchangeRefreshToken(audiences: ["billing"]) }
+        try await harness.clock.waitForSleeper()
+
+        let pending = await manager.beginSignOut()
+        try await harness.signInAgain()
+        let newSession = try #require(await harness.currentRefreshToken())
+        harness.clock.advance(by: .seconds(2))
+
+        let response = try await exchange.value
+        #expect(!response.accessToken.reveal().isEmpty)
+        let rotated = try #require(response.refreshToken?.reveal())
+        #expect(rotated != original)
+        #expect(await pending.result().revocation == .revoked)
+        let revoked = await harness.server.requests(to: "/revoke").compactMap { $0.value("token") }
+        #expect(revoked == [rotated], "the ended session's revocation targets the rotated subject")
+        #expect(await harness.currentRefreshToken() == newSession)
+        #expect(await harness.storedRefreshToken() == newSession)
+    }
+
     @Test("invariant 3: a save that finishes after a later sign-out cannot bring the session back")
     func slowSaveDoesNotOutliveSignOut() async throws {
         let store = GatedStore()

@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `TokenManager.exchangeRefreshToken` returns the response when the server answered, even if the session ended or
+  was replaced while the request was in flight; it used to throw `.notAuthenticated` and drop the issued token,
+  which stayed valid at the server. The rotated subject still goes to the ended session's revocation and the new
+  session is not touched. Callers that must not use a token of an ended session check their own state and revoke it
+  as the audience client (ADR 0015).
 - `TokenManager.signOut(revoke:)` is `beginSignOut(revoke:)` followed by `result()`. The revocation's time limit and
   its log line now run in a task the manager owns, so a revocation outcome is logged even when the caller of
   `signOut` was cancelled. Results are unchanged.

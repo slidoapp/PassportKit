@@ -66,7 +66,10 @@ exchange when your server requires it.
 ``TokenManager/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``
 exchanges the refresh token itself, for example to hand a refresh token to
 another component. It is not cached and does not run the acceptance policy;
-the result belongs to your app.
+the result belongs to your app. Once the server answered, the result is
+returned even if the session ended or was replaced meanwhile. If your app must
+not use a token of an ended session, check your own state when the call returns
+and discard the token, revoking it as the client it was issued to.
 
 ## A session from a refresh token you already hold
 
