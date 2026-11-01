@@ -206,6 +206,24 @@ struct LifecycleTests {
         #expect(error.code == .temporarilyUnavailable)
     }
 
+    @Test("cancelling one reader of a pending sign-out does not affect another")
+    func cancelledReaderOfPendingSignOut() async throws {
+        let harness = try await Harness()
+        await harness.server.configure {
+            $0.override = { $0.path == "/revoke" ? .init(status: 200, delay: .seconds(2)) : nil }
+        }
+        let pending = await harness.manager.beginSignOut()
+        let cancelled = Task { await pending.result }
+        let patient = Task { await pending.result }
+        // The wait limit, the request limit and the server's own delay.
+        #expect(await waitUntil { harness.clock.sleeperCount >= 3 })
+        cancelled.cancel()
+        #expect(await cancelled.value == SignOutResult(isStoredCredentialDeleted: true, revocation: .cancelled))
+        harness.clock.advance(by: .seconds(2))
+        #expect(await patient.value == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
+        #expect(await pending.result.revocation == .revoked)
+    }
+
     @Test("a sign-in right after beginSignOut is not held up or touched by the pending revocation")
     func signInAfterBeginSignOut() async throws {
         let harness = try await Harness()

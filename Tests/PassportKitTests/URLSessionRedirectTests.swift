@@ -35,6 +35,7 @@ final class RedirectingURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+@Suite(.timeLimit(.minutes(1)))
 struct URLSessionRedirectTests {
     private static func configuration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral

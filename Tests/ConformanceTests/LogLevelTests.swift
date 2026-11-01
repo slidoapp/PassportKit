@@ -147,6 +147,14 @@ struct LogLevelTests {
         #expect(slow.levels(of: "Revoking the refresh token timed out") == [.notice])
     }
 
+    @Test("A revocation outcome is logged even when nobody reads the sign-out result")
+    func revocationLoggedWithoutReader() async throws {
+        let rig = try await Rig()
+        rig.fail("/revoke", with: URLError(.notConnectedToInternet))
+        _ = await rig.manager.beginSignOut()
+        #expect(await waitUntil { rig.levels(of: Self.revocationFailed) == [.notice] })
+    }
+
     @Test("A resource that rejects a renewed token again is a notice")
     func renewedTokenRejected() async throws {
         let rig = try await Rig()

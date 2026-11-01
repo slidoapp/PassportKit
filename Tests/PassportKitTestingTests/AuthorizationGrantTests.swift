@@ -4,7 +4,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("Fake server: metadata, authorization code and client credentials")
+@Suite("Fake server: metadata, authorization code and client credentials", .timeLimit(.minutes(1)))
 struct AuthorizationGrantTests {
     @Test("metadata advertises the endpoints at the issuer")
     func metadata() async throws {

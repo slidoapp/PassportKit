@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("Fake server: refresh, rotation, revocation and device grant")
+@Suite("Fake server: refresh, rotation, revocation and device grant", .timeLimit(.minutes(1)))
 struct RefreshAndDeviceTests {
     @Test("without rotation the refresh token stays valid and is not reissued")
     func refreshWithoutRotation() async throws {

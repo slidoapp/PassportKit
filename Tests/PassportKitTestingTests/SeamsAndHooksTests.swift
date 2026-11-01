@@ -6,7 +6,7 @@ import Testing
 
 @testable import PassportKitTesting
 
-@Suite("Testing module: clocks, seams, recording and override hooks")
+@Suite("Testing module: clocks, seams, recording and override hooks", .timeLimit(.minutes(1)))
 struct SeamsAndHooksTests {
     @Test("ManualClock wakes sleepers in deadline order and never sleeps for real")
     func manualClockOrder() async throws {
@@ -188,7 +188,7 @@ actor Order {
     func append(_ value: String) { values.append(value) }
 }
 
-@Suite("Testing module: response delay")
+@Suite("Testing module: response delay", .timeLimit(.minutes(1)))
 struct ResponseDelayTests {
     @Test("a delayed response still takes effect on the server immediately")
     func delayedResponse() async throws {
