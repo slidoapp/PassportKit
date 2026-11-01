@@ -42,7 +42,7 @@ Each dependency is linked only into the target that needs it.
 | ~~swift-crypto~~ | ~~`Crypto`~~ | removed | Replaced by CryptoKit, which ships with the OS, in [0011](0011-apple-platforms-only.md). SHA-256 for PKCE S256 (RFC 7636 §4.2) uses it directly; the fake authorization server calls it too but not PassportKit's code path, so it still checks the client independently. |
 | [swift-http-types](https://github.com/apple/swift-http-types) `from: "1.5.0"` | `HTTPTypes`, `HTTPTypesFoundation` | `PassportKit` (both), `PassportKitTesting` (`HTTPTypes`) | The HTTP currency types of `HTTPTransport` and `RequestAuthorizer` (`HTTPRequest`, `HTTPResponse`, `HTTPFields`) and the `URLSession` conversions, in place of hand-written ones. It prints header values, so no public type that stores them may print them (ADR 0010). |
 | [swift-log](https://github.com/apple/swift-log) `from: 1.6.0` | `Logging` | `PassportKit` | The `logger:` parameters. A logger labelled `PassportKit` uses whatever `LoggingSystem.bootstrap` the host configured. `PassportObserver` stays the channel for typed events. |
-| [SwiftKeychain](https://github.com/slidoapp/SwiftKeychain) `.upToNextMinor(from: "2.1.0")` | `SwiftKeychain` | `PassportKit` | The Keychain wrapper the Slido OAuth stack already uses; `KeychainCredentialStore` is built on it. Adopted with a known issue, below. |
+| [SwiftKeychain](https://github.com/slidoapp/SwiftKeychain) `.upToNextMinor(from: "2.1.0")` | `SwiftKeychain` | `PassportKit` | A maintained Keychain wrapper for generic password items; `KeychainCredentialStore` is built on it. Adopted with a known issue, below. |
 
 `SystemRandomSource` stays: `SystemRandomNumberGenerator` is the standard
 library's cryptographically secure generator on every supported platform,
