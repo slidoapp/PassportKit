@@ -15,7 +15,8 @@ struct StoreOrderingTests {
         let manager = harness.manager
         let original = try #require(await harness.currentRefreshToken())
         harness.expireAccessTokens()
-        await harness.delayTokenResponses()
+        // Shorter than the revocation's time limit, so the revocation can still finish after the request.
+        await harness.delayTokenResponses(by: .seconds(2))
         let inFlight = Task {
             switch operation {
             case .refresh: _ = try await manager.accessToken()
@@ -26,7 +27,7 @@ struct StoreOrderingTests {
         let signOut = Task { await manager.signOut() }
         #expect(await waitUntil { await manager.credential == nil })
         // The request sent before sign-out finishes; the revocation request is not delayed.
-        try await harness.deliverResponses(1)
+        harness.clock.advance(by: .seconds(2))
         let result = await signOut.value
         _ = await thrownError { try await inFlight.value }
 
