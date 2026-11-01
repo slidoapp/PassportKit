@@ -75,7 +75,7 @@ struct KeychainCredentialStoreTests {
     }
 
     /// The login keychain of macOS does not enforce accessibility classes, so this passes there with or
-    /// without the fix; ``deletionQueryIdentifiesTheItemWithoutItsAccessibility`` pins the query itself.
+    /// without the fix; ``identityQueryIdentifiesTheItemWithoutItsAccessibility`` pins the query itself.
     /// Access groups cannot be tested end to end for the same reason: the login keychain ignores them.
     @Test func deleteRemovesAnItemStoredWithAnotherAccessibility() async throws {
         defer { cleanUp() }
@@ -86,15 +86,28 @@ struct KeychainCredentialStoreTests {
         #expect(try await store.load(account) == nil)
     }
 
-    @Test func deletionQueryIdentifiesTheItemWithoutItsAccessibility() {
+    /// After an app changes its accessibility class, the item stored with the old class is still loaded and
+    /// replaced, not hidden: on iOS the data protection keychain matches queries on `kSecAttrAccessible`, so a
+    /// query carrying it would miss the old item. The macOS login keychain passes either way.
+    @Test func anotherAccessibilityLoadsAndReplacesTheItem() async throws {
+        defer { cleanUp() }
+        try await KeychainCredentialStore(accessibility: .whenUnlocked).save(credential("refresh-1"), for: account)
+        let store = KeychainCredentialStore(accessibility: .afterFirstUnlockThisDeviceOnly)
+        #expect(try await store.load(account) == credential("refresh-1"))
+        try await store.save(credential("refresh-2"), for: account)
+        #expect(try await store.load(account) == credential("refresh-2"))
+        #expect(itemCount() == 1)
+    }
+
+    @Test func identityQueryIdentifiesTheItemWithoutItsAccessibility() {
         let query = KeychainCredentialStore(accessGroup: "group", accessibility: .whenUnlocked)
-            .deletionQuery(for: account)
+            .identityQuery(for: account)
         #expect(query[kSecAttrAccessible as String] == nil)
         #expect(query[kSecAttrSynchronizable as String] as? Bool == false)
         #expect(query[kSecAttrService as String] as? String == account.service)
         #expect(query[kSecAttrAccount as String] as? String == account.account)
         #expect(query[kSecAttrAccessGroup as String] as? String == "group")
-        #expect(KeychainCredentialStore().deletionQuery(for: account)[kSecAttrAccessGroup as String] == nil)
+        #expect(KeychainCredentialStore().identityQuery(for: account)[kSecAttrAccessGroup as String] == nil)
     }
 
     @Test func corruptPayloadIsAStorageFailureWithoutLeakingIt() async throws {

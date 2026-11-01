@@ -70,13 +70,16 @@ the issue is listed under Known limits in the security model.
 
 Resolution (2026-11-01): no upstream change was needed. SwiftKeychain's
 `saveInKeychain(_:)` takes any `KeychainServiceType`, so
-`KeychainCredentialStore` passes its own, whose insert calls
-`SecItemUpdate` with only `kSecValueData` to change and calls `SecItemAdd`
-only on `errSecItemNotFound` (and updates again if another store added the
-item meanwhile). A missing payload, which SwiftKeychain's `try?` archiving
-would produce, is refused with `errSecParam` instead of being stored. The
-race test of eight stores is a regular test again. The other two limits
-(no data protection keychain, accessibility in the queries) remain.
+`KeychainCredentialStore` passes its own. Every call of it matches the item
+by identity (class, service, account, `kSecAttrSynchronizable` and the
+access group, never `kSecAttrAccessible`). Its insert calls `SecItemUpdate`
+with `kSecValueData` and `kSecAttrAccessible` to change and calls
+`SecItemAdd` only on `errSecItemNotFound` (and updates again if another
+store added the item meanwhile), so a changed accessibility class moves the
+item instead of hiding it. A missing payload, which SwiftKeychain's `try?`
+archiving would produce, is refused with `errSecParam` instead of being
+stored. The race test of eight stores is a regular test again. The limit
+that remains is the data protection keychain on macOS.
 
 ### Rejected candidates
 

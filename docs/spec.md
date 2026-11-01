@@ -973,8 +973,12 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   protection keychain, so there is no `useDataProtectionKeychain`
   option). That keychain enforces neither accessibility classes nor
   access groups, so on macOS `accessibility` and `accessGroup` do not
-  restrict access; they are enforced on iOS. `delete` matches the item
-  by class, service, account and access group, not by accessibility.
+  restrict access; they are enforced on iOS. `load`, `save` and `delete`
+  match the item by class, service, account and access group, not by
+  accessibility; `save` sets the configured accessibility on an existing
+  item too. With `accessGroup: nil` the query names no group, so on iOS it
+  matches the item in any access group the app can reach; new items go to
+  the app's default group.
   Calls block, so each runs on a private serial `DispatchQueue` bridged
   with a continuation. The store reads and writes only its own format: an
   item it cannot decode is a `.storageFailure`, and there is no migration

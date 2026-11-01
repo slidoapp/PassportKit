@@ -7,8 +7,9 @@ import SwiftKeychain
 /// A `CredentialStore` that keeps credentials as generic password items in the Keychain.
 ///
 /// The item's service and account are the `CredentialAccount`'s `service` and `account`; the library has
-/// no defaults for either. Items are written through SwiftKeychain: the payload is the versioned JSON of
-/// `CredentialCoding`, kept as one value inside SwiftKeychain's archived dictionary. Items are never
+/// no defaults for either. The payload is the versioned JSON of `CredentialCoding`, kept as one value inside
+/// SwiftKeychain's archived dictionary; the store makes the Keychain calls itself, matching the item by
+/// class, service, account and access group. Items are never
 /// synchronizable: a refresh token is a bearer secret for one device and must not travel through iCloud
 /// Keychain. The store sets `kSecAttrSynchronizable` to `false` when it adds, fetches and deletes an item,
 /// and there is no option to change it.
@@ -72,9 +73,12 @@ public final class KeychainCredentialStore: CredentialStore {
     ///
     /// - Parameters:
     ///   - accessGroup: The Keychain access group, to share credentials between apps of one team. `nil`
-    ///     uses the app's default group. Enforced on iOS only; the login keychain on macOS ignores it.
-    ///   - accessibility: When items become readable. Applied when an item is created, and part of the
-    ///     item's identity: an item stored with another class is not found.
+    ///     adds new items to the app's default group but, as for any Keychain query without a group, loads,
+    ///     replaces and deletes the item for `account` in whichever of the app's groups holds it. Apps that
+    ///     share a group and use the same service and account in several groups should name the group.
+    ///     Enforced on iOS only; the login keychain on macOS ignores it.
+    ///   - accessibility: When items become readable. Not part of the item's identity: a save also moves an
+    ///     item stored with another class to this one.
     ///   - logger: Receives storage failures, never credentials.
     public init(
         accessGroup: String? = nil,
@@ -98,7 +102,7 @@ public final class KeychainCredentialStore: CredentialStore {
     public func delete(_ account: CredentialAccount) async throws {
         try await perform {
             do {
-                try Keychain().removeItemWithAttributes(self.deletionQuery(for: account))
+                try self.keychain(for: account).removeItemWithAttributes([:])
             } catch  where Self.isNotFound(error) {
                 return
             } catch {
@@ -118,7 +122,7 @@ public final class KeychainCredentialStore: CredentialStore {
         var item = item(for: account)
         let payload: Data
         do {
-            _ = try item.fetchFromKeychain()
+            _ = try item.fetchFromKeychain(keychain(for: account))
             guard let stored = item.data[Self.payloadKey] as? Data else { throw Self.malformed }
             payload = stored
         } catch  where Self.isNotFound(error) {
@@ -144,19 +148,17 @@ public final class KeychainCredentialStore: CredentialStore {
         var item = item(for: account)
         item.data = [Self.payloadKey: data]
         do {
-            // Not SwiftKeychain's own `Keychain`, which replaces an existing item by deleting and adding it:
-            // a failure in between would lose the credential, and with rotation the old token is already
-            // invalid (ADR 0009).
-            try item.saveInKeychain(UpdatingKeychain())
+            try item.saveInKeychain(keychain(for: account))
         } catch {
             throw failure(error, operation: "save")
         }
     }
 
-    /// Matches the item by identity only. SwiftKeychain's own delete query carries `kSecAttrAccessible`, so
-    /// an item stored with another class would survive a sign-out, and omits `kSecAttrAccessGroup`, so it
-    /// would match items of every group.
-    func deletionQuery(for account: CredentialAccount) -> KeychainAttributes {
+    /// Matches the item by identity only, for load, save and delete. SwiftKeychain's own queries carry
+    /// `kSecAttrAccessible`, so an item stored with another class would be neither found, replaced nor deleted.
+    /// Without an access group the query names none, so on iOS it matches the item in any group the app can
+    /// reach (see ``init(accessGroup:accessibility:logger:)``).
+    func identityQuery(for account: CredentialAccount) -> KeychainAttributes {
         var query: KeychainAttributes = [
             String(kSecClass): String(kSecClassGenericPassword),
             String(kSecAttrService): account.service,
@@ -165,6 +167,10 @@ public final class KeychainCredentialStore: CredentialStore {
         ]
         if let accessGroup { query[String(kSecAttrAccessGroup)] = accessGroup }
         return query
+    }
+
+    private func keychain(for account: CredentialAccount) -> CredentialKeychain {
+        CredentialKeychain(identity: identityQuery(for: account), accessibility: String(accessibility.value))
     }
 
     private func item(for account: CredentialAccount) -> CredentialItem {
@@ -208,30 +214,44 @@ public final class KeychainCredentialStore: CredentialStore {
     }
 }
 
-/// SwiftKeychain's `Keychain` with an insert that updates an existing item in place instead of deleting and
-/// adding it, so the stored item is never missing while it is replaced.
-private struct UpdatingKeychain: KeychainServiceType {
+/// The Keychain calls of the store: SwiftKeychain's `Keychain`, except that every call matches the item by its
+/// identity (``KeychainCredentialStore/identityQuery(for:)``) and a save updates the existing item in place.
+///
+/// SwiftKeychain replaces an existing item by deleting and adding it, so a failure in between would lose the
+/// credential (ADR 0009). Its queries also carry `kSecAttrAccessible`, which the data protection keychain
+/// matches on, so after an app changed ``KeychainCredentialStore/Accessibility`` the old item would be neither
+/// found nor replaced.
+private struct CredentialKeychain: KeychainServiceType {
+    /// Class, service, account, `kSecAttrSynchronizable: false` and the access group, if one is set.
+    let identity: KeychainAttributes
+    /// The `kSecAttrAccessible` value the item gets, whether it is added or updated.
+    let accessibility: String
+
     func insertItemWithAttributes(_ attributes: KeychainAttributes) throws {
-        var query = attributes
         // SwiftKeychain archives the payload with `try?`; without data there is nothing to store.
-        guard let data = query.removeValue(forKey: String(kSecValueData)) else { throw Self.error(errSecParam) }
-        // Only the value changes. The attributes to update must not repeat `kSecClass` or the query.
-        let changes: KeychainAttributes = [String(kSecValueData): data]
-        var status = SecItemUpdate(query as CFDictionary, changes as CFDictionary)
+        guard let data = attributes[String(kSecValueData)] else { throw Self.error(errSecParam) }
+        // The attributes to change must not repeat `kSecClass` or anything else of the query.
+        let changes: KeychainAttributes = [String(kSecValueData): data, String(kSecAttrAccessible): accessibility]
+        var status = SecItemUpdate(identity as CFDictionary, changes as CFDictionary)
         if status == errSecItemNotFound {
             status = SecItemAdd(attributes as CFDictionary, nil)
             // Another store added the item since the update looked: update that one.
-            if status == errSecDuplicateItem { status = SecItemUpdate(query as CFDictionary, changes as CFDictionary) }
+            if status == errSecDuplicateItem {
+                status = SecItemUpdate(identity as CFDictionary, changes as CFDictionary)
+            }
         }
         guard status == errSecSuccess else { throw Self.error(status) }
     }
 
     func removeItemWithAttributes(_ attributes: KeychainAttributes) throws {
-        try Keychain().removeItemWithAttributes(attributes)
+        try Keychain().removeItemWithAttributes(identity)
     }
 
     func fetchItemWithAttributes(_ attributes: KeychainAttributes) throws -> KeychainItem? {
-        try Keychain().fetchItemWithAttributes(attributes)
+        var query = identity
+        query[String(kSecReturnData)] = attributes[String(kSecReturnData)]
+        query[String(kSecReturnAttributes)] = attributes[String(kSecReturnAttributes)]
+        return try Keychain().fetchItemWithAttributes(query)
     }
 
     /// An error in SwiftKeychain's domain, which the store maps like SwiftKeychain's own.
