@@ -25,6 +25,11 @@ audience need not be a client of this manager's configuration. A vendor-neutral 
 - The returned response never carries the rotated subject: `refreshToken` is `nil`. That token is the session's (it
   is persisted, or handed to the ended session's revocation); a caller that presented it elsewhere would make the
   server see one refresh token used twice.
+- This keeps the reading of ADR 0005: when the subject is the refresh token, a `refresh_token` in the response is
+  the rotated subject (refresh token rotation, RFC 9700 §4.14.2), not a refresh token for the issued token's context
+  that RFC 8693 §2.2.1 also allows. A server that returns the latter is not supported by `exchangeRefreshToken`: its
+  token would replace the session's root token. Such an app calls `OAuthClient.exchange(_:)` itself, which returns
+  the response untouched.
 - A caller that cancels the call after its request was sent gives the issued token up: nobody receives it, and it
   stays valid at the server until it expires. The documentation says so; a caller that must not lose it does not
   cancel.

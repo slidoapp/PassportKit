@@ -698,7 +698,10 @@ result is not cached or run through the acceptance policy: the issued token is
 usually a refresh token for another audience and belongs to the application.
 Its `refresh_token`, the rotated subject, is persisted and removed from the
 returned response (`refreshToken` is `nil`): it belongs to the session, and
-presenting it elsewhere could trigger reuse detection. An exchange the server
+presenting it elsewhere could trigger reuse detection. A server whose
+exchange response carries a refresh token for the issued token's context
+(RFC 8693 §2.2.1) instead of the rotated subject is not supported by
+`exchangeRefreshToken`; use `OAuthClient.exchange(_:)` (ADR 0015). An exchange the server
 answered is returned even if the session ended or was replaced meanwhile (ADR
 0015): its rotated subject then goes to the ended session's revocation and the
 current session is not touched, and a caller that must not use a token of an
