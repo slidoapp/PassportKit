@@ -7,7 +7,8 @@ keeping the session safe while refresh tokens rotate, and signing requests to pr
 and the HTTP transport are injected, so every flow can be tested offline, and secrets never appear in logs,
 descriptions or errors.
 
-> **Status:** pre-1.0. The API can change in any minor version; see [CHANGELOG.md](CHANGELOG.md).
+> **Status:** stable. The API follows [Semantic Versioning](https://semver.org): a breaking change needs a new major
+> version. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
@@ -21,7 +22,7 @@ descriptions or errors.
 | Token exchange for other audiences and resources | RFC 8693 |
 | Resource indicators | RFC 8707 |
 | Authorization server metadata discovery | RFC 8414 |
-| Token revocation on sign-out | RFC 7009 |
+| Token revocation on sign-out, and best effort for any token | RFC 7009 |
 | Bearer token requests with a single retry after a 401 | RFC 6750 |
 | Native app redirects: `ASWebAuthenticationSession`, loopback | RFC 8252 |
 | Granted scope on every token, and an acceptance hook before a token is used | RFC 6749 §3.3, §5.1 |
@@ -45,7 +46,7 @@ Add the package to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/slidoapp/PassportKit.git", from: "0.3.0")
+    .package(url: "https://github.com/slidoapp/PassportKit.git", from: "1.0.0")
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -57,7 +58,8 @@ targets: [
 ]
 ```
 
-Pin with `.upToNextMinor(from: "0.3.0")` if you need stability: a 0.x minor version can break the API.
+`from: "1.0.0"` accepts every 1.x release, none of which breaks the API. Pin with `.upToNextMinor(from: "1.0.0")`
+only if you want to take new features deliberately.
 
 ## Quick start
 

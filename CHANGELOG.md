@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-01
+
+The first stable release: from here on, a breaking change to the public API of `PassportKit` or `PassportKitTesting`
+needs a new major version.
+
 ### Added
 
 - `OAuthClient.revokeBestEffort(_:typeHint:timeLimit:)` revokes a token best effort (RFC 7009) and returns a
@@ -391,7 +396,8 @@ unchanged: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1.
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization request query as form data, so a `+` in
   `scope` is a space.
 
-[Unreleased]: https://github.com/slidoapp/PassportKit/compare/0.3.2...HEAD
+[Unreleased]: https://github.com/slidoapp/PassportKit/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/slidoapp/PassportKit/compare/0.3.2...1.0.0
 [0.3.2]: https://github.com/slidoapp/PassportKit/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/slidoapp/PassportKit/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/slidoapp/PassportKit/compare/0.2.0...0.3.0
