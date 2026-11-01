@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** the members of `PassportError` (`code`, `recovery`, `statusCode`, `errorURI`, `underlying`) are
+  read-only outside the library, like `detail` already was. Create an error with the initializers instead of
+  changing one.
 - **Breaking:** `SignOutResult.Revocation` is the top-level `RevocationOutcome`, shared by sign-out and
   `OAuthClient.revokeBestEffort(_:typeHint:timeLimit:)`; `SignOutResult.revocation` has that type. Its cases are
   unchanged.

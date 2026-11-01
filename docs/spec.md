@@ -255,12 +255,12 @@ public struct PassportError: LocalizedError, Sendable, Equatable, CustomStringCo
         case fixConfiguration
         case noAction
     }
-    public var code: Code
-    public var recovery: Recovery
-    public var statusCode: Int?
-    public var detail: String?    // server `error_description` or the library's explanation, redacted and truncated to 200 characters; never used for logic
-    public var errorURI: URL?
-    public var underlying: (any Error & Sendable)?
+    public internal(set) var code: Code
+    public internal(set) var recovery: Recovery
+    public internal(set) var statusCode: Int?
+    public internal(set) var detail: String?    // server `error_description` or the library's explanation, redacted and truncated to 200 characters; never used for logic
+    public internal(set) var errorURI: URL?
+    public internal(set) var underlying: (any Error & Sendable)?
 }
 ```
 
