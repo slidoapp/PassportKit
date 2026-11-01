@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `OAuthClient.beginAuthorization(_:)` throws `.invalidConfiguration` when `prompt` combines
+  `.noInteraction` (`none`) with another value, which OpenID Connect Core §3.1.2.1 forbids. Such a request used to be
+  sent.
 - **Breaking:** `LoopbackRedirectListener.waitForCallback(timeout:accept:)` is `waitForCallback(timeLimit:accept:)`
   and `LoopbackUserAgent(listener:timeout:openURL:)` is `LoopbackUserAgent(listener:timeLimit:openURL:)`, matching
   the `timeLimit` of the other APIs that give up after a duration on the injected clock.

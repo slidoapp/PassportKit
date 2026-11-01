@@ -466,8 +466,9 @@ The request URL is the authorization endpoint plus, in order, `response_type`,
 `prompt` and the additional parameters. Existing query items on the endpoint
 are preserved; one that the request also sets is `.invalidConfiguration`, as
 are a missing authorization endpoint and a redirect URI that is relative, has a
-fragment, or is `http` on a non-loopback host (RFC 8252 §7.3, §8.3), and when
-no issuer is configured. A loopback
+fragment, or is `http` on a non-loopback host (RFC 8252 §7.3, §8.3), a
+`prompt` that combines `none` with another value (OpenID Connect Core
+§3.1.2.1), and when no issuer is configured. A loopback
 redirect URI carries the actual port; the callback is compared with it.
 
 **Mix-up protection.** The code flow requires `ClientConfiguration.issuer`:

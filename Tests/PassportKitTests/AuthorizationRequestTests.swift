@@ -46,6 +46,20 @@ struct AuthorizationRequestTests {
         #expect(AuthorizationRequest.Prompt.noInteraction.rawValue == "none")
     }
 
+    @Test("OpenID Connect Core §3.1.2.1: prompt none alone is sent, combined with another value it is refused")
+    func noInteractionPromptStandsAlone() throws {
+        let alone = try client().beginAuthorization(
+            AuthorizationRequest(redirectURI: AuthorizationFixtures.redirectURI, prompt: [.noInteraction]))
+        #expect(pairs(alone.url).contains("prompt=none"))
+        for combined in [[AuthorizationRequest.Prompt.noInteraction, .login], [.consent, .noInteraction]] {
+            let error = #expect(throws: PassportError.self) {
+                try client().beginAuthorization(
+                    AuthorizationRequest(redirectURI: AuthorizationFixtures.redirectURI, prompt: combined))
+            }
+            #expect(error?.code == .invalidConfiguration)
+        }
+    }
+
     @Test func stateAndVerifierAre32RandomBytesEach() throws {
         let pending = try client().beginAuthorization(
             AuthorizationRequest(redirectURI: AuthorizationFixtures.redirectURI))
