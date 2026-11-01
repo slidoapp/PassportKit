@@ -534,7 +534,8 @@ public actor TokenManager {
     public func invalidate(_ token: AccessToken)                    // after a 401 with this token
     public func exchangeRefreshToken(audiences: [String] = [], resources: [URL] = [], scope: ScopeSet? = nil,
                                      requestedTokenType: TokenTypeIdentifier = .refreshToken) async throws -> TokenResponse
-    public func signOut(revoke: Bool = true) async -> SignOutResult
+    public func signOut(revoke: Bool = true) async -> SignOutResult   // beginSignOut(revoke:) then result()
+    public func beginSignOut(revoke: Bool = true) -> PendingSignOut   // clears local state without suspending (ADR 0014)
 
     public nonisolated var events: AsyncStream<SessionEvent> { get }   // multiple subscribers supported
 }
@@ -650,11 +651,17 @@ Invariants (each has a conformance test):
    exists now, if there is one, instead of failing; with none it throws
    `.notAuthenticated`. `.signedOut` and `.signedIn` are emitted before
    the manager first suspends, so their order is the order of the calls.
+   `beginSignOut` does not suspend at all: when it returns, the session is
+   cleared, `.signedOut` was emitted, the delete of the stored credential is
+   queued and the revocation has its lane turn. `signOut` is `beginSignOut`
+   followed by `PendingSignOut.result()`.
 7. **Cancellation.** Cancelling a caller only stops it waiting. A
    request that was already sent is allowed to finish and its result is
    persisted. A caller that is cancelled before it starts never starts
    one. A cancelled `signOut` clears the session and reports the
-   revocation as `.cancelled`.
+   revocation as `.cancelled`; so does `PendingSignOut.result()` for the
+   caller that was cancelled. The revocation's time limit runs in a task
+   the manager owns, from when the delete finished, whoever waits.
 8. **Expiry.** A cached token is used while
    `expiresAt - minimumTokenLifetime > now`. Tokens without expiry use
    `defaultTokenLifetime`, or are refreshed on every use when nil.
@@ -721,6 +728,9 @@ extension TokenAcceptancePolicy where Self == ClosureTokenAcceptancePolicy {
     public static func custom(_ body: @escaping @Sendable (TokenAcceptanceContext) async -> TokenAcceptance) -> ClosureTokenAcceptancePolicy
 }
 
+public struct PendingSignOut: Sendable {           // copies share one sign-out
+    public func result() async -> SignOutResult   // the same outcome for every call; a cancelled caller gets .cancelled
+}
 public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected, expiredWithoutRefreshToken }
 public struct SignOutResult: Sendable, Equatable {
     public enum Revocation: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut, cancelled }

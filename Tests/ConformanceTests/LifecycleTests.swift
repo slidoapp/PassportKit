@@ -161,6 +161,79 @@ struct LifecycleTests {
         #expect(await harness.manager.signOut().revocation == .skipped)
     }
 
+    @Test("beginSignOut clears local state before it returns; the handle completes with the revocation outcome")
+    func beginSignOut() async throws {
+        let store = GatedStore()
+        let harness = try await Harness(store: store)
+        let refreshToken = try #require(await harness.currentRefreshToken())
+        await harness.server.configure {
+            $0.override = { $0.path == "/revoke" ? .init(status: 200, delay: .seconds(2)) : nil }
+        }
+        await store.hold(.delete)
+
+        let pending = await harness.manager.beginSignOut()
+        // The store has not deleted and the server has not answered, but the session is gone.
+        #expect(await harness.manager.credential == nil)
+        #expect(await Harness.take(2, from: harness.events) == [.signedIn, .signedOut(reason: .userInitiated)])
+        #expect(await thrownError { try await harness.manager.accessToken() }?.code == .notAuthenticated)
+
+        let result = Task { await pending.result() }
+        #expect(await waitUntil { await store.suspendedCount(.delete) == 1 })
+        await store.release(.delete)
+        // The wait limit, the request limit and the server's own delay.
+        #expect(await waitUntil { harness.clock.sleeperCount >= 3 })
+        harness.clock.advance(by: .seconds(2))
+        #expect(await result.value == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
+        #expect(await pending.result() == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
+        #expect(await harness.server.requests(to: "/revoke").compactMap { $0.value("token") } == [refreshToken])
+        #expect(await harness.storedRefreshToken() == nil)
+    }
+
+    @Test("beginSignOut reports a revocation that is not requested or fails")
+    func beginSignOutOutcomes() async throws {
+        let skipped = try await Harness()
+        #expect(
+            await skipped.manager.beginSignOut(revoke: false).result()
+                == SignOutResult(isStoredCredentialDeleted: true, revocation: .skipped))
+        #expect(await skipped.server.requests(to: "/revoke").isEmpty)
+
+        let failing = try await Harness()
+        await failing.server.configure { $0.override = { $0.path == "/revoke" ? .init(status: 500) : nil } }
+        guard case .failed(let error) = await failing.manager.beginSignOut().result().revocation else {
+            Issue.record("Expected a failure")
+            return
+        }
+        #expect(error.code == .temporarilyUnavailable)
+    }
+
+    @Test("a sign-in right after beginSignOut is not held up or touched by the pending revocation")
+    func signInAfterBeginSignOut() async throws {
+        let harness = try await Harness()
+        let oldRefreshToken = try #require(await harness.currentRefreshToken())
+        await harness.server.configure {
+            $0.override = { $0.path == "/revoke" ? .init(status: 200, delay: .seconds(4)) : nil }
+        }
+        let pending = await harness.manager.beginSignOut()
+        try await harness.signInAgain()
+        let newRefreshToken = try #require(await harness.currentRefreshToken())
+        #expect(newRefreshToken != oldRefreshToken)
+
+        // The new session refreshes while the old session's revocation is still waiting for the server.
+        harness.expireAccessTokens()
+        _ = try await harness.manager.accessToken()
+        #expect(await harness.tokenRequests(.refreshToken).count == 1)
+
+        let result = Task { await pending.result() }
+        #expect(await waitUntil { harness.clock.sleeperCount >= 3 })
+        harness.clock.advance(by: .seconds(4))
+        #expect(await result.value.revocation == .revoked)
+        let revoked = await harness.server.requests(to: "/revoke").compactMap { $0.value("token") }
+        #expect(revoked == [oldRefreshToken])
+        #expect(await harness.manager.credential != nil)
+        #expect(await harness.storedRefreshToken() == harness.currentRefreshToken())
+        _ = try await harness.manager.accessToken()
+    }
+
     @Test("sign-out clears local state even when revocation fails or hangs")
     func signOutWithBrokenRevocation() async throws {
         let failing = try await Harness()

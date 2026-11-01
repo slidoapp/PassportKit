@@ -127,6 +127,12 @@ revokes the newest refresh token (RFC 7009) with a time limit. The
 ``SignOutResult`` reports whether the stored credential was deleted and what
 happened to the revocation; the in-memory session is always cleared.
 
+``TokenManager/beginSignOut(revoke:)`` does the same but returns as soon as
+the session is cleared, before the store or the server answer. Await
+``PendingSignOut/result()`` for the ``SignOutResult`` when you need it, or
+never. A sign-in may follow at once: the pending revocation neither waits for
+it nor touches the new session.
+
 ## After a 401
 
 ``TokenManager/invalidate(_:)`` drops a cached token that a resource server

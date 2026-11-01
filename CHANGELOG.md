@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clock, `cancelled`, or `skipped` without a revocation endpoint. It is for a token that never became a session, such
   as a refresh token the app obtained but did not adopt. `OAuthClient.defaultRevocationTimeLimit` (5 seconds) is the
   limit `TokenManager.signOut(revoke:)` uses, so apps need not copy it.
+- `TokenManager.beginSignOut(revoke:)` clears the session without suspending and returns a `PendingSignOut`, whose
+  `result()` waits for the store delete and the revocation (RFC 7009) and returns the `SignOutResult`. Apps no longer
+  need to watch for `.signedOut(.userInitiated)` to learn that the session is gone (ADR 0014).
+
+### Changed
+
+- `TokenManager.signOut(revoke:)` is `beginSignOut(revoke:)` followed by `result()`. The revocation's time limit and
+  its log line now run in a task the manager owns, so a revocation outcome is logged even when the caller of
+  `signOut` was cancelled. Results are unchanged.
 
 ### Fixed
 

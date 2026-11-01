@@ -228,53 +228,70 @@ public actor TokenManager {
         cache.forgetRejection(of: token.target)
     }
 
-    /// Ends the session: clears local state, then revokes the refresh token at the server (RFC 7009).
+    /// Ends the session: clears local state, then revokes the refresh token at the server (RFC 7009 §2).
     ///
     /// Local state is cleared first and always, whatever happens to the revocation, which is best effort and
-    /// limited to five seconds. In-flight operations of the ended session are discarded, but the revocation
-    /// targets the newest refresh token the session was issued, including one rotated by a request that was
-    /// already in flight. If the store cannot delete the credential, ``SignOutResult/isStoredCredentialDeleted``
-    /// is false, ``SessionEvent/storageFailed`` is emitted, and ``load()`` would restore the session.
+    /// limited to ``OAuthClient/defaultRevocationTimeLimit``. In-flight operations of the ended session are
+    /// discarded, but the revocation targets the newest refresh token the session was issued, including one
+    /// rotated by a request that was already in flight. If the store cannot delete the credential,
+    /// ``SignOutResult/isStoredCredentialDeleted`` is false, ``SessionEvent/storageFailed`` is emitted, and
+    /// ``load()`` would restore the session.
+    ///
+    /// Returns once the delete and the revocation finished. To carry on as soon as local state is cleared, use
+    /// ``beginSignOut(revoke:)``; this method is that call followed by ``PendingSignOut/result()``.
     public func signOut(revoke: Bool = true) async -> SignOutResult {
+        await beginSignOut(revoke: revoke).result()
+    }
+
+    /// Ends the session like ``signOut(revoke:)`` but returns as soon as local state is cleared, with a handle
+    /// to await the store delete and the revocation (RFC 7009 §2).
+    ///
+    /// Nothing here suspends the manager, so when this returns the session is gone: ``credential`` is `nil`,
+    /// ``SessionEvent/signedOut(reason:)`` with ``SignOutReason/userInitiated`` was emitted, the delete of the
+    /// stored credential is queued ahead of any save a later sign-in makes, and the revocation has its turn on
+    /// the ended session's lane. A ``signIn(with:requestedScope:)`` right after it starts a session that the
+    /// pending revocation neither waits for nor blocks. See ADR 0014.
+    public func beginSignOut(revoke: Bool = true) -> PendingSignOut {
         let endedSession = generation
         let endedLane = lane
         let snapshot = current?.refreshToken
         startNewSession()
         current = nil
-        // Reported before the first suspension, so a slow store cannot order it after the events of a sign-in
+        // Reported before anything is awaited, so a slow store cannot order it after the events of a sign-in
         // that follows.
         eventHub.emit(.signedOut(reason: .userInitiated))
         logger.info(
             "Signed out",
             metadata: [LogKey.reason: "\(SignOutReason.userInitiated.logValue)", LogKey.revoke: "\(revoke)"])
-        // Reserved now, before any suspension, so the revocation queues behind operations that are
-        // already sending the old refresh token.
+        // Reserved now, so the revocation queues behind operations that are already sending the old refresh
+        // token.
         let revocation =
             revoke ? snapshot.flatMap { startRevocation(of: $0, session: endedSession, lane: endedLane) } : nil
-        let isDeleted = await deleteStoredCredential()
-        guard let revocation else { return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: .skipped) }
-        let outcome: SignOutResult.Revocation
-        do {
-            outcome =
-                try await withTimeLimit(OAuthClient.defaultRevocationTimeLimit, clock: client.clock) {
+        let deletion = requestDeletion()
+        guard let revocation else { return PendingSignOut(deletion: deletion, revocation: nil) }
+        let outcome = Completion<SignOutResult.Revocation>()
+        let clock = client.clock
+        let logger = self.logger
+        // Owned by the manager and never cancelled, so the limit and the log line do not depend on who waits.
+        Task {
+            _ = await deletion.value
+            let result =
+                (try? await withTimeLimit(OAuthClient.defaultRevocationTimeLimit, clock: clock) {
                     try await revocation.wait()
-                }
-                ?? .timedOut
-        } catch {
-            // Only the caller's cancellation can end the wait early; the revocation itself carries on.
-            outcome = .cancelled
+                }) ?? .timedOut
+            switch result {
+            case .failed(let error):
+                // An offline sign-out is expected; a server refusal or a TLS failure is not.
+                logger.log(
+                    level: error.code == .transportFailure ? .level(forTransportFailure: error) : .warning,
+                    "Revoking the refresh token failed", metadata: [LogKey.errorCode: "\(error.code.rawValue)"])
+            case .timedOut: logger.notice("Revoking the refresh token timed out")
+            case .revoked: logger.debug("Revoked the refresh token")
+            default: break
+            }
+            outcome.complete(.success(result))
         }
-        switch outcome {
-        case .failed(let error):
-            // An offline sign-out is expected; a server refusal or a TLS failure is not.
-            logger.log(
-                level: error.code == .transportFailure ? .level(forTransportFailure: error) : .warning,
-                "Revoking the refresh token failed", metadata: [LogKey.errorCode: "\(error.code.rawValue)"])
-        case .timedOut: logger.notice("Revoking the refresh token timed out")
-        case .revoked: logger.debug("Revoked the refresh token")
-        default: break
-        }
-        return SignOutResult(isStoredCredentialDeleted: isDeleted, revocation: outcome)
+        return PendingSignOut(deletion: deletion, revocation: outcome)
     }
 
     /// Replaces the session: stale work is discarded, cached tokens and in-flight operations are forgotten.
@@ -319,9 +336,14 @@ public actor TokenManager {
 
     @discardableResult
     func deleteStoredCredential() async -> Bool {
+        await requestDeletion().value
+    }
+
+    /// Queues the delete of the stored credential and returns it without waiting.
+    func requestDeletion() -> Task<Bool, Never> {
         let store = self.store
         let account = self.account
-        return await changeStore("delete") { try await store.delete(account) }.value
+        return changeStore("delete") { try await store.delete(account) }
     }
 
     static func storageError(_ error: any Error) -> PassportError {
