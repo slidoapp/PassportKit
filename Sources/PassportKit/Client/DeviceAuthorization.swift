@@ -145,7 +145,7 @@ extension DeviceAuthorization {
         let pollInterval = seconds(DeviceAuthorizationResponseField.interval).flatMap {
             $0.isFinite && $0 > 0 ? $0 : nil
         }
-        if let pollInterval, pollInterval > Double(Self.maximumInterval.components.seconds) {
+        if let pollInterval, pollInterval > Self.maximumInterval.timeInterval {
             throw PassportError(
                 .invalidResponse,
                 detail: "The device authorization response has an unusable polling interval."
@@ -158,7 +158,7 @@ extension DeviceAuthorization {
             verificationURI: verificationURI,
             verificationURIComplete: url(text(DeviceAuthorizationResponseField.verificationURIComplete)),
             expiresIn: expiresIn,
-            expiresAt: wallClock.now().addingTimeInterval(Double(expiresIn.components.seconds)),
+            expiresAt: wallClock.now().addingTimeInterval(expiresIn.timeInterval),
             interval: pollInterval.map { Duration.seconds($0) } ?? Self.defaultInterval,
             stopwatch: Stopwatch(clock: clock)
         )

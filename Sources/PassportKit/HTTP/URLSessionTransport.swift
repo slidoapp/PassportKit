@@ -67,12 +67,6 @@ public struct URLSessionTransport: HTTPTransport {
     }
 }
 
-extension Duration {
-    fileprivate var timeInterval: TimeInterval {
-        Double(components.seconds) + Double(components.attoseconds) / 1e18
-    }
-}
-
 /// Owns the session and invalidates it on release, which breaks the session-to-delegate reference cycle.
 private final class SessionOwner: Sendable {
     let session: URLSession

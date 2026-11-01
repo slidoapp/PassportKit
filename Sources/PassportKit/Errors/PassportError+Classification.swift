@@ -122,11 +122,19 @@ extension PassportError {
         return .seconds(max(0, Int(min(date.timeIntervalSince(now), 31_536_000_000).rounded(.up))))
     }
 
-    /// The three HTTP-date formats a recipient must accept (RFC 9110 §5.6.7).
+    /// The preferred HTTP-date format (RFC 9110 §5.6.7), for example `Sun, 06 Nov 1994 08:49:37 GMT`.
+    private static let imfFixdate = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+    /// The obsolete RFC 850 format (RFC 9110 §5.6.7), for example `Sunday, 06-Nov-94 08:49:37 GMT`.
+    private static let rfc850Date = "EEEE, dd-MMM-yy HH:mm:ss 'GMT'"
+    /// The obsolete ANSI C `asctime()` format (RFC 9110 §5.6.7), for example `Sun Nov  6 08:49:37 1994`.
+    private static let asctimeDate = "EEE MMM d HH:mm:ss yyyy"
+
+    /// Parses the three HTTP-date formats a recipient must accept (RFC 9110 §5.6.7).
+    ///
+    /// `Date.HTTPFormatStyle` is not used because it parses only IMF-fixdate, and a recipient must also accept the
+    /// two obsolete formats.
     private static func parseHTTPDate(_ text: String) -> Date? {
-        for format in [
-            "EEE, dd MMM yyyy HH:mm:ss 'GMT'", "EEEE, dd-MMM-yy HH:mm:ss 'GMT'", "EEE MMM d HH:mm:ss yyyy",
-        ] {
+        for format in [imfFixdate, rfc850Date, asctimeDate] {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.timeZone = TimeZone(identifier: "GMT")
