@@ -25,7 +25,7 @@ extension OAuthClient {
         try request.add(resources: resources)
         request.additionalParameters = additionalParameters
         let (response, body) = try await send(request)
-        guard (200..<300).contains(response.status.code) else {
+        guard response.status.kind == .successful else {
             throw failure(response, body: body, to: request, context: .other)
         }
         return try DeviceAuthorization(
@@ -76,7 +76,7 @@ extension OAuthClient {
                 wait = backoff ?? interval
                 continue
             }
-            if (200..<300).contains(response.status.code) {
+            if response.status.kind == .successful {
                 return try TokenResponse(parsing: body)
             }
             let error = failure(response, body: body, to: request, context: .deviceAuthorizationPoll)
@@ -95,7 +95,7 @@ extension OAuthClient {
                 if case .retryLater = error.recovery {
                     isTransient = true
                 } else {
-                    isTransient = response.status.code == 429 || (500...599).contains(response.status.code)
+                    isTransient = response.status.isTransient
                 }
                 guard isTransient else { throw error }
                 backoff = nextBackoff(after: backoff, interval: interval)

@@ -82,7 +82,7 @@ public enum Discovery {
             .response(
                 endpoint: .metadata,
                 statusCode: response.status.code,
-                errorCode: OAuthClient.errorCode(statusCode: response.status.code, body: body),
+                errorCode: OAuthClient.errorCode(status: response.status, body: body),
                 duration: stopwatch.elapsed
             )
         )
@@ -90,9 +90,9 @@ public enum Discovery {
             "Request completed",
             metadata: .request(
                 endpoint: .metadata, status: response.status.code,
-                errorCode: OAuthClient.errorCode(statusCode: response.status.code, body: body),
+                errorCode: OAuthClient.errorCode(status: response.status, body: body),
                 duration: stopwatch.elapsed))
-        guard (200..<300).contains(response.status.code) else {
+        guard response.status.kind == .successful else {
             throw PassportError.fromErrorResponse(
                 statusCode: response.status.code,
                 headers: response.headerFields,

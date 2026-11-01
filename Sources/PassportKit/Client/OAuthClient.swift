@@ -94,7 +94,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
             .response(
                 endpoint: request.endpoint,
                 statusCode: response.status.code,
-                errorCode: Self.errorCode(statusCode: response.status.code, body: body),
+                errorCode: Self.errorCode(status: response.status, body: body),
                 duration: stopwatch.elapsed
             )
         )
@@ -102,13 +102,13 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
             "Request completed",
             metadata: .request(
                 endpoint: request.endpoint, grantType: request.grantType, status: response.status.code,
-                errorCode: Self.errorCode(statusCode: response.status.code, body: body), duration: stopwatch.elapsed))
+                errorCode: Self.errorCode(status: response.status, body: body), duration: stopwatch.elapsed))
         return (response, body)
     }
 
     /// The OAuth `error` member of a non-2xx response, only when it is a short plain token.
-    static func errorCode(statusCode: Int, body: Data) -> String? {
-        guard !(200..<300).contains(statusCode),
+    static func errorCode(status: HTTPResponse.Status, body: Data) -> String? {
+        guard status.kind != .successful,
             case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: body),
             case .string(let code)? = members[ErrorResponseField.error],
             (1...64).contains(code.count),
@@ -126,7 +126,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
         exchange: Bool = false
     ) async throws -> TokenResponse {
         let (response, body) = try await send(request)
-        guard (200..<300).contains(response.status.code) else {
+        guard response.status.kind == .successful else {
             throw failure(response, body: body, to: request, context: context)
         }
         return try TokenResponse(parsing: body, exchange: exchange)

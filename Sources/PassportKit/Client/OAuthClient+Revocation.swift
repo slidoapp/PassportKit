@@ -15,7 +15,7 @@ extension OAuthClient {
         request.add(OAuthParameter.token, token.reveal())
         if let typeHint { request.add(OAuthParameter.tokenTypeHint, typeHint.rawValue) }
         let (response, body) = try await send(request)
-        guard (200..<300).contains(response.status.code) else {
+        guard response.status.kind == .successful else {
             throw failure(response, body: body, to: request, context: .other)
         }
     }
