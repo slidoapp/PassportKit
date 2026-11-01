@@ -66,6 +66,10 @@ struct RequestAuthorizerTests {
         Case(
             name: "401 DPoP only", status: 401, challenges: [#"DPoP error="invalid_token", algs="ES256""#],
             attempt: 0, expected: .deliver),
+        // The DPoP error is not a Bearer error: the bare Bearer challenge decides, as without any error code.
+        Case(
+            name: "401 DPoP insufficient_scope with Bearer realm", status: 401,
+            challenges: [#"DPoP error="insufficient_scope""#, #"Bearer realm="api""#], attempt: 0, expected: .retry),
         Case(
             name: "401 Basic only after retry", status: 401, challenges: [#"Basic realm="x""#], attempt: 1,
             expected: unauthorized),
