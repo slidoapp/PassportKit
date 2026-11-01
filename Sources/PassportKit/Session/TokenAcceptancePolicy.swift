@@ -1,4 +1,7 @@
 /// The verdict of a ``TokenAcceptancePolicy``.
+///
+/// The verdict is accept or reject. The enumeration is frozen: no case will be added in a 1.x release, so a `switch`
+/// over it may be exhaustive.
 public enum TokenAcceptance: Sendable {
     /// The token may be cached and used.
     case accept

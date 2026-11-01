@@ -15,6 +15,8 @@ struct AuthorizationCode {
 
 extension FakeAuthorizationServer {
     /// What the simulated user does at the authorization endpoint.
+    ///
+    /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
     public enum Decision: Sendable {
         /// Log in and consent.
         case approve

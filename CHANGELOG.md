@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its log line now run in a task the manager owns, so a revocation outcome is logged even when the caller of
   `signOut` was cancelled. Results are unchanged.
 
+- Every public enumeration states whether it is frozen. `TokenAcceptance` and `JSONValue` are frozen; `PassportEvent`,
+  `IssuerValidation`, `Discovery.Style`, `KeychainCredentialStore.Accessibility` and the enumerations of
+  `PassportKitTesting` may gain cases in a minor release, so a `switch` over them needs a `default`.
+
 ### Fixed
 
 - `KeychainCredentialStore` updates an existing item in place instead of deleting it and adding it again, so a save

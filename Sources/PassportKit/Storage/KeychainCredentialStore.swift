@@ -38,6 +38,9 @@ public final class KeychainCredentialStore: CredentialStore {
     /// The `…ThisDeviceOnly` classes keep the item out of backups and device migration. Prefer them for
     /// refresh tokens. The class is enforced on iOS only: the login keychain that the store uses on macOS
     /// does not enforce it, because SwiftKeychain cannot target the data protection keychain.
+    ///
+    /// Cases may be added in a minor release, as the Keychain gains classes: the enumeration is not frozen, so a
+    /// `switch` over it needs a `default`.
     public enum Accessibility: Sendable, Hashable {
         /// Readable while the device is unlocked.
         case whenUnlocked

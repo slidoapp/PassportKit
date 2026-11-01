@@ -3,6 +3,9 @@ import Foundation
 /// JSON for members the library does not interpret, such as unknown token response fields.
 ///
 /// Numbers are stored as `Double`, so integers beyond 2^53 lose precision.
+///
+/// The cases are the value types of JSON (RFC 8259 §3). The enumeration is frozen: no case will be added in a 1.x
+/// release, so a `switch` over it may be exhaustive.
 public enum JSONValue: Sendable, Hashable, Codable {
     /// A JSON string.
     case string(String)

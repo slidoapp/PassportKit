@@ -61,6 +61,8 @@ public actor RecordingTransport: HTTPTransport {
     /// One scripted outcome.
     ///
     /// Descriptions and reflection show the status and the header names, never header values or the body.
+    ///
+    /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
     public enum Step: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
         /// Answer with a response and its body.
         case respond(HTTPResponse, body: Data = Data())

@@ -8,6 +8,8 @@ public protocol PassportObserver: Sendable {
 }
 
 /// Something that happened while talking to a server.
+///
+/// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
 public enum PassportEvent: Sendable, Equatable {
     /// A request is about to be sent. `grantType` is set for token endpoint requests.
     case request(endpoint: EndpointKind, grantType: GrantType?)
