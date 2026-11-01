@@ -40,10 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and revoke it as the audience client (ADR 0015).
 - **Breaking:** the response of `TokenManager.exchangeRefreshToken` has `refreshToken` set to `nil`. The rotated
   refresh token belongs to the session, which saves it; handing it out invited presenting it twice.
-- `TokenManager.signOut(revoke:)` is `beginSignOut(revoke:)` followed by `await result`. The revocation's time limit and
-  its log line now run in a task the manager owns, so a revocation outcome is logged even when the caller of
-  `signOut` was cancelled. Results are unchanged.
-
+- `TokenManager.signOut(revoke:)` is `beginSignOut(revoke:)` followed by `await result`. The revocation's time
+  limit and its log line now run in a task the manager owns, so a revocation outcome is logged even when the caller
+  of `signOut` was cancelled. Results are unchanged.
 - Every public enumeration states whether it is frozen. `TokenAcceptance` and `JSONValue` are frozen; `PassportEvent`,
   `IssuerValidation`, `Discovery.Style`, `KeychainCredentialStore.Accessibility` and the enumerations of
   `PassportKitTesting` may gain cases in a minor release, so a `switch` over them needs a `default`.

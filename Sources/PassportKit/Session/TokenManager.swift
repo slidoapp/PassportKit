@@ -6,7 +6,7 @@ import Logging
 /// ## Concurrency
 ///
 /// The manager is an actor, and every operation that takes time (a request to the authorization server, a
-/// store call, the acceptance policy) suspends it, so other calls run in between. Three rules keep that safe:
+/// store call, the acceptance policy) suspends it, so other calls run in between. Four rules keep that safe:
 ///
 /// - Bookkeeping that other callers must see (registering an in-flight operation, reserving a lane turn,
 ///   bumping the generation) happens synchronously, before the first `await` of the call.
@@ -48,7 +48,7 @@ public actor TokenManager {
     var lastStoreChange: Task<Bool, Never>?
     /// For each session that ended with a sign-out that revokes: the newest refresh token known to belong to
     /// it. The revocation reads it when its lane turn starts, so it sends the token that is live then, not the
-    /// one that was live when the user signed out (see ``spendRefreshToken(turn:session:adoptsIDToken:send:)``).
+    /// one that was live when the user signed out (see ``spendRefreshToken(turn:session:adoptsIDToken:adoptsScope:returnsAnsweredResponse:send:)``).
     var revocableTokens: [Int: Secret] = [:]
 
     /// Creates a manager with no session. Call ``load()`` to restore one from `store`.
