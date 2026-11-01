@@ -979,9 +979,11 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   with a continuation. The store reads and writes only its own format: an
   item it cannot decode is a `.storageFailure`, and there is no migration
   hook (apps move credentials from another library with
-  `TokenManager.signIn(refreshToken:)`, see the "Migrating stored tokens" article). **Known issue (ADR 0009):** SwiftKeychain replaces an
-  existing item by delete-then-add, so a failed second step loses the
-  credential.
+  `TokenManager.signIn(refreshToken:)`, see the "Migrating stored tokens" article). `save` updates an
+  existing item's value in place (`SecItemUpdate`) and adds an item only
+  on `errSecItemNotFound`, so a failed save leaves the previous
+  credential stored and stores writing one item at once do not lose it
+  (ADR 0009).
 - `WebAuthenticationSessionUserAgent` (`@MainActor`): wraps
   `ASWebAuthenticationSession` with a presentation-anchor provider and
   `prefersEphemeralWebBrowserSession`; private-use-scheme callbacks on all

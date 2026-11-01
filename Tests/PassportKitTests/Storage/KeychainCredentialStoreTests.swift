@@ -120,21 +120,41 @@ struct KeychainCredentialStoreTests {
         #expect(itemCount() == 1)
     }
 
-    /// Known issue (ADR 0009): SwiftKeychain replaces an existing item by deleting and adding it, so stores
-    /// that race to write one item can fail or lose it. The single-store test above is the guarantee we keep.
+    /// Each store updates in place and adds only when no item exists, so stores racing to write one item
+    /// neither fail nor lose it (ADR 0009).
     @Test func separateStoresRacingToCreateTheItemDoNotFail() async throws {
         defer { cleanUp() }
-        await withKnownIssue("SwiftKeychain deletes and re-adds an existing item", isIntermittent: true) {
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                for index in 0..<8 {
-                    group.addTask {
-                        try await KeychainCredentialStore().save(credential("refresh-\(index)"), for: account)
-                    }
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0..<8 {
+                group.addTask {
+                    try await KeychainCredentialStore().save(credential("refresh-\(index)"), for: account)
                 }
-                try await group.waitForAll()
             }
-            #expect(itemCount() == 1)
+            try await group.waitForAll()
         }
+        #expect(itemCount() == 1)
+        #expect(try await KeychainCredentialStore().load(account) != nil)
+    }
+
+    /// A save replaces the value of the existing item instead of deleting the item and adding a new one, so
+    /// the credential is never missing in between. An attribute the store does not write survives the save.
+    @Test func saveUpdatesTheExistingItem() async throws {
+        let store = KeychainCredentialStore()
+        defer { cleanUp() }
+        try await store.save(credential("refresh-1"), for: account)
+        let status = SecItemUpdate(
+            [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: account.service,
+                kSecAttrAccount as String: account.account,
+            ] as CFDictionary,
+            [kSecAttrLabel as String: "marker"] as CFDictionary)
+        try #require(status == errSecSuccess)
+
+        try await store.save(credential("refresh-2"), for: account)
+        #expect(try storedAttributes()[kSecAttrLabel as String] as? String == "marker")
+        #expect(try await store.load(account) == credential("refresh-2"))
+        #expect(itemCount() == 1)
     }
 
     @Test func storedItemIsNotSynchronizable() async throws {

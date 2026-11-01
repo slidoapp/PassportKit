@@ -25,10 +25,8 @@ import SwiftKeychain
 /// Keychain calls block, so each runs on a private serial queue and the caller's executor is not held.
 /// The queue also serializes this store's own writes.
 ///
-/// Known issue: when an item already exists, SwiftKeychain replaces it by deleting it and adding it again
-/// instead of updating it. If the second step fails (device locked, denied prompt, entitlement problem) or
-/// the process dies in between, the stored credential is lost and the user has to sign in again; two
-/// stores writing the same item at once can fail the same way. See ADR 0009.
+/// A save updates an existing item in place (`SecItemUpdate`) and adds one only when none exists, so a failed
+/// save leaves the previous credential stored, and stores that write the same item at once do not lose it.
 ///
 /// Keychain access is a security boundary of the app, not of the library: an access group needs the
 /// matching entitlement, and without one the Keychain answers `errSecMissingEntitlement`, reported as
@@ -146,12 +144,10 @@ public final class KeychainCredentialStore: CredentialStore {
         var item = item(for: account)
         item.data = [Self.payloadKey: data]
         do {
-            // Known issue: on `errSecDuplicateItem` SwiftKeychain deletes the existing item and adds it
-            // again (Keychain.insertItemWithAttributes). If the second step fails, or the process dies in
-            // between, the credential is lost, and with refresh token rotation the replaced token is
-            // already invalid. The payload is also archived with `try?`, so an encoding failure would
-            // store no data. Planned fix: an upstream change to update first (ADR 0009).
-            try item.saveInKeychain()
+            // Not SwiftKeychain's own `Keychain`, which replaces an existing item by deleting and adding it:
+            // a failure in between would lose the credential, and with rotation the old token is already
+            // invalid (ADR 0009).
+            try item.saveInKeychain(UpdatingKeychain())
         } catch {
             throw failure(error, operation: "save")
         }
@@ -177,7 +173,7 @@ public final class KeychainCredentialStore: CredentialStore {
             accessMode: String(accessibility.value), storedClasses: [NSData.self, NSString.self])
     }
 
-    private static let keychainErrorDomain = "swift.keychain.error"
+    fileprivate static let keychainErrorDomain = "swift.keychain.error"
 
     private static func isNotFound(_ error: any Error) -> Bool {
         let error = error as NSError
@@ -209,6 +205,38 @@ public final class KeychainCredentialStore: CredentialStore {
             detail: "The Keychain operation failed with status \(status).",
             underlying: underlying
         )
+    }
+}
+
+/// SwiftKeychain's `Keychain` with an insert that updates an existing item in place instead of deleting and
+/// adding it, so the stored item is never missing while it is replaced.
+private struct UpdatingKeychain: KeychainServiceType {
+    func insertItemWithAttributes(_ attributes: KeychainAttributes) throws {
+        var query = attributes
+        // SwiftKeychain archives the payload with `try?`; without data there is nothing to store.
+        guard let data = query.removeValue(forKey: String(kSecValueData)) else { throw Self.error(errSecParam) }
+        // Only the value changes. The attributes to update must not repeat `kSecClass` or the query.
+        let changes: KeychainAttributes = [String(kSecValueData): data]
+        var status = SecItemUpdate(query as CFDictionary, changes as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(attributes as CFDictionary, nil)
+            // Another store added the item since the update looked: update that one.
+            if status == errSecDuplicateItem { status = SecItemUpdate(query as CFDictionary, changes as CFDictionary) }
+        }
+        guard status == errSecSuccess else { throw Self.error(status) }
+    }
+
+    func removeItemWithAttributes(_ attributes: KeychainAttributes) throws {
+        try Keychain().removeItemWithAttributes(attributes)
+    }
+
+    func fetchItemWithAttributes(_ attributes: KeychainAttributes) throws -> KeychainItem? {
+        try Keychain().fetchItemWithAttributes(attributes)
+    }
+
+    /// An error in SwiftKeychain's domain, which the store maps like SwiftKeychain's own.
+    private static func error(_ status: OSStatus) -> NSError {
+        NSError(domain: KeychainCredentialStore.keychainErrorDomain, code: Int(status))
     }
 }
 

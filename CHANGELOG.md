@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `KeychainCredentialStore` updates an existing item in place instead of deleting it and adding it again, so a save
+  that fails (device locked, denied prompt) or a process that dies mid-save no longer loses the stored credential,
+  and stores writing the same item at once no longer fail with `errSecDuplicateItem`. A save whose payload could not
+  be archived fails with `.storageFailure` instead of storing an item without data.
 - The documentation of `RequestAuthorizer.sign(_:for:)` for `HTTPRequest` and of `URLSessionTransport` states that
   the never-indexed marking of `Authorization` (RFC 7541 §7.1.3) reaches the wire only through a transport that keeps
   the indexing strategy of `HTTPFields`. `URLSessionTransport` converts to `URLRequest`, which drops it.

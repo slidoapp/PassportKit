@@ -6,6 +6,8 @@
   [0002](0002-package-layout-and-toolchain.md)
 - Amended by [0011](0011-apple-platforms-only.md): the Linux criterion and
   the swift-crypto row are removed
+- Amended 2026-11-01: the SwiftKeychain write-path issue is fixed inside
+  PassportKit, without an upstream change (see "Resolution" below)
 
 ## Context
 
@@ -65,6 +67,16 @@ Planned fix: an upstream change that updates first and adds only on
 `errSecItemNotFound`, with typed errors. Until then the single-store
 write path (serialized by the store's queue) is the supported use, and
 the issue is listed under Known limits in the security model.
+
+Resolution (2026-11-01): no upstream change was needed. SwiftKeychain's
+`saveInKeychain(_:)` takes any `KeychainServiceType`, so
+`KeychainCredentialStore` passes its own, whose insert calls
+`SecItemUpdate` with only `kSecValueData` to change and calls `SecItemAdd`
+only on `errSecItemNotFound` (and updates again if another store added the
+item meanwhile). A missing payload, which SwiftKeychain's `try?` archiving
+would produce, is refused with `errSecParam` instead of being stored. The
+race test of eight stores is a regular test again. The other two limits
+(no data protection keychain, accessibility in the queries) remain.
 
 ### Rejected candidates
 
