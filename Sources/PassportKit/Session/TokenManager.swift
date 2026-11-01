@@ -107,12 +107,15 @@ public actor TokenManager {
     /// Restores the session from the store.
     ///
     /// A stored credential for another client or issuer is ignored and left in place (specification §9). Does
-    /// nothing when a session is already active. Throws ``PassportError`` with code
-    /// ``PassportError/Code-swift.struct/storageFailure`` when the store fails.
+    /// nothing when a session is already active. The store is read after every save and delete decided before
+    /// this call, so a sign-out whose delete is still running cannot be undone by a load. Throws
+    /// ``PassportError`` with code ``PassportError/Code-swift.struct/storageFailure`` when the store fails.
     public func load() async throws -> Credential? {
         let session = generation
+        let pendingChange = lastStoreChange
         let stored: Credential?
         do {
+            _ = await pendingChange?.value
             stored = try await store.load(account)
         } catch {
             logger.warning(

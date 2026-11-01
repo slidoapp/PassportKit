@@ -66,6 +66,38 @@ struct StoreOrderingTests {
         #expect(await harness.storedRefreshToken() == newSession)
     }
 
+    enum SessionEnd: CaseIterable { case signOut, refreshTokenRejected }
+
+    @Test(
+        "invariant 3: a load while the delete of an ended session is still running does not restore it",
+        arguments: SessionEnd.allCases)
+    func loadWaitsForPendingDelete(end: SessionEnd) async throws {
+        let store = GatedStore()
+        let harness = try await Harness(store: store)
+        let manager = harness.manager
+        await store.hold(.delete)
+        var ending: Task<Void, Never>?
+        switch end {
+        case .signOut:
+            _ = await manager.beginSignOut(revoke: false)
+        case .refreshTokenRejected:
+            await harness.server.revoke(token: try #require(await harness.currentRefreshToken()))
+            harness.expireAccessTokens()
+            ending = Task { _ = await thrownError { try await manager.accessToken() } }
+        }
+        #expect(await waitUntil { await store.suspendedCount(.delete) == 1 })
+
+        let load = Task { try await manager.load() }
+        await store.release(.delete)
+        #expect(try await load.value == nil)
+        await ending?.value
+        #expect(await manager.credential == nil)
+        #expect(try await store.load(harness.account) == nil)
+        let events = await Harness.take(2, from: harness.events)
+        #expect(events.first == .signedIn)
+        if case .signedOut? = events.last {} else { Issue.record("Expected the session to end, got \(events)") }
+    }
+
     @Test("invariant 3: a save that finishes after a later sign-out cannot bring the session back")
     func slowSaveDoesNotOutliveSignOut() async throws {
         let store = GatedStore()

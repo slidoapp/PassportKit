@@ -615,7 +615,9 @@ Invariants (each has a conformance test):
    token is returned, and `SessionEvent.storageFailed` is emitted.
    Saves and deletes of the stored credential are applied one after the
    other in the order the manager decided them, whatever the store's
-   speed, so a late save never undoes a sign-out. If a delete fails the
+   speed, so a late save never undoes a sign-out. `load()` reads the
+   store only after the saves and deletes decided before it, so it cannot
+   restore a session whose delete is still running. If a delete fails the
    stored credential survives and `load()` would restore it:
    `SignOutResult.isStoredCredentialDeleted` is false and
    `.storageFailed` is emitted.

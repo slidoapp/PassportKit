@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `TokenManager.load()` reads the store only after every save and delete decided before it, so a load that runs
+  while the delete of a signed-out or rejected session is still in progress no longer restores that session.
 - `KeychainCredentialStore` updates an existing item in place instead of deleting it and adding it again, so a save
   that fails (device locked, denied prompt) or a process that dies mid-save no longer loses the stored credential,
   and stores writing the same item at once no longer fail with `errSecDuplicateItem`. A save whose payload could not
