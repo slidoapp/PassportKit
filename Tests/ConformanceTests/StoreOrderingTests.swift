@@ -58,7 +58,7 @@ struct StoreOrderingTests {
         #expect(!response.accessToken.reveal().isEmpty)
         let rotated = try #require(response.refreshToken?.reveal())
         #expect(rotated != original)
-        #expect(await pending.result().revocation == .revoked)
+        #expect(await pending.result.revocation == .revoked)
         let revoked = await harness.server.requests(to: "/revoke").compactMap { $0.value("token") }
         #expect(revoked == [rotated], "the ended session's revocation targets the rotated subject")
         #expect(await harness.currentRefreshToken() == newSession)

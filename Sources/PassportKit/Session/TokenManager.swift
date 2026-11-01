@@ -231,16 +231,16 @@ public actor TokenManager {
     /// Ends the session: clears local state, then revokes the refresh token at the server (RFC 7009 §2).
     ///
     /// Local state is cleared first and always, whatever happens to the revocation, which is best effort and
-    /// limited to ``OAuthClient/defaultRevocationTimeLimit``. In-flight operations of the ended session are
+    /// limited to ``OAuthClient/revocationTimeLimit``. In-flight operations of the ended session are
     /// discarded, but the revocation targets the newest refresh token the session was issued, including one
     /// rotated by a request that was already in flight. If the store cannot delete the credential,
     /// ``SignOutResult/isStoredCredentialDeleted`` is false, ``SessionEvent/storageFailed`` is emitted, and
     /// ``load()`` would restore the session.
     ///
     /// Returns once the delete and the revocation finished. To carry on as soon as local state is cleared, use
-    /// ``beginSignOut(revoke:)``; this method is that call followed by ``PendingSignOut/result()``.
+    /// ``beginSignOut(revoke:)``; this method is that call followed by ``PendingSignOut/result``.
     public func signOut(revoke: Bool = true) async -> SignOutResult {
-        await beginSignOut(revoke: revoke).result()
+        await beginSignOut(revoke: revoke).result
     }
 
     /// Ends the session like ``signOut(revoke:)`` but returns as soon as local state is cleared, with a handle
@@ -269,14 +269,14 @@ public actor TokenManager {
             revoke ? snapshot.flatMap { startRevocation(of: $0, session: endedSession, lane: endedLane) } : nil
         let deletion = requestDeletion()
         guard let revocation else { return PendingSignOut(deletion: deletion, revocation: nil) }
-        let outcome = Completion<SignOutResult.Revocation>()
+        let outcome = Completion<RevocationOutcome>()
         let clock = client.clock
         let logger = self.logger
         // Owned by the manager and never cancelled, so the limit and the log line do not depend on who waits.
         Task {
             _ = await deletion.value
             let result =
-                (try? await withTimeLimit(OAuthClient.defaultRevocationTimeLimit, clock: clock) {
+                (try? await withTimeLimit(OAuthClient.revocationTimeLimit, clock: clock) {
                     try await revocation.wait()
                 }) ?? .timedOut
             switch result {

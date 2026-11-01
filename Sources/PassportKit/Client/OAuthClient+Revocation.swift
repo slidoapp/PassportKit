@@ -2,9 +2,9 @@ import Foundation
 import HTTPTypes
 
 extension OAuthClient {
-    /// The time limit ``TokenManager/signOut(revoke:)`` gives the revocation, for
-    /// ``revoke(_:typeHint:timeLimit:)``: five seconds.
-    public static let defaultRevocationTimeLimit = Duration.seconds(5)
+    /// The time limit ``TokenManager`` applies to the revocation on sign-out, and the default of
+    /// ``revokeBestEffort(_:typeHint:timeLimit:)``: five seconds.
+    public static let revocationTimeLimit = Duration.seconds(5)
 
     /// Revokes a token (RFC 7009 §2).
     ///
@@ -30,16 +30,16 @@ extension OAuthClient {
     /// to a ``TokenManager``, so it can be invalidated at the server without holding up the app. Revocation is
     /// a courtesy to the server, and the token may still be valid whatever the outcome (RFC 7009 §2.2).
     ///
-    /// Never throws. Returns ``SignOutResult/Revocation/revoked`` for any 2xx (§2.2),
-    /// ``SignOutResult/Revocation/failed(_:)`` with the error ``revoke(_:typeHint:)`` would throw,
-    /// ``SignOutResult/Revocation/timedOut`` when `timeLimit` passed first, ``SignOutResult/Revocation/cancelled``
-    /// when the calling task was cancelled, and ``SignOutResult/Revocation/skipped`` when no revocation endpoint
-    /// is configured. A timeout or cancellation cancels the request; it may still have reached the server.
+    /// Never throws. Returns ``RevocationOutcome/revoked`` for any 2xx (§2.2), ``RevocationOutcome/failed(_:)``
+    /// with the error ``revoke(_:typeHint:)`` would throw, ``RevocationOutcome/timedOut`` when `timeLimit` passed
+    /// first, ``RevocationOutcome/cancelled`` when the calling task was cancelled, and
+    /// ``RevocationOutcome/skipped`` when no revocation endpoint is configured. A timeout or cancellation cancels
+    /// the request; it may still have reached the server.
     ///
-    /// ``defaultRevocationTimeLimit`` is the limit ``TokenManager/signOut(revoke:)`` uses.
-    public func revoke(
-        _ token: Secret, typeHint: TokenTypeHint? = nil, timeLimit: Duration
-    ) async -> SignOutResult.Revocation {
+    /// The default `timeLimit` is ``revocationTimeLimit``, the limit ``TokenManager`` uses on sign-out.
+    public func revokeBestEffort(
+        _ token: Secret, typeHint: TokenTypeHint? = nil, timeLimit: Duration = OAuthClient.revocationTimeLimit
+    ) async -> RevocationOutcome {
         guard configuration.endpoints.revocation != nil else { return .skipped }
         do {
             let finished = try await withTimeLimit(timeLimit, clock: clock) {

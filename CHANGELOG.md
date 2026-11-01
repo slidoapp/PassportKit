@@ -9,23 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `OAuthClient.revoke(_:typeHint:timeLimit:)` revokes a token best effort (RFC 7009) and returns a
-  `SignOutResult.Revocation` instead of throwing: `revoked`, `failed`, `timedOut` after the limit on the client's
-  clock, `cancelled`, or `skipped` without a revocation endpoint. It is for a token that never became a session, such
-  as a refresh token the app obtained but did not adopt. `OAuthClient.defaultRevocationTimeLimit` (5 seconds) is the
-  limit `TokenManager.signOut(revoke:)` uses, so apps need not copy it.
+- `OAuthClient.revokeBestEffort(_:typeHint:timeLimit:)` revokes a token best effort (RFC 7009) and returns a
+  `RevocationOutcome` instead of throwing: `revoked`, `failed`, `timedOut` after the limit on the client's clock,
+  `cancelled`, or `skipped` without a revocation endpoint. It is for a token that never became a session, such as a
+  refresh token the app obtained but did not adopt. The limit defaults to `OAuthClient.revocationTimeLimit` (5
+  seconds), the limit `TokenManager` applies on sign-out, so apps need not copy it.
 - `TokenManager.beginSignOut(revoke:)` clears the session without suspending and returns a `PendingSignOut`, whose
-  `result()` waits for the store delete and the revocation (RFC 7009) and returns the `SignOutResult`. Apps no longer
-  need to watch for `.signedOut(.userInitiated)` to learn that the session is gone (ADR 0014).
+  `result` (`get async`, like `Task.value`) waits for the store delete and the revocation (RFC 7009) and returns the
+  `SignOutResult`. Apps no longer need to watch for `.signedOut(.userInitiated)` to learn that the session is gone
+  (ADR 0014).
 
 ### Changed
 
+- **Breaking:** `SignOutResult.Revocation` is the top-level `RevocationOutcome`, shared by sign-out and
+  `OAuthClient.revokeBestEffort(_:typeHint:timeLimit:)`; `SignOutResult.revocation` has that type. Its cases are
+  unchanged.
 - `TokenManager.exchangeRefreshToken` returns the response when the server answered, even if the session ended or
   was replaced while the request was in flight; it used to throw `.notAuthenticated` and drop the issued token,
   which stayed valid at the server. The rotated subject still goes to the ended session's revocation and the new
   session is not touched. Callers that must not use a token of an ended session check their own state and revoke it
   as the audience client (ADR 0015).
-- `TokenManager.signOut(revoke:)` is `beginSignOut(revoke:)` followed by `result()`. The revocation's time limit and
+- `TokenManager.signOut(revoke:)` is `beginSignOut(revoke:)` followed by `await result`. The revocation's time limit and
   its log line now run in a task the manager owns, so a revocation outcome is logged even when the caller of
   `signOut` was cancelled. Results are unchanged.
 

@@ -132,7 +132,7 @@ happened to the revocation; the in-memory session is always cleared.
 
 ``TokenManager/beginSignOut(revoke:)`` does the same but returns as soon as
 the session is cleared, before the store or the server answer. Await
-``PendingSignOut/result()`` for the ``SignOutResult`` when you need it, or
+``PendingSignOut/result`` for the ``SignOutResult`` when you need it, or
 never. A sign-in may follow at once: the pending revocation neither waits for
 it nor touches the new session.
 

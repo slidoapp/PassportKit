@@ -354,9 +354,9 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     public func revoke(_ token: Secret, typeHint: TokenTypeHint? = nil) async throws
     // RFC 7009, best effort: never throws; .skipped without a revocation endpoint, .timedOut after
     // `timeLimit` on the client's clock, .cancelled when the caller is cancelled (both cancel the request)
-    public func revoke(_ token: Secret, typeHint: TokenTypeHint? = nil,
-                       timeLimit: Duration) async -> SignOutResult.Revocation
-    public static let defaultRevocationTimeLimit: Duration   // 5 s, the limit signOut uses
+    public func revokeBestEffort(_ token: Secret, typeHint: TokenTypeHint? = nil,
+                                 timeLimit: Duration = OAuthClient.revocationTimeLimit) async -> RevocationOutcome
+    public static let revocationTimeLimit: Duration   // 5 s, the limit TokenManager applies on sign-out
     // RFC 8628
     public func beginDeviceAuthorization(scope: ScopeSet? = nil, resources: [URL] = [],
                                          additionalParameters: AdditionalParameters = [:]) async throws -> DeviceAuthorization
@@ -534,7 +534,7 @@ public actor TokenManager {
     public func invalidate(_ token: AccessToken)                    // after a 401 with this token
     public func exchangeRefreshToken(audiences: [String] = [], resources: [URL] = [], scope: ScopeSet? = nil,
                                      requestedTokenType: TokenTypeIdentifier = .refreshToken) async throws -> TokenResponse
-    public func signOut(revoke: Bool = true) async -> SignOutResult   // beginSignOut(revoke:) then result()
+    public func signOut(revoke: Bool = true) async -> SignOutResult   // beginSignOut(revoke:) then await result
     public func beginSignOut(revoke: Bool = true) -> PendingSignOut   // clears local state without suspending (ADR 0014)
 
     public nonisolated var events: AsyncStream<SessionEvent> { get }   // multiple subscribers supported
@@ -654,12 +654,12 @@ Invariants (each has a conformance test):
    `beginSignOut` does not suspend at all: when it returns, the session is
    cleared, `.signedOut` was emitted, the delete of the stored credential is
    queued and the revocation has its lane turn. `signOut` is `beginSignOut`
-   followed by `PendingSignOut.result()`.
+   followed by `await PendingSignOut.result`.
 7. **Cancellation.** Cancelling a caller only stops it waiting. A
    request that was already sent is allowed to finish and its result is
    persisted. A caller that is cancelled before it starts never starts
    one. A cancelled `signOut` clears the session and reports the
-   revocation as `.cancelled`; so does `PendingSignOut.result()` for the
+   revocation as `.cancelled`; so does `PendingSignOut.result` for the
    caller that was cancelled. The revocation's time limit runs in a task
    the manager owns, from when the delete finished, whoever waits.
 8. **Expiry.** A cached token is used while
@@ -698,7 +698,7 @@ ended session discards it itself. An exchange whose session ended before it was
 sent throws `.notAuthenticated`, as does a failure that arrives late. Revocation in
 `signOut` also takes a lane turn, reserved before `signOut` suspends, so it
 queues behind operations already sending the old token; the request and the
-wait for it are each limited to `OAuthClient.defaultRevocationTimeLimit` (5 s)
+wait for it are each limited to `OAuthClient.revocationTimeLimit` (5 s)
 on the client's clock. A time limit gives up
 on an operation that ignores cancellation, which then runs on in the background.
 
@@ -734,13 +734,13 @@ extension TokenAcceptancePolicy where Self == ClosureTokenAcceptancePolicy {
 }
 
 public struct PendingSignOut: Sendable {           // copies share one sign-out
-    public func result() async -> SignOutResult   // the same outcome for every call; a cancelled caller gets .cancelled
+    public var result: SignOutResult { get async }   // the same outcome for every reader; a cancelled reader gets .cancelled
 }
+public enum RevocationOutcome: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut, cancelled }
 public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected, expiredWithoutRefreshToken }
 public struct SignOutResult: Sendable, Equatable {
-    public enum Revocation: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut, cancelled }
     public var isStoredCredentialDeleted: Bool     // memory is always cleared
-    public var revocation: Revocation              // .skipped: not requested, no refresh token or no revocation endpoint
+    public var revocation: RevocationOutcome              // .skipped: not requested, no refresh token or no revocation endpoint
 }
 
 public enum SessionEvent: Sendable, Hashable {

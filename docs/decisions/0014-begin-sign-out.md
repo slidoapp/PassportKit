@@ -25,14 +25,14 @@ of any save a later sign-in makes.
 - `TokenManager.beginSignOut(revoke:)` is a synchronous actor method that does exactly the part of sign-out before the
   first suspension and returns a `PendingSignOut`. Because it does not suspend, every guarantee above holds when it
   returns, and the caller knows the session is gone.
-- `PendingSignOut` is a `Sendable` value with one method, `result() async -> SignOutResult`. It waits for the queued
-  delete and for the revocation. It is a value of its own rather than a `Task<SignOutResult, Never>`: a task's `value`
-  cannot report that its waiter was cancelled, and `SignOutResult.Revocation.cancelled` must stay per caller.
-- The revocation's time limit (`OAuthClient.defaultRevocationTimeLimit`) and its log line run in a task the manager
-  owns, started by `beginSignOut`. The limit counts from when the delete finished, as before, whether or not anyone
-  calls `result()`, and any number of calls report the same outcome. Cancelling a caller of `result()` returns
-  `.cancelled` to that caller only.
-- `signOut(revoke:)` is `beginSignOut(revoke:)` followed by `result()`, so the two cannot drift apart.
+- `PendingSignOut` is a `Sendable` value with one asynchronous property, `result: SignOutResult { get async }`,
+  shaped like `Task.value`. It waits for the queued delete and for the revocation. It is a value of its own rather than
+  a `Task<SignOutResult, Never>`: a task's `value` cannot report that its waiter was cancelled, and
+  `RevocationOutcome.cancelled` must stay per reader.
+- The revocation's time limit (`OAuthClient.revocationTimeLimit`) and its log line run in a task the manager owns,
+  started by `beginSignOut`. The limit counts from when the delete finished, as before, whether or not anyone reads
+  `result`, and every reader gets the same outcome. A reader whose task is cancelled gets `.cancelled`; others do not.
+- `signOut(revoke:)` is `beginSignOut(revoke:)` followed by `await result`, so the two cannot drift apart.
 
 ## Consequences
 

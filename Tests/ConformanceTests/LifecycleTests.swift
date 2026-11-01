@@ -177,14 +177,14 @@ struct LifecycleTests {
         #expect(await Harness.take(2, from: harness.events) == [.signedIn, .signedOut(reason: .userInitiated)])
         #expect(await thrownError { try await harness.manager.accessToken() }?.code == .notAuthenticated)
 
-        let result = Task { await pending.result() }
+        let result = Task { await pending.result }
         #expect(await waitUntil { await store.suspendedCount(.delete) == 1 })
         await store.release(.delete)
         // The wait limit, the request limit and the server's own delay.
         #expect(await waitUntil { harness.clock.sleeperCount >= 3 })
         harness.clock.advance(by: .seconds(2))
         #expect(await result.value == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
-        #expect(await pending.result() == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
+        #expect(await pending.result == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
         #expect(await harness.server.requests(to: "/revoke").compactMap { $0.value("token") } == [refreshToken])
         #expect(await harness.storedRefreshToken() == nil)
     }
@@ -193,13 +193,13 @@ struct LifecycleTests {
     func beginSignOutOutcomes() async throws {
         let skipped = try await Harness()
         #expect(
-            await skipped.manager.beginSignOut(revoke: false).result()
+            await skipped.manager.beginSignOut(revoke: false).result
                 == SignOutResult(isStoredCredentialDeleted: true, revocation: .skipped))
         #expect(await skipped.server.requests(to: "/revoke").isEmpty)
 
         let failing = try await Harness()
         await failing.server.configure { $0.override = { $0.path == "/revoke" ? .init(status: 500) : nil } }
-        guard case .failed(let error) = await failing.manager.beginSignOut().result().revocation else {
+        guard case .failed(let error) = await failing.manager.beginSignOut().result.revocation else {
             Issue.record("Expected a failure")
             return
         }
@@ -223,7 +223,7 @@ struct LifecycleTests {
         _ = try await harness.manager.accessToken()
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
 
-        let result = Task { await pending.result() }
+        let result = Task { await pending.result }
         #expect(await waitUntil { harness.clock.sleeperCount >= 3 })
         harness.clock.advance(by: .seconds(4))
         #expect(await result.value.revocation == .revoked)

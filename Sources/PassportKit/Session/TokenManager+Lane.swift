@@ -156,22 +156,21 @@ extension TokenManager {
     /// its own lane turn, and returns what will become of it.
     ///
     /// The turn is reserved before this returns; the token is read when the turn starts. The request is limited
-    /// to `OAuthClient.defaultRevocationTimeLimit` on the client's clock so a hung server cannot hold the lane.
+    /// to `OAuthClient.revocationTimeLimit` on the client's clock so a hung server cannot hold the lane.
     func startRevocation(of refreshToken: Secret, session: Int, lane: RefreshLane) -> Completion<
-        SignOutResult.Revocation
+        RevocationOutcome
     >? {
         guard client.configuration.endpoints.revocation != nil else { return nil }
         revocableTokens[session] = refreshToken
         // The lane of the ended session: behind its in-flight requests, and not holding up the next session.
         let turn = lane.reserve()
-        let completion = Completion<SignOutResult.Revocation>()
+        let completion = Completion<RevocationOutcome>()
         Task {
             await turn.start()
             defer { turn.finish() }
             let refreshToken = revocableTokens.removeValue(forKey: session) ?? refreshToken
             // The task is never cancelled, so the outcome is never `cancelled`.
-            let outcome = await client.revoke(
-                refreshToken, typeHint: .refreshToken, timeLimit: OAuthClient.defaultRevocationTimeLimit)
+            let outcome = await client.revokeBestEffort(refreshToken, typeHint: .refreshToken)
             completion.complete(.success(outcome))
         }
         return completion

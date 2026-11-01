@@ -77,6 +77,7 @@ appear in descriptions, errors or events.
 - ``AccessToken``
 - ``Credential``
 - ``SignOutResult``
+- ``RevocationOutcome``
 - ``SignOutReason``
 - ``SessionEvent``
 
