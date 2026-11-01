@@ -24,6 +24,56 @@ struct LifecycleTests {
                 == .notAuthenticated)
     }
 
+    enum TransientRefreshFailure: CaseIterable, CustomTestStringConvertible {
+        case serviceUnavailable, tooManyRequests, timedOut
+
+        var testDescription: String {
+            switch self {
+            case .serviceUnavailable: "503"
+            case .tooManyRequests: "429"
+            case .timedOut: "URLError.timedOut"
+            }
+        }
+
+        var response: FakeAuthorizationServer.ResponseOverride {
+            switch self {
+            case .serviceUnavailable: .init(status: 503, body: #"{"error":"temporarily_unavailable"}"#)
+            case .tooManyRequests: .init(status: 429)
+            case .timedOut: .init(failure: URLError(.timedOut))
+            }
+        }
+    }
+
+    @Test(
+        "invariant 5: a refresh that fails with 503, 429 or a timeout keeps the session",
+        arguments: TransientRefreshFailure.allCases)
+    func transientRefreshFailureKeepsSession(failure: TransientRefreshFailure) async throws {
+        let harness = try await Harness()
+        let before = try #require(await harness.storedRefreshToken())
+        harness.expireAccessTokens()
+        await harness.server.configure {
+            $0.override = { $0.value("grant_type") == GrantType.refreshToken.rawValue ? failure.response : nil }
+        }
+
+        let error = await thrownError { try await harness.manager.accessToken() }
+        guard case .retryLater? = error?.recovery else {
+            Issue.record("Expected retryLater, got \(String(describing: error))")
+            return
+        }
+        #expect(await harness.manager.credential != nil)
+        #expect(await harness.storedRefreshToken() == before)
+
+        await harness.server.configure { $0.override = nil }
+        _ = try await harness.manager.accessToken()
+        #expect(await harness.tokenRequests(.refreshToken).count == 2)
+        // The only session end is the sign-out below: the failure emitted none.
+        _ = await harness.manager.signOut()
+        #expect(
+            await Harness.take(3, from: harness.events) == [
+                .signedIn, .refreshed(target: .default), .signedOut(reason: .userInitiated),
+            ])
+    }
+
     @Test("invariant 6: a stale invalid_grant cannot end a session that replaced the one it was for")
     func staleRefreshAfterSignIn() async throws {
         let harness = try await Harness()
