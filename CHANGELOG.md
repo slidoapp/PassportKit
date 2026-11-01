@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The documentation of `RequestAuthorizer.sign(_:for:)` for `HTTPRequest` and of `URLSessionTransport` states that
   the never-indexed marking of `Authorization` (RFC 7541 §7.1.3) reaches the wire only through a transport that keeps
   the indexing strategy of `HTTPFields`. `URLSessionTransport` converts to `URLRequest`, which drops it.
+- `DeviceAuthorization.expiresAt` keeps the fractional part of a fractional `expires_in` instead of truncating it to
+  whole seconds.
 
 ## [0.3.2] - 2026-10-19
 
