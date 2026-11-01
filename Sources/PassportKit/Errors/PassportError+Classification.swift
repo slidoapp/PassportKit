@@ -18,7 +18,7 @@ extension PassportError {
         guard case .object(let members)? = try? JSONDecoder().decode(JSONValue.self, from: body),
             case .string(let text)? = members[ErrorResponseField.error], let code = Code.fromServer(text)
         else {
-            let isTransient = HTTPResponse.Status(code: statusCode).isTransient
+            let isTransient = HTTPResponse.Status.isTransient(code: statusCode)
             let code: Code = isTransient ? .temporarilyUnavailable : .invalidResponse
             return PassportError(
                 code,
@@ -106,7 +106,7 @@ extension PassportError {
         case .expiredToken:
             context == .deviceAuthorizationPoll ? .reauthenticate : .noAction
         default:
-            statusCode.map { HTTPResponse.Status(code: $0).isTransient } == true
+            statusCode.map(HTTPResponse.Status.isTransient(code:)) == true
                 ? .retryLater(after: retryAfter) : .noAction
         }
     }

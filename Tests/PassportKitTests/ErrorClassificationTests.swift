@@ -55,6 +55,19 @@ struct ErrorClassificationTests {
         }
     }
 
+    @Test(
+        "a number that is not an HTTP status classifies as not transient instead of trapping",
+        arguments: [-1, 1000, Int.min, Int.max])
+    func outOfRangeStatus(status: Int) {
+        // An unknown code falls back to the status.
+        #expect(PassportError(.init(rawValue: "x"), statusCode: status).recovery == .noAction)
+        #expect(PassportError(.invalidResponse, statusCode: status).recovery == .noAction)
+        let error = PassportError.fromErrorResponse(statusCode: status, headers: [:], body: Data(), context: .other)
+        #expect(error.code == .invalidResponse)
+        #expect(error.statusCode == status)
+        #expect(PassportError(.init(rawValue: "x"), statusCode: 503).recovery == .retryLater(after: nil))
+    }
+
     @Test func unauthorizedAccessDeniedIsAccessDenied() {
         let body = Data(#"{"error":"access_denied","error_description":"No access"}"#.utf8)
         let error = PassportError.fromErrorResponse(statusCode: 401, headers: [:], body: body, context: .other)

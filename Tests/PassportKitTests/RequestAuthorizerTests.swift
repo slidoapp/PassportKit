@@ -35,6 +35,8 @@ struct RequestAuthorizerTests {
 
     static let table: [Case] = [
         Case(name: "200", status: 200, challenges: [], attempt: 0, expected: .deliver),
+        Case(name: "not a status: -1", status: -1, challenges: [], attempt: 0, expected: .deliver),
+        Case(name: "not a status: 1000", status: 1000, challenges: [], attempt: 0, expected: .deliver),
         Case(name: "404 after retry", status: 404, challenges: [], attempt: 1, expected: .deliver),
         Case(name: "403 without challenge", status: 403, challenges: [], attempt: 0, expected: .deliver),
         Case(
