@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-01
+
+### Fixed
+
+- An app that depends on PassportKit through Xcode can build it again. `Package.swift` treated all warnings as errors,
+  which Xcode combines with the `-suppress-warnings` it uses for remote packages and then refuses ("conflicting options
+  '-warnings-as-errors' and '-suppress-warnings'"). Warnings are now errors only in this repository's own `make`
+  targets.
+
 ## [1.0.0] - 2026-11-01
 
 The first stable release: from here on, a breaking change to the public API of `PassportKit` or `PassportKitTesting`
@@ -396,7 +405,8 @@ unchanged: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1.
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization request query as form data, so a `+` in
   `scope` is a space.
 
-[Unreleased]: https://github.com/slidoapp/PassportKit/compare/1.0.0...HEAD
+[Unreleased]: https://github.com/slidoapp/PassportKit/compare/1.0.1...HEAD
+[1.0.1]: https://github.com/slidoapp/PassportKit/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/slidoapp/PassportKit/compare/0.3.2...1.0.0
 [0.3.2]: https://github.com/slidoapp/PassportKit/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/slidoapp/PassportKit/compare/0.3.0...0.3.1
