@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `Retry-After` in the obsolete RFC 850 date form with a two-digit year up to 50 years ahead is read as a future
+  date (RFC 9110 §5.6.7); years 46 to 76 used to be read as the 20th century, which made the delay zero.
 - `LoopbackUserAgent` installs its `state` filter before it opens the browser, so a request with another `state`
   that reaches the listener while the browser opens is refused instead of being taken as the redirect.
 - `TokenManager.load()` reads the store only after every save and delete decided before it, so a load that runs

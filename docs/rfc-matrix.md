@@ -23,7 +23,8 @@ for the RFC is done; features left out on purpose are listed in Notes.
 | 8693 | Token Exchange | done | Access-token and refresh-token subjects; claims inside tokens are not interpreted. |
 | 8707 | Resource Indicators | done | |
 | 8414 | Authorization Server Metadata | partial | Configurable issuer validation; `IssuerValidation.disabled` is an explicit opt-out of the §3.3 check (DISC-3). |
-| 9110 | HTTP Semantics | done | Only what a client needs: `WWW-Authenticate` challenge syntax (§11) and `Retry-After` (§10.2.3). |
+| 9110 | HTTP Semantics | done | Only what a client needs: `WWW-Authenticate` challenge syntax (§11), `Retry-After` (§10.2.3) with HTTP-date (§5.6.7), and 5xx as transient (§15.6). |
+| 6585 | Additional HTTP Status Codes | done | 429 Too Many Requests (§4) is transient. |
 | 7009 | Token Revocation | done | |
 | 9207 | Authorization Server Issuer Identification | done | |
 | 9700 | OAuth 2.0 Security Best Current Practice | partial | PKCE on every code flow, exact redirect matching, single-use codes, refresh token rotation handling. Sender-constrained tokens need DPoP (RFC 9449), which is not planned yet. |
@@ -49,7 +50,8 @@ for the RFC is done; features left out on purpose are listed in Notes.
 | ERR-2 | 6749 §5.2 | MUST | `error_description` and `error_uri` preserved; description sanitized (controls, line separators, invisible format characters, token-like runs) and truncated; `error_uri` only `http(s)` | done | `Sources/PassportKit/Errors/PassportError.swift`, `PassportError+Classification.swift` | `PassportErrorTests`, `ErrorClassificationTests` |
 | ERR-5 | 6749 §5.2, §4.1.2.1 | MUST | A server `error` code outside `%x20-21 / %x23-5B / %x5D-7E` or longer than 64 characters is not trusted: `invalidResponse`, no raw text kept | done | `Sources/PassportKit/Errors/PassportError+Code.swift`, `PassportError+Classification.swift`, `Sources/PassportKit/Client/OAuthClient+AuthorizationCode.swift` | `ErrorClassificationTests`, `AuthorizationCompletionTests` |
 | ERR-3 | 6749 §6; 8693 §2.2.2 | MUST | `invalid_grant` on a refresh-token-consuming request ends the session; elsewhere it does not | done | `Sources/PassportKit/Errors/PassportError+Classification.swift` | `ErrorClassificationTests` |
-| ERR-4 | 9110 §10.2.3 | SHOULD | `Retry-After` delta-seconds and HTTP-date (IMF-fixdate and the two obsolete forms, relative to the injected wall clock) honoured on 429 and 5xx | done | `Sources/PassportKit/Errors/PassportError+Classification.swift` | `ErrorClassificationTests` |
+| ERR-4 | 9110 §10.2.3 | SHOULD | `Retry-After` delta-seconds and HTTP-date (IMF-fixdate and the two obsolete forms, relative to the injected wall clock) honoured on 429 and 5xx; a two-digit RFC 850 year more than 50 years ahead is read as the most recent past year (§5.6.7) | done | `Sources/PassportKit/Errors/PassportError+Classification.swift` | `ErrorClassificationTests` |
+| ERR-6 | 6585 §4; 9110 §15.6 | Library policy | A status of 429 or 5xx without an OAuth `error` body is `temporarilyUnavailable` with `retryLater`; a number outside 0...999 is not a status and is never transient | done | `Sources/PassportKit/HTTP/HTTPResponse+Status.swift`, `Sources/PassportKit/Errors/PassportError+Classification.swift` | `ErrorClassificationTests` (`outOfRangeStatus`), `LifecycleTests` (`transientRefreshFailureKeepsSession`) |
 | PKCE-1 | 7636 §4.1 | MUST | Verifier from 32 random octets, base64url without padding (43 characters) | done | `Sources/PassportKit/PKCE/PKCE.swift` | `PKCETests` |
 | PKCE-2 | 7636 §4.2, App. B | MUST | `S256` challenge is base64url(SHA-256(ASCII(verifier))); Appendix B vector passes | done | `Sources/PassportKit/PKCE/PKCE.swift` (CryptoKit `SHA256`) | `PKCETests` |
 | TRN-1 | 6749 §3.2 | MUST | Token endpoint requests do not follow redirects (`POST`) | done | `Sources/PassportKit/HTTP/URLSessionTransportDelegate.swift` | `URLSessionTransportTests` |

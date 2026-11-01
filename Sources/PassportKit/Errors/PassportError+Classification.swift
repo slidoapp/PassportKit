@@ -118,7 +118,7 @@ extension PassportError {
             text.allSatisfy(\.isASCII)
         else { return nil }
         if text.allSatisfy(\.isNumber) { return Int(text).map { .seconds($0) } }
-        guard let now, let date = parseHTTPDate(text) else { return nil }
+        guard let now, let date = parseHTTPDate(text, now: now) else { return nil }
         return .seconds(max(0, Int(min(date.timeIntervalSince(now), 31_536_000_000).rounded(.up))))
     }
 
@@ -132,12 +132,18 @@ extension PassportError {
     /// Parses the three HTTP-date formats a recipient must accept (RFC 9110 §5.6.7).
     ///
     /// `Date.HTTPFormatStyle` is not used because it parses only IMF-fixdate, and a recipient must also accept the
-    /// two obsolete formats.
-    private static func parseHTTPDate(_ text: String) -> Date? {
+    /// two obsolete formats. A two-digit RFC 850 year that would be more than 50 years after `now` is the most
+    /// recent past year with those digits (§5.6.7), so two-digit years fall in the century from 50 years before
+    /// `now`.
+    private static func parseHTTPDate(_ text: String, now: Date) -> Date? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "GMT") ?? calendar.timeZone
         for format in [imfFixdate, rfc850Date, asctimeDate] {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.timeZone = TimeZone(identifier: "GMT")
+            formatter.calendar = calendar
+            formatter.twoDigitStartDate = calendar.date(byAdding: .year, value: -50, to: now)
             formatter.dateFormat = format
             if let date = formatter.date(from: text) { return date }
         }

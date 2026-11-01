@@ -152,6 +152,10 @@ struct ErrorClassificationTests {
         ("Wed, 21 Oct 2026 07:28:30 GMT", Duration?.some(.seconds(30))),  // IMF-fixdate
         ("Wednesday, 21-Oct-26 07:29:00 GMT", .some(.seconds(60))),  // obsolete RFC 850
         ("Wed Oct 21 07:30:00 2026", .some(.seconds(120))),  // obsolete asctime
+        ("Sat Nov  7 07:28:00 2026", .some(.seconds(17 * 86400))),  // asctime, single-digit day padded with a space
+        // A two-digit year at most 50 years ahead is in the future; one further ahead is in the past.
+        ("Tuesday, 21-Oct-70 07:28:00 GMT", .some(.seconds(16_071 * 86400))),
+        ("Tuesday, 21-Oct-80 07:28:00 GMT", .some(.seconds(0))),
         ("Wed, 21 Oct 2026 07:00:00 GMT", .some(.seconds(0))),  // in the past
         ("Wed, 21 Oct 2026 07:28:30 PST", nil), ("tomorrow", nil),
     ])
