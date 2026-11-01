@@ -188,6 +188,11 @@ public final class LoopbackRedirectListener: Sendable {
         }
     }
 
+    /// Makes `accept` decide which requests may be the callback from now on, before anyone waits.
+    func install(accept: @escaping @Sendable (URL) -> Bool) {
+        acceptor.withLock { $0 = accept }
+    }
+
     /// Stops the listener and closes open connections. Pending and later waits end with
     /// `CancellationError`. Safe to call repeatedly.
     public func cancel() {

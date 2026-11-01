@@ -233,6 +233,21 @@ struct LoopbackUserAgentTests {
         #expect(try await agent.present(authorization, redirectURI: listener.redirectURI) == redirect)
     }
 
+    @Test("a request with another state that arrives while the browser opens is refused, not taken as the callback")
+    func filtersStateBeforeTheBrowserOpens() async throws {
+        let listener = try await LoopbackRedirectListener.start()
+        let base = listener.redirectURI.absoluteString
+        let stray = try #require(URL(string: base + "?code=stray&state=other"))
+        let redirect = try #require(URL(string: base + "?code=abc&state=xyz"))
+        let agent = LoopbackUserAgent(listener: listener) { _ in
+            let (_, response) = try await URLSession(configuration: .ephemeral).data(from: stray)
+            #expect((response as? HTTPURLResponse)?.statusCode == 400)
+            _ = try await URLSession(configuration: .ephemeral).data(from: redirect)
+        }
+        let authorization = try #require(URL(string: "https://as.example.com/authorize?state=xyz"))
+        #expect(try await agent.present(authorization, redirectURI: listener.redirectURI) == redirect)
+    }
+
     @Test func refusesAForeignRedirectURI() async throws {
         let listener = try await LoopbackRedirectListener.start()
         let agent = LoopbackUserAgent(listener: listener) { _ in Issue.record("must not open the browser") }

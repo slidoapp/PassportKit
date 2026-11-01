@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `LoopbackUserAgent` installs its `state` filter before it opens the browser, so a request with another `state`
+  that reaches the listener while the browser opens is refused instead of being taken as the redirect.
 - `TokenManager.load()` reads the store only after every save and delete decided before it, so a load that runs
   while the delete of a signed-out or rejected session is still in progress no longer restores that session.
 - `KeychainCredentialStore` updates an existing item in place instead of deleting it and adding it again, so a save
