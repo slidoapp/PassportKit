@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `LoopbackRedirectListener.waitForCallback(timeout:accept:)` is `waitForCallback(timeLimit:accept:)`
+  and `LoopbackUserAgent(listener:timeout:openURL:)` is `LoopbackUserAgent(listener:timeLimit:openURL:)`, matching
+  the `timeLimit` of the other APIs that give up after a duration on the injected clock.
 - **Breaking:** the members of `PassportError` (`code`, `recovery`, `statusCode`, `errorURI`, `underlying`) are
   read-only outside the library, like `detail` already was. Create an error with the initializers instead of
   changing one.

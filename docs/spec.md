@@ -1010,7 +1010,7 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
 - `LoopbackRedirectListener`: `static func start(path: String = "/callback", clock:, logger:)`
   binds an `NWListener` to `127.0.0.1` on an ephemeral port and returns
   once it is ready; `redirectURI` carries the real port (RFC 8252 §7.3).
-  `waitForCallback(timeout:accept:)` claims the first `GET` for the path on
+  `waitForCallback(timeLimit:accept:)` claims the first `GET` for the path on
   the loopback `Host` whose query has `state` and `code` or `error`, that
   `Sec-Fetch-Mode`/`Sec-Fetch-Dest` do not mark as a background fetch (400
   otherwise) and that `accept` allows (default: all); other requests get an
@@ -1021,10 +1021,10 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   releasing a listener cancels it. The
   listener is started first so that its `redirectURI` goes into the
   `AuthorizationRequest`.
-- `LoopbackUserAgent(listener:timeout:openURL:)`: a `AuthorizationUserAgent` for a
+- `LoopbackUserAgent(listener:timeLimit:openURL:)`: a `AuthorizationUserAgent` for a
   running listener; opens the URL through an injected
   `@Sendable (URL) async throws -> Void` (default `NSWorkspace` /
-  `UIApplication`), then `waitForCallback(timeout:accept:)` (default 5 minutes).
+  `UIApplication`), then `waitForCallback(timeLimit:accept:)` (default 5 minutes).
   It rejects a request whose `redirectURI` is not the listener's and passes
   an `accept` that matches the `state` of the authorization URL.
 

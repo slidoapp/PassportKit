@@ -19,23 +19,23 @@ import Foundation
 /// ```
 public struct LoopbackUserAgent: AuthorizationUserAgent {
     private let listener: LoopbackRedirectListener
-    private let timeout: Duration
+    private let timeLimit: Duration
     private let openURL: @Sendable (URL) async throws -> Void
 
     /// Creates an agent for a listener that is already running.
     ///
     /// - Parameters:
     ///   - listener: The listener whose ``LoopbackRedirectListener/redirectURI`` the request uses.
-    ///   - timeout: How long to wait for the redirect after the browser was opened.
+    ///   - timeLimit: How long to wait for the redirect after the browser was opened.
     ///   - openURL: Opens a URL in the user's browser. The default uses `NSWorkspace` on macOS and
     ///     `UIApplication` on iOS.
     public init(
         listener: LoopbackRedirectListener,
-        timeout: Duration = .seconds(300),
+        timeLimit: Duration = .seconds(300),
         openURL: @escaping @Sendable (URL) async throws -> Void = LoopbackUserAgent.openInSystemBrowser
     ) {
         self.listener = listener
-        self.timeout = timeout
+        self.timeLimit = timeLimit
         self.openURL = openURL
     }
 
@@ -72,7 +72,7 @@ public struct LoopbackUserAgent: AuthorizationUserAgent {
                 underlying: error
             )
         }
-        return try await listener.waitForCallback(timeout: timeout, accept: accept)
+        return try await listener.waitForCallback(timeLimit: timeLimit, accept: accept)
     }
 
     /// Opens `url` with the platform's default browser.

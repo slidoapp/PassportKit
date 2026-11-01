@@ -108,7 +108,7 @@ struct LoopbackRedirectListenerTests {
         let clock = ManualClock()
         let listener = try await LoopbackRedirectListener.start(clock: clock)
         let port = try #require(listener.redirectURI.port)
-        let waiting = Task { try await listener.waitForCallback(timeout: .seconds(300)) }
+        let waiting = Task { try await listener.waitForCallback(timeLimit: .seconds(300)) }
         #expect(try await clock.advanceToNextSleeper() == .seconds(300))
         await #expect(throws: PassportError(.timedOut, recovery: .reauthenticate)) { try await waiting.value }
         // The listener is closed afterwards.
