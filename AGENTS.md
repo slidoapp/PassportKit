@@ -108,7 +108,9 @@ logging, redirects or errors.
 
 ## Git and pull requests
 
-- Branch: `<github-nick>/<short-slug>`.
+- Branch: a short topic name in snake_case, such as `public_api_naming`. Prefix it with `feature/` or `bugfix/` when
+  the branch adds a feature or fixes a bug (`feature/device_flow_polling`, `bugfix/keychain_update`). Choose the name
+  before the first push, because renaming a pushed branch closes its pull request.
 - Commit subject: `<type>(<scope>): <summary>`, imperative, at most 72 characters. Types: `feat`, `fix`, `refactor`,
   `test`, `docs`, `chore`, `build`, `ci`. Scope is the module name; omit it for repository-level files.
 - Commit body explains why, wrapped at 72 columns. Sign commits (`git commit -S`). One intent per commit; keep
