@@ -122,7 +122,7 @@ func run() async throws {
 
     // The session owns the refresh token and rotates it; a real app passes a persistent store.
     let account = CredentialAccount(service: "passportkit-example", account: arguments.clientID)
-    let session = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
+    let session = OAuthSession(client: client, store: .inMemory(), account: account)
     try await session.signIn(with: response, requestedScope: arguments.scope)
 
     guard let before = await session.credential?.refreshToken else {

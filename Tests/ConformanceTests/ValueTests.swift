@@ -7,6 +7,18 @@ import Testing
 struct ValueTests {
     static let canaries = ["canary-access-token", "canary-refresh-token", "canary-id-token", "canary-extra-field"]
 
+    @Test("the built-in credential stores are static members of CredentialStore")
+    func storeStaticMembers() async throws {
+        let account = CredentialAccount(service: "com.example.app", account: "default")
+        let credential = Credential(
+            clientID: "app", refreshToken: Secret("rt"), updatedAt: Date(timeIntervalSince1970: 0))
+        let memory: any CredentialStore = .inMemory(credentials: [account: credential])
+        #expect(memory is InMemoryCredentialStore)
+        #expect(try await memory.load(account) == credential)
+        let keychain: any CredentialStore = .keychain(accessibility: .whenUnlockedThisDeviceOnly)
+        #expect(keychain is KeychainCredentialStore)
+    }
+
     @Test("a DeviceAuthorization can be created for previews and keeps its device code private")
     func deviceAuthorizationForPreviews() {
         let clock = ManualClock()

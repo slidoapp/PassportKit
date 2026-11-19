@@ -32,3 +32,11 @@ public actor InMemoryCredentialStore: CredentialStore {
         credentials[account] = nil
     }
 }
+
+extension CredentialStore where Self == InMemoryCredentialStore {
+    /// A store that keeps credentials in memory, for `store: .inMemory()` in tests, previews and short-lived
+    /// processes.
+    public static func inMemory(credentials: [CredentialAccount: Credential] = [:]) -> InMemoryCredentialStore {
+        InMemoryCredentialStore(credentials: credentials)
+    }
+}

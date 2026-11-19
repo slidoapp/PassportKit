@@ -780,6 +780,13 @@ public actor InMemoryCredentialStore: CredentialStore {
     public init(credentials: [CredentialAccount: Credential] = [:])
     public func failNextSaves(_ count: Int = 1)       // injected save failures for tests
 }
+extension CredentialStore where Self == InMemoryCredentialStore {
+    public static func inMemory(credentials: [CredentialAccount: Credential] = [:]) -> InMemoryCredentialStore
+}
+extension CredentialStore where Self == KeychainCredentialStore {   // §13; the parameters of its initializer
+    public static func keychain(accessGroup: String? = nil, accessibility: KeychainCredentialStore.Accessibility = .afterFirstUnlockThisDeviceOnly,
+                                logger: Logger = Logger(label: "PassportKit")) -> KeychainCredentialStore
+}
 /// Versioned JSON for stores that write bytes: the credential's members plus `"version": 1`.
 extension Credential {
     public func serializedData() throws -> Data

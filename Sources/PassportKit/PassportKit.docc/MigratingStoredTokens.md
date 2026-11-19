@@ -33,7 +33,7 @@ On launch, before anything asks for a token:
 func migratedSession(client: OAuthClient) async throws -> OAuthSession {
     // A different service than the old item used.
     let account = CredentialAccount(service: "com.example.app.passportkit", account: "default")
-    let session = OAuthSession(client: client, store: KeychainCredentialStore(), account: account)
+    let session = OAuthSession(client: client, store: .keychain(), account: account)
     _ = try await session.restore()
 
     guard let legacyRefreshToken = loadLegacyRefreshToken() else { return session }

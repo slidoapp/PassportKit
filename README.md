@@ -82,7 +82,7 @@ let tokens = try await client.completeDeviceAuthorization(authorization)
 
 // 2. Keep the session. It stores, rotates and refreshes the tokens.
 let account = CredentialAccount(service: "com.example.app", account: "default")
-let session = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
+let session = OAuthSession(client: client, store: .inMemory(), account: account)
 try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
 // 3. Call an API. The authorizer adds the token and refreshes once if the server rejects it.
@@ -91,7 +91,7 @@ let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
 let (data, response) = try await authorizer.data(for: request, session: URLSession(configuration: .ephemeral))
 ```
 
-In an app, store the session in `KeychainCredentialStore` instead of `InMemoryCredentialStore`. `allowedOrigins` limits
+In an app, pass `store: .keychain()` (a `KeychainCredentialStore`) instead of `.inMemory()`. `allowedOrigins` limits
 where a token may be sent. The `passportkit-example` executable runs the device and code flows against a server you name.
 
 ## Logging

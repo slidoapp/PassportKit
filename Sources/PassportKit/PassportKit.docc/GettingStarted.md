@@ -113,14 +113,15 @@ tokens when they run low:
 
 ```swift
 let account = CredentialAccount(service: "com.example.app", account: "default")
-let session = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
+let session = OAuthSession(client: client, store: .inMemory(), account: account)
 try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
 let token = try await session.accessToken()
 ```
 
-Use ``InMemoryCredentialStore`` in tests only. Store the credential in the
-Keychain with ``KeychainCredentialStore``. On the next launch call
+Use `.inMemory()`, an ``InMemoryCredentialStore``, in tests only. Store the
+credential in the Keychain with `.keychain()`, a ``KeychainCredentialStore``.
+On the next launch call
 ``OAuthSession/restore()`` instead of signing in again. Subscribe to
 ``OAuthSession/events`` to learn when the session ends.
 

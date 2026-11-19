@@ -7,8 +7,8 @@ import SwiftKeychain
 /// A `CredentialStore` that keeps credentials as generic password items in the Keychain.
 ///
 /// The item's service and account are the `CredentialAccount`'s `service` and `account`; the library has
-/// no defaults for either. The payload is the versioned JSON of `Credential.serializedData()`, kept as one value inside
-/// SwiftKeychain's archived dictionary; the store makes the Keychain calls itself, matching the item by
+/// no defaults for either. The payload is the versioned JSON of `Credential.serializedData()`, kept as one value
+/// inside SwiftKeychain's archived dictionary; the store makes the Keychain calls itself, matching the item by
 /// class, service, account, synchronizable and access group. Items are never synchronizable: a refresh token is
 /// a bearer secret for one device and must not travel through iCloud Keychain. The store sets
 /// `kSecAttrSynchronizable` to `false` on the item it adds and in the query it finds, updates and deletes the item
@@ -286,5 +286,18 @@ private struct CredentialItem: KeychainGenericPasswordType {
             String(kSecAttrAccount): accountName,
             String(kSecAttrSynchronizable): false,
         ]
+    }
+}
+
+extension CredentialStore where Self == KeychainCredentialStore {
+    /// A store that keeps the credential in the Keychain, for `store: .keychain()`.
+    ///
+    /// The parameters are those of ``KeychainCredentialStore/init(accessGroup:accessibility:logger:)``.
+    public static func keychain(
+        accessGroup: String? = nil,
+        accessibility: KeychainCredentialStore.Accessibility = .afterFirstUnlockThisDeviceOnly,
+        logger: Logger = Logger(label: "PassportKit")
+    ) -> KeychainCredentialStore {
+        KeychainCredentialStore(accessGroup: accessGroup, accessibility: accessibility, logger: logger)
     }
 }

@@ -28,7 +28,7 @@ only if at least one of the scopes you name was granted:
 ```swift
 let policy = RequireAnyScope(["items.read", "items.write"])
 let session = OAuthSession(
-    client: client, store: InMemoryCredentialStore(), account: account, acceptancePolicy: policy)
+    client: client, store: .inMemory(), account: account, acceptancePolicy: policy)
 ```
 
 Scopes are compared as exact strings. `*` is not a wildcard:
@@ -51,7 +51,7 @@ time counts as a rejection.
 
 ```swift
 let session = OAuthSession(
-    client: client, store: InMemoryCredentialStore(), account: account,
+    client: client, store: .inMemory(), account: account,
     acceptancePolicy: .custom { context in
         context.token.grantedScope?.scopes.contains("items.read") == true
             ? .accept : .reject(reason: "The items scope is missing.")
@@ -64,7 +64,7 @@ scope starting with `items.`, and rejects one whose scope is unknown:
 
 ```swift
 let session = OAuthSession(
-    client: client, store: InMemoryCredentialStore(), account: account,
+    client: client, store: .inMemory(), account: account,
     acceptancePolicy: .custom { context in
         guard let granted = context.token.grantedScope else {
             return .reject(reason: "The granted scope is unknown.")

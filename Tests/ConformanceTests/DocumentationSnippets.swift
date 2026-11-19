@@ -21,7 +21,7 @@ enum DocumentationSnippets {
         let tokens = try await client.completeDeviceAuthorization(authorization)
 
         let account = CredentialAccount(service: "com.example.app", account: "default")
-        let session = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
+        let session = OAuthSession(client: client, store: .inMemory(), account: account)
         try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
         let token = try await session.accessToken()
@@ -59,7 +59,7 @@ enum DocumentationSnippets {
 
         // 2. Keep the session. It stores, rotates and refreshes the tokens.
         let account = CredentialAccount(service: "com.example.app", account: "default")
-        let session = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
+        let session = OAuthSession(client: client, store: .inMemory(), account: account)
         try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
         // 3. Call an API. The authorizer adds the token and refreshes once if the server rejects it.
@@ -118,7 +118,7 @@ enum DocumentationSnippets {
     static func migratedSession(client: OAuthClient) async throws -> OAuthSession {
         // A different service than the old item used.
         let account = CredentialAccount(service: "com.example.app.passportkit", account: "default")
-        let session = OAuthSession(client: client, store: KeychainCredentialStore(), account: account)
+        let session = OAuthSession(client: client, store: .keychain(), account: account)
         _ = try await session.restore()
 
         guard let legacyRefreshToken = loadLegacyRefreshToken() else { return session }
@@ -155,13 +155,13 @@ enum DocumentationSnippets {
     static func policy(client: OAuthClient, account: CredentialAccount) {
         let policy = RequireAnyScope(["items.read", "items.write"])
         let session = OAuthSession(
-            client: client, store: InMemoryCredentialStore(), account: account, acceptancePolicy: policy)
+            client: client, store: .inMemory(), account: account, acceptancePolicy: policy)
         _ = session
     }
 
     static func prefixPolicy(client: OAuthClient, account: CredentialAccount) {
         let session = OAuthSession(
-            client: client, store: InMemoryCredentialStore(), account: account,
+            client: client, store: .inMemory(), account: account,
             acceptancePolicy: .custom { context in
                 guard let granted = context.token.grantedScope else {
                     return .reject(reason: "The granted scope is unknown.")
@@ -174,7 +174,7 @@ enum DocumentationSnippets {
 
     static func customPolicy(client: OAuthClient, account: CredentialAccount) {
         let session = OAuthSession(
-            client: client, store: InMemoryCredentialStore(), account: account,
+            client: client, store: .inMemory(), account: account,
             acceptancePolicy: .custom { context in
                 context.token.grantedScope?.scopes.contains("items.read") == true
                     ? .accept : .reject(reason: "The items scope is missing.")

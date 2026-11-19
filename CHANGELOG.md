@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The names of the main objects follow ADR 0016. Each rename breaks source compatibility, and no deprecated aliases
 are kept.
 
+### Added
+
+- `CredentialStore` lists its built-in stores as static members, so `store: .keychain()` and `store: .inMemory()`
+  appear in autocomplete. They take the parameters of the `KeychainCredentialStore` and `InMemoryCredentialStore`
+  initializers.
+
 ### Changed
 
 - **Breaking:** `TokenManager` is `OAuthSession`, so the two entry points `OAuthClient` and `OAuthSession` appear
