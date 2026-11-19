@@ -46,7 +46,7 @@ Add the package to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/slidoapp/PassportKit.git", from: "1.0.0")
+    .package(url: "https://github.com/slidoapp/PassportKit.git", from: "1.1.0")
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
@@ -58,7 +58,7 @@ targets: [
 ]
 ```
 
-`from: "1.0.0"` accepts every 1.x release, none of which breaks the API. Pin with `.upToNextMinor(from: "1.0.0")`
+`from: "1.1.0"` accepts every 1.x release, none of which breaks the API. Pin with `.upToNextMinor(from: "1.1.0")`
 only if you want to take new features deliberately.
 
 ## Quick start
