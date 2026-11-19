@@ -44,7 +44,7 @@ let configuration = try ClientConfiguration(
 ```
 
 The opt-in admits `http` on `localhost`, `127.0.0.1` and `[::1]` only; any other `http` URL is still refused. It also
-applies to the verification URIs of the device flow and to the URLs a ``RequestAuthorizer`` signs. Keep it out of
+applies to the verification URIs of the device flow and to the URLs a ``ProtectedResourceClient`` sends tokens to. Keep it out of
 release builds. It has nothing to do with redirect URIs: the `http` loopback redirect URI of a native app
 (<doc:NativeAppRedirects>) works without it.
 
@@ -144,14 +144,14 @@ tokens, codes, verifiers, URLs with queries or response bodies. Use a ``Passport
 
 ## Call an API
 
-``RequestAuthorizer`` adds the bearer token, refreshes once when the server
+``ProtectedResourceClient`` adds the bearer token, refreshes once when the server
 rejects it, and never sends a request without a token:
 
 ```swift
-let authorizer = RequestAuthorizer(manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
+let api = ProtectedResourceClient(session: session, allowedOrigins: [URL(string: "https://api.example.com")!])
 let urlSession = URLSession(configuration: .ephemeral)
 let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
-let (data, response) = try await authorizer.data(for: request, session: urlSession)
+let (data, response) = try await api.data(for: request, urlSession: urlSession)
 ```
 
 Tokens are only sent over `https` (an `http` loopback URL needs ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), to the origins you

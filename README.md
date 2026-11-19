@@ -3,7 +3,7 @@
 PassportKit is an OAuth 2.0 client library for Swift 6. It works against any standards-compliant authorization
 server and has no vendor-specific behavior: server quirks are handled through the RFCs it implements and a few
 documented extension points. It covers signing a person in (authorization code with PKCE, or the device flow),
-keeping the session safe while refresh tokens rotate, and signing requests to protected resources. Time, randomness
+keeping the session safe while refresh tokens rotate, and sending requests to protected resources with its tokens. Time, randomness
 and the HTTP transport are injected, so every flow can be tested offline, and secrets never appear in logs,
 descriptions or errors.
 
@@ -85,10 +85,10 @@ let account = CredentialAccount(service: "com.example.app", account: "default")
 let session = OAuthSession(client: client, store: .inMemory(), account: account)
 try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
-// 3. Call an API. The authorizer adds the token and refreshes once if the server rejects it.
-let authorizer = RequestAuthorizer(manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
+// 3. Call an API. The resource client adds the token and refreshes it once if the server rejects it.
+let api = ProtectedResourceClient(session: session, allowedOrigins: [URL(string: "https://api.example.com")!])
 let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
-let (data, response) = try await authorizer.data(for: request, session: URLSession(configuration: .ephemeral))
+let (data, response) = try await api.data(for: request, urlSession: URLSession(configuration: .ephemeral))
 ```
 
 In an app, pass `store: .keychain()` (a `KeychainCredentialStore`) instead of `.inMemory()`. `allowedOrigins` limits

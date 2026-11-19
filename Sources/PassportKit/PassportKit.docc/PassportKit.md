@@ -21,7 +21,7 @@ Two layers fit together:
 - ``OAuthSession`` is the session. It owns the refresh token, keeps it safe
   across rotation and concurrency, caches access tokens per
   ``TokenTarget`` and applies your acceptance policy before a token is used.
-  ``RequestAuthorizer`` signs requests with its tokens.
+  ``ProtectedResourceClient`` adds its tokens to requests to protected resources.
 
 Time, randomness and the HTTP transport are injected, so every flow can be
 tested without a network or sleeping (see <doc:Testing>). Secrets never
@@ -101,8 +101,8 @@ appear in descriptions, errors or events.
 
 ### Calling protected resources
 
-- ``RequestAuthorizer``
-- ``RetryDecision``
+- ``ProtectedResourceClient``
+- ``ProtectedResourceClient/RetryDecision``
 - ``AuthenticationChallenge``
 
 ### Errors

@@ -160,4 +160,4 @@ it nor touches the new session.
 ``OAuthSession/discard(_:)`` drops a cached token that a resource server
 rejected. Pass the exact ``AccessToken`` that was used: only that token is
 dropped, so many concurrent 401s for one token cause one refresh.
-``RequestAuthorizer`` does this for you.
+``ProtectedResourceClient`` does this for you.

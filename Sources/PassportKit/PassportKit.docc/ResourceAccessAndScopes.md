@@ -115,7 +115,7 @@ to ask the server every time.
 
 ## At the resource server
 
-``RequestAuthorizer`` follows RFC 6750 §3.1:
+``ProtectedResourceClient`` follows RFC 6750 §3.1:
 
 - A 401 without a Bearer error code, or with `invalid_token`, drops the token,
   gets a fresh one and retries once.
@@ -137,19 +137,19 @@ from data you do not control (links in a response, stored addresses), pass the
 origins you trust, so the token is never sent anywhere else:
 
 ```swift
-let authorizer = RequestAuthorizer(
-    manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
+let api = ProtectedResourceClient(
+    session: session, allowedOrigins: [URL(string: "https://api.example.com")!])
 ```
 
 A request for another origin fails with
 ``PassportError/Code-swift.struct/invalidConfiguration`` before a token is
 obtained. A token that is not a valid `b64token` (RFC 6750 §2.1) is refused
 with ``PassportError/Code-swift.struct/invalidResponse`` instead of being
-written into a header. `data(for:target:session:)` never lets a redirect take
-the token to another origin or from HTTPS to HTTP, whatever the session's own
+written into a header. `data(for:target:urlSession:)` never lets a redirect take
+the token to another origin or from HTTPS to HTTP, whatever the URL session's own
 delegate does.
 
-Besides `URLRequest`, the authorizer signs and sends the request types of
+Besides `URLRequest`, the resource client adds tokens to and sends the request types of
 [swift-http-types](https://github.com/apple/swift-http-types), the same ones
 an ``HTTPTransport`` receives. The body travels beside the request:
 
@@ -159,12 +159,12 @@ import HTTPTypes
 let request = HTTPRequest(
     method: .post, url: URL(string: "https://api.example.com/items")!,
     headerFields: [.contentType: "application/json"])
-let (response, body) = try await authorizer.send(request, body: Data(#"{"name":"a"}"#.utf8))
+let (response, body) = try await api.send(request, body: Data(#"{"name":"a"}"#.utf8))
 ```
 
-A signed `HTTPRequest` carries the token in its `Authorization` field, and
+An `HTTPRequest` with a token carries it in its `Authorization` field, and
 `HTTPFields` and `HTTPRequest` print their header fields and the URL with its
-query. Treat a signed request as a credential: do not log it, dump it or attach
+query. Treat a request that carries a token as a credential: do not log it, dump it or attach
 it to a crash report. The library marks the field never indexed for HTTP/2 and
 HTTP/3 (RFC 7541 §7.1.3); the marking reaches the wire only through a transport
 that keeps the indexing strategy of `HTTPFields`. ``URLSessionTransport``

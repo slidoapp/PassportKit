@@ -44,7 +44,7 @@ DPoP and PAR (see §11).
 
 | Product / target | Contents | Imports |
 |---|---|---|
-| `PassportKit` | Everything: types, client, session, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store, and the Apple integrations (§13): `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | Foundation, CryptoKit, swift-http-types, swift-log, SwiftKeychain, Security, AuthenticationServices, Network, AppKit/UIKit |
+| `PassportKit` | Everything: types, client, session, protected resource client, discovery, device flow, PKCE, challenge parsing, in-memory store, and the Apple integrations (§13): `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | Foundation, CryptoKit, swift-http-types, swift-log, SwiftKeychain, Security, AuthenticationServices, Network, AppKit/UIKit |
 | `PassportKitTesting` | `FakeAuthorizationServer`, `ManualClock`, `ManualWallClock`, `SequenceRandomSource`, `RecordingTransport` | `PassportKit` |
 
 Test targets: `PassportKitTests` (unit), `PassportKitTestingTests` (the
@@ -165,8 +165,8 @@ and `dump`), and `HTTPRequest` prints its URL with query under `dump` as well as
 its fields. PassportKit therefore never holds an `HTTPFields` in a public type
 that can be printed unredacted: `ClientConfiguration`, `RecordedRequest`,
 `RecordingTransport.Step` and `FakeAuthorizationServer.ResponseOverride` show
-header names only. A request or response handed back to the caller (the signed
-request of `RequestAuthorizer.sign`, the response of `send`) is the caller's
+header names only. A request or response handed back to the caller (the request
+returned by `ProtectedResourceClient.addingToken(to:for:)`, the response of `send`) is the caller's
 value and prints like any `HTTPTypes` value; apps must not log it. The library
 sets `Authorization` with `indexingStrategy = .disallow` (never indexed in
 HPACK or QPACK, RFC 7541 §7.1.3). The marking reaches the wire only through an
@@ -228,7 +228,7 @@ those URLs use `http` when the host is a loopback address (`localhost`,
 `127.0.0.1`, `::1`), for local development servers only. A non-loopback
 `http` URL is refused with or without the opt-in, always with
 `.invalidConfiguration` (ADR 0012). The opt-in also governs the verification
-URIs of the device flow (§10) and the resource URLs of `RequestAuthorizer`
+URIs of the device flow (§10) and the resource URLs of `ProtectedResourceClient`
 (§15). It does not concern redirect URIs: they are not endpoints, and the
 RFC 8252 §7.3 `http` loopback redirect URI works without it.
 `localhost` is also accepted in a redirect URI although RFC 8252 §7.3 says
@@ -820,23 +820,25 @@ it: the same `OAuthSession` can sign in again). A stream buffers the newest 64 e
 has not yielded; older ones are dropped. `OAuthClient.configuration`
 and `OAuthClient.wallClock` are public read-only properties.
 
-## 10. Using tokens: `RequestAuthorizer`
+## 10. Using tokens: `ProtectedResourceClient`
 
 ```swift
-public struct RequestAuthorizer: Sendable {
+public struct ProtectedResourceClient: Sendable {
     /// `allowedOrigins`: when not nil, the only origins (scheme, host, port; path ignored) a request may name.
-    public init(manager: OAuthSession, transport: any HTTPTransport = URLSessionTransport(), allowedOrigins: Set<URL>? = nil)
-    /// Adds `Authorization: Bearer <token>`. Throws if no token can be obtained; never returns an unsigned request.
-    public func sign(_ request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
-    public func sign(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)   // the request is the caller's value: never log it
+    public init(session: OAuthSession, transport: any HTTPTransport = URLSessionTransport(), allowedOrigins: Set<URL>? = nil)
+    /// Returns the request with `Authorization: Bearer <token>` added. Throws if no token can be obtained; never returns the request without it.
+    public func addingToken(to request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
+    public func addingToken(to request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)   // the request is the caller's value: never log it
     /// Decides what to do with a resource-server response for a request sent with `token`.
     public func evaluate(statusCode: Int, headers: HTTPFields, token: AccessToken, attempt: Int) async -> RetryDecision
-    /// Convenience: sign, send on the transport given at creation, evaluate, retry at most once.
+    /// Convenience: add the token, send on the transport given at creation, evaluate, retry at most once.
     public func send(_ request: HTTPRequest, body: Data? = nil, for target: TokenTarget = .default) async throws -> (HTTPResponse, Data)
-    /// The same for `URLSession`; the session is required, the library never uses `URLSession.shared`.
-    public func data(for request: URLRequest, target: TokenTarget = .default, session: URLSession) async throws -> (Data, HTTPURLResponse)
+    /// The same for `URLSession`; the URL session is required, the library never uses `URLSession.shared`.
+    public func data(for request: URLRequest, target: TokenTarget = .default, urlSession: URLSession) async throws -> (Data, HTTPURLResponse)
 }
-public enum RetryDecision: Sendable, Equatable { case deliver; case retry; case fail(PassportError) }
+extension ProtectedResourceClient {
+    public enum RetryDecision: Sendable, Equatable { case deliver; case retry; case fail(PassportError) }
+}
 
 public struct AuthenticationChallenge: Sendable, Hashable {
     public var scheme: String
@@ -871,9 +873,9 @@ RFC 6750 §3.1 prescribes no retry; retrying once after `invalid_token`, or
 after a 401 without any challenge (treated like a bare Bearer challenge), is
 library policy.
 
-`sign` throws `.invalidConfiguration` for a URL that is not `https` (`http`
+`addingToken(to:for:)` throws `.invalidConfiguration` for a URL that is not `https` (`http`
 on a loopback host is accepted only when the client configuration of the
-manager sets `allowsInsecureLoopbackEndpoints`), or whose origin is not in `allowedOrigins`
+session sets `allowsInsecureLoopbackEndpoints`), or whose origin is not in `allowedOrigins`
 when that is set, before asking for a token. A token that is not a valid
 `b64token` (RFC 6750 §2.1) fails with `.invalidResponse` and is never put
 into a header. The token goes to whatever host the request names unless
@@ -882,9 +884,9 @@ untrusted data. It also throws
 `.invalidConfiguration`, after obtaining the token and before anything is
 sent, when `AccessToken.tokenType` is not `Bearer` (compared
 case-insensitively): a sender-constrained type such as `DPoP` needs a proof
-this authorizer cannot make, and a token must never be sent as a bearer
+this client cannot make, and a token must never be sent as a bearer
 credential it was not issued as. The session is not affected. `send` and
-`data(for:target:session:)` inherit these rules. `data(for:target:session:)`
+`data(for:target:urlSession:)` inherit these rules. `data(for:target:urlSession:)`
 also attaches a per-task delegate with the redirect policy of
 `URLSessionTransport` (never HTTPS to HTTP; a redirect to another origin
 drops every header but `Accept`, `Accept-Language`, `User-Agent`).
@@ -972,7 +974,7 @@ tests. `OAuthClient.init`, `Discovery.fetchMetadata`,
 Logger(label: "PassportKit")`; with the default label the lines go to the
 `LoggingSystem` the host app bootstrapped. `OAuthSession.init` takes
 `logger: Logger? = nil` and uses its client's logger when `nil`;
-`RequestAuthorizer` uses its manager's client's. `OAuthClient.logger` is
+`ProtectedResourceClient` uses its session's client's. `OAuthClient.logger` is
 public.
 
 | Level | What |

@@ -24,7 +24,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   `AuthorizationRequest.Prompt`, `TargetSelector`. A type that describes a
   closed outcome the caller must handle stays an enum and is documented
   as not frozen, so callers switch with a `default`: `Recovery`,
-  `RetryDecision`, `OAuthSession.Event`, `OAuthSession.SignOutReason`,
+  `ProtectedResourceClient.RetryDecision`, `OAuthSession.Event`, `OAuthSession.SignOutReason`,
   `RevocationOutcome`.
 - **Factories and names that cannot collide.** A case that would be
   called `none` is named for what it does: `.publicClient(clientID:)`,
@@ -41,7 +41,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   phrase about it (`refresh(_ refreshToken:)`, `sign(_ request:for:)`);
   `for:` names a target, `using:` a collaborator that does the work for
   one call, and collaborators that live as long as the value are
-  initializer parameters (`RequestAuthorizer(manager:transport:)`).
+  initializer parameters (`ProtectedResourceClient(session:transport:)`).
   Parameters that hold several values are plural (`audiences`,
   `resources`) and arrays default to `[]`.
 - **Verb pairs.** A flow that spans user interaction has `begin...` and
@@ -95,7 +95,7 @@ Callers can rely on source-compatible minor releases when types grow, and
 switch statements over non-frozen enums need a `default`. Open structs
 lose exhaustiveness checking for their own members, which is the price of
 evolvability and is why only registries and roadmap-driven sets use them.
-Types that hold a transport (`RequestAuthorizer`) must keep a fixed
+Types that hold a transport (`ProtectedResourceClient`) must keep a fixed
 description, because the canary test dumps them around fakes that hold
 secrets. The one-time cost was a breaking change to every call site, test,
 article and snippet before the first release.

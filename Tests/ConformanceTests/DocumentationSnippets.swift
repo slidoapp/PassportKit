@@ -27,10 +27,10 @@ enum DocumentationSnippets {
         let token = try await session.accessToken()
         _ = token
 
-        let authorizer = RequestAuthorizer(manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
+        let api = ProtectedResourceClient(session: session, allowedOrigins: [URL(string: "https://api.example.com")!])
         let urlSession = URLSession(configuration: .ephemeral)
         let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
-        let (data, response) = try await authorizer.data(for: request, session: urlSession)
+        let (data, response) = try await api.data(for: request, urlSession: urlSession)
         _ = (data, response)
     }
 
@@ -62,10 +62,10 @@ enum DocumentationSnippets {
         let session = OAuthSession(client: client, store: .inMemory(), account: account)
         try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
-        // 3. Call an API. The authorizer adds the token and refreshes once if the server rejects it.
-        let authorizer = RequestAuthorizer(manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
+        // 3. Call an API. The resource client adds the token and refreshes it once if the server rejects it.
+        let api = ProtectedResourceClient(session: session, allowedOrigins: [URL(string: "https://api.example.com")!])
         let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
-        let (data, response) = try await authorizer.data(for: request, session: URLSession(configuration: .ephemeral))
+        let (data, response) = try await api.data(for: request, urlSession: URLSession(configuration: .ephemeral))
         _ = (data, response)
     }
 
@@ -137,17 +137,17 @@ enum DocumentationSnippets {
 
     // ResourceAccessAndScopes.md
     static func origins(session: OAuthSession) {
-        let authorizer = RequestAuthorizer(
-            manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
-        _ = authorizer
+        let api = ProtectedResourceClient(
+            session: session, allowedOrigins: [URL(string: "https://api.example.com")!])
+        _ = api
     }
 
     // ResourceAccessAndScopes.md
-    static func httpTypes(authorizer: RequestAuthorizer) async throws {
+    static func httpTypes(api: ProtectedResourceClient) async throws {
         let request = HTTPRequest(
             method: .post, url: URL(string: "https://api.example.com/items")!,
             headerFields: [.contentType: "application/json"])
-        let (response, body) = try await authorizer.send(request, body: Data(#"{"name":"a"}"#.utf8))
+        let (response, body) = try await api.send(request, body: Data(#"{"name":"a"}"#.utf8))
         _ = (response, body)
     }
 

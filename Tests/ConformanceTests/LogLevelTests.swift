@@ -159,7 +159,7 @@ struct LogLevelTests {
     func renewedTokenRejected() async throws {
         let rig = try await Rig()
         let resource = StaticTransport(status: 401, challenge: #"Bearer error="invalid_token""#)
-        let authorizer = RequestAuthorizer(manager: rig.manager, transport: resource)
+        let authorizer = ProtectedResourceClient(session: rig.manager, transport: resource)
         let error = await thrownError {
             try await authorizer.send(HTTPRequest(method: .get, url: URL(string: "https://api.example.com/items")!))
         }

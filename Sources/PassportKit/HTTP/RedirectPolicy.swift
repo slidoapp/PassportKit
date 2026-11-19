@@ -1,7 +1,7 @@
 import Foundation
 
 /// Which redirects a request that may carry credentials follows. Shared by ``URLSessionTransport`` and
-/// ``RequestAuthorizer/data(for:target:session:)``.
+/// ``ProtectedResourceClient/data(for:target:urlSession:)``.
 enum RedirectPolicy {
     /// Request headers that carry no credential and stay on a cross-origin redirect.
     private static let retainedAcrossOrigins: Set<String> = ["accept", "accept-language", "user-agent"]

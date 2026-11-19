@@ -28,7 +28,7 @@ Testing depends on the core, never the reverse. External dependencies follow ADR
 | `Discovery` | `Discovery` and `AuthorizationServerMetadata` (RFC 8414) |
 | `PKCE` | Verifier, S256 challenge, base64url |
 | `Session` | `OAuthSession` and everything it owns: refresh lane, token cache, acceptance policies, events, `Credential`, `CredentialStore`, `InMemoryCredentialStore` |
-| `Authorization` | `RequestAuthorizer` and `RetryDecision` |
+| `ProtectedResources` | `ProtectedResourceClient` and `ProtectedResourceClient.RetryDecision` |
 | `Storage` | `KeychainCredentialStore` |
 | `UserAgents` | `WebAuthenticationSessionUserAgent`, `LoopbackRedirectListener`, `LoopbackUserAgent` |
 | `Observability` | `PassportObserver`, `PassportEvent`, logging keys |

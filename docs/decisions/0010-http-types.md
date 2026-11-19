@@ -42,7 +42,7 @@ Checked before any code was migrated (swift-http-types 1.8.0 unless noted).
   the path, the fragment and userinfo are dropped (the authority is host and
   port only), which is what is sent on the wire anyway. A URL without a scheme
   can trap in the initializer; the library only builds requests from endpoints
-  that were validated as `https` or loopback `http`, and `RequestAuthorizer`
+  that were validated as `https` or loopback `http`, and `ProtectedResourceClient`
   checks the URL before it signs. The initializer and `url` live in
   `HTTPTypes` from 1.5.0 (trait `FoundationURL`, on by default); before that
   they needed `HTTPTypesFoundation` in every file.
@@ -93,11 +93,11 @@ public protocol HTTPTransport: Sendable {
   and the response body is capped at 1 MiB.
 - The response body is a non-optional `Data` (empty for no body), so callers
   do not unwrap what the protocol always has.
-- `RequestAuthorizer.send(_:body:for:)` mirrors it and returns
+- `ProtectedResourceClient.send(_:body:for:)` mirrors it and returns
   `(HTTPResponse, Data)`.
 
 **Names.** Public API that took `HTTPHeaders` takes `HTTPFields`
-(`ClientConfiguration.additionalHeaders`, `RequestAuthorizer.evaluate`).
+(`ClientConfiguration.additionalHeaders`, `ProtectedResourceClient.evaluate`).
 `AuthenticationChallenge.parse` keeps `[String]`, which is what
 `fields[values: .wwwAuthenticate]` returns. The recording types of
 `PassportKitTesting` expose `headerFields`, as `HTTPRequest` does.
@@ -112,10 +112,10 @@ public protocol HTTPTransport: Sendable {
   Their summaries use a `package` helper (`HTTPFields.names`) and
   `URL.redactedTarget`, which replace the former per-type code.
 - Types the library only *hands back* are the caller's values and print like
-  any `HTTPTypes` value: the signed `HTTPRequest` of `sign`, the response of
+  any `HTTPTypes` value: the signed `HTTPRequest` of `addingToken(to:for:)`, the response of
   `send`, the `request` property of `RecordedRequest`. This is documented on
   those members and in the articles: apps must not log a signed request.
-  `RequestAuthorizer`, `OAuthClient` and the transports hold no fields.
+  `ProtectedResourceClient`, `OAuthClient` and the transports hold no fields.
 - The library marks `Authorization` (Basic client authentication, Bearer
   signing) with `indexingStrategy = .disallow`.
 - Inside the library, headers, requests and responses are never logged or put
@@ -127,7 +127,7 @@ public protocol HTTPTransport: Sendable {
 `HTTPURLResponse.httpResponse`. Redirect handling stays on `URLRequest`
 (`RedirectPolicy`), so POST no-redirect, the https to http refusal, the
 cross-origin header stripping, the body cap, timeouts and late-cancel
-delivery are unchanged. `RequestAuthorizer.data(for:target:session:)` keeps
+delivery are unchanged. `ProtectedResourceClient.data(for:target:urlSession:)` keeps
 its `URLRequest` convenience.
 
 ## Consequences

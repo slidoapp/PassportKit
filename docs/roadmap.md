@@ -22,7 +22,7 @@ features left out on purpose are `not planned` rows in `docs/rfc-matrix.md`.
   server-side Swift is a small adapter. It would live in its own target so the core does not link swift-nio, and it
   needs an ADR 0009 review. Linux itself stays out of scope (ADR 0011).
 - **Rate limit for 401-triggered invalidation.** A resource that answers 401 `invalid_token` to every fresh token costs
-  one refresh per request. A limit needs a policy for what to do over it; apps can wrap `RequestAuthorizer.evaluate`
+  one refresh per request. A limit needs a policy for what to do over it; apps can wrap `ProtectedResourceClient.evaluate`
   today (`docs/security-model.md`, known limits).
 
 ## Not planned

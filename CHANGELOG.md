@@ -30,6 +30,11 @@ are kept.
 - **Breaking:** `CredentialCoding.encode(_:)` and `CredentialCoding.decode(_:)` are `Credential.serializedData()`
   and `Credential(serializedData:)`. The record format and its version are unchanged, so credentials stored by 1.0
   stay readable.
+- **Breaking:** `RequestAuthorizer` is `ProtectedResourceClient`, because it talks to a protected resource (RFC 6749
+  §1.1) and "authorize" names the sign-in flow. Its initializer takes `session:` instead of `manager:`.
+  `sign(_:for:)` is `addingToken(to:for:)`, because a bearer token is not a signature.
+  `data(for:target:session:)` is `data(for:target:urlSession:)`, because "session" means the OAuth session.
+  `RetryDecision` is `ProtectedResourceClient.RetryDecision`.
 
 ## [1.0.1] - 2026-11-01
 

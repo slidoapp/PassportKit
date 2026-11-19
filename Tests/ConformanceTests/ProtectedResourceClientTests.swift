@@ -4,8 +4,8 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("RequestAuthorizer: bearer tokens at the resource server", .timeLimit(.minutes(1)))
-struct RequestAuthorizerConformanceTests {
+@Suite("ProtectedResourceClient: bearer tokens at the resource server", .timeLimit(.minutes(1)))
+struct ProtectedResourceClientConformanceTests {
     private let resource = HTTPRequest(method: .get, url: URL(string: "https://api.example.com/items")!)
 
     private func resourceRequests(_ harness: Harness) async -> [RecordedRequest] {
@@ -24,7 +24,7 @@ struct RequestAuthorizerConformanceTests {
     @Test("RFC 6750 §3.1: an expired token is refreshed and the request succeeds")
     func endToEnd() async throws {
         let harness = try await Harness()
-        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
+        let authorizer = ProtectedResourceClient(session: harness.manager, transport: harness.server)
         let stale = try await harness.manager.accessToken()
         await harness.server.expire(token: stale.value.reveal())
 
@@ -42,7 +42,7 @@ struct RequestAuthorizerConformanceTests {
     @Test("RFC 6750 §3.1: concurrent 401s for one token cause one refresh and each request retries once")
     func concurrentRejections() async throws {
         let harness = try await Harness()
-        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
+        let authorizer = ProtectedResourceClient(session: harness.manager, transport: harness.server)
         let stale = try await harness.manager.accessToken()
         await harness.server.expire(token: stale.value.reveal())
         let request = resource
@@ -61,8 +61,8 @@ struct RequestAuthorizerConformanceTests {
     @Test("RFC 6750 §3.1: a 401 after another caller refreshed retries with the new token, without a refresh")
     func lateRejection() async throws {
         let harness = try await Harness()
-        let authorizer = RequestAuthorizer(manager: harness.manager)
-        let (signed, stale) = try await authorizer.sign(resource)
+        let authorizer = ProtectedResourceClient(session: harness.manager)
+        let (signed, stale) = try await authorizer.addingToken(to: resource)
         await harness.server.expire(token: stale.value.reveal())
         let (rejection, _) = try await harness.server.send(signed, body: nil)
         #expect(rejection.status == .unauthorized)
@@ -75,7 +75,7 @@ struct RequestAuthorizerConformanceTests {
         let decision = await authorizer.evaluate(
             statusCode: rejection.status.code, headers: rejection.headerFields, token: stale, attempt: 0)
         #expect(decision == .retry)
-        let (retried, token) = try await authorizer.sign(resource)
+        let (retried, token) = try await authorizer.addingToken(to: resource)
         #expect(token.value == fresh.value)
         #expect(try await harness.server.send(retried, body: nil).0.status == .ok)
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
@@ -85,7 +85,7 @@ struct RequestAuthorizerConformanceTests {
     func forbidden() async throws {
         let harness = try await Harness()
         await harness.server.configure { $0.requiredScope = ["admin"] }
-        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
+        let authorizer = ProtectedResourceClient(session: harness.manager, transport: harness.server)
 
         let (response, _) = try await authorizer.send(resource)
         #expect(response.status == .forbidden)
@@ -98,7 +98,7 @@ struct RequestAuthorizerConformanceTests {
     func insufficientScope() async throws {
         let harness = try await Harness()
         await rejectAtResource(harness, challenge: #"Bearer error="insufficient_scope""#)
-        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
+        let authorizer = ProtectedResourceClient(session: harness.manager, transport: harness.server)
 
         let error = await thrownError { try await authorizer.send(resource) }
         #expect(error?.code == .insufficientScope)
@@ -112,7 +112,7 @@ struct RequestAuthorizerConformanceTests {
     func persistentRejection() async throws {
         let harness = try await Harness()
         await rejectAtResource(harness, challenge: #"Bearer error="invalid_token""#)
-        let authorizer = RequestAuthorizer(manager: harness.manager, transport: harness.server)
+        let authorizer = ProtectedResourceClient(session: harness.manager, transport: harness.server)
 
         let error = await thrownError { try await authorizer.send(resource) }
         #expect(error?.code == .unauthorized)
@@ -126,7 +126,7 @@ struct RequestAuthorizerConformanceTests {
     func signedOut() async throws {
         let harness = try await Harness(signedIn: false)
         let transport = RecordingTransport()
-        let authorizer = RequestAuthorizer(manager: harness.manager, transport: transport)
+        let authorizer = ProtectedResourceClient(session: harness.manager, transport: transport)
 
         let error = await thrownError { try await authorizer.send(resource) }
         #expect(error?.code == .notAuthenticated)
@@ -137,7 +137,7 @@ struct RequestAuthorizerConformanceTests {
     func tokenType() async throws {
         let harness = try await Harness(signedIn: false)
         let transport = RecordingTransport()
-        let authorizer = RequestAuthorizer(manager: harness.manager, transport: transport)
+        let authorizer = ProtectedResourceClient(session: harness.manager, transport: transport)
 
         try await harness.manager.signIn(
             with: TokenResponse(
@@ -154,7 +154,7 @@ struct RequestAuthorizerConformanceTests {
                 accessToken: Secret("plain"), tokenType: "bEaReR", expiresIn: .seconds(600),
                 refreshToken: Secret("refresh")),
             requestedScope: ["read"])
-        let (signed, _) = try await authorizer.sign(resource)
+        let (signed, _) = try await authorizer.addingToken(to: resource)
         #expect(signed.headerFields[.authorization] == "Bearer plain")
     }
 
@@ -162,7 +162,7 @@ struct RequestAuthorizerConformanceTests {
     func insecureURL() async throws {
         let harness = try await Harness()
         let transport = RecordingTransport()
-        let authorizer = RequestAuthorizer(manager: harness.manager, transport: transport)
+        let authorizer = ProtectedResourceClient(session: harness.manager, transport: transport)
         let request = HTTPRequest(method: .get, url: URL(string: "http://api.example.com/items")!)
 
         let error = await thrownError { try await authorizer.send(request) }

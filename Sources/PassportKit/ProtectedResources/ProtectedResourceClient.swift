@@ -3,7 +3,7 @@ import HTTPTypes
 import HTTPTypesFoundation
 import Logging
 
-/// Signs requests to a protected resource with a bearer token and decides what a failure means
+/// Sends requests to a protected resource (RFC 6749 §1.1) with a bearer token and decides what a failure means
 /// (RFC 6750 §2.1, §3, §3.1).
 ///
 /// A request is never sent without a token, and a rejected request is retried at most once. A 403, or a
@@ -11,16 +11,18 @@ import Logging
 ///
 /// A bearer token is sent to whatever host the request names. When requests are built from URLs that a server
 /// or a user can influence (links in a response, a redirect target stored earlier), pass `allowedOrigins`.
-public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
-    private let manager: OAuthSession
+public struct ProtectedResourceClient: Sendable, CustomStringConvertible, CustomDebugStringConvertible,
+    CustomReflectable
+{
+    private let session: OAuthSession
     private let transport: any HTTPTransport
     private let allowedOrigins: Set<OriginKey>?
 
-    /// Creates an authorizer that obtains tokens from `manager` and sends ``send(_:body:for:)`` requests on
+    /// Creates a client that obtains tokens from `session` and sends ``send(_:body:for:)`` requests on
     /// `transport`.
     ///
     /// - Parameters:
-    ///   - manager: Supplies the access tokens.
+    ///   - session: Supplies the access tokens.
     ///   - transport: Sends the requests of ``send(_:body:for:)``.
     ///   - allowedOrigins: When not `nil`, the only origins a request may name. An origin is a URL whose
     ///     scheme, host and port count and whose path is ignored, such as `https://api.example.com`; a default
@@ -28,17 +30,17 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     ///     ``PassportError/Code-swift.struct/invalidConfiguration`` before a token is obtained. An entry
     ///     without a scheme and host allows nothing.
     public init(
-        manager: OAuthSession,
+        session: OAuthSession,
         transport: any HTTPTransport = URLSessionTransport(),
         allowedOrigins: Set<URL>? = nil
     ) {
-        self.manager = manager
+        self.session = session
         self.transport = transport
         self.allowedOrigins = allowedOrigins.map { Set($0.map(OriginKey.init)) }
     }
 
     /// A fixed summary: the injected transport is never reached, so a dump cannot show what it holds.
-    public var description: String { "RequestAuthorizer()" }
+    public var description: String { "ProtectedResourceClient()" }
 
     /// Same as ``description``.
     public var debugDescription: String { description }
@@ -46,55 +48,55 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     /// A mirror exposing the summary only.
     public var customMirror: Mirror { Mirror(self, children: ["summary": description], displayStyle: .struct) }
 
-    /// Adds `Authorization: Bearer <token>` (RFC 6750 §2.1) and returns the token that was used.
+    /// Returns `request` with `Authorization: Bearer <token>` added (RFC 6750 §2.1), and the token that was used.
     ///
     /// Throws what ``OAuthSession/accessToken(for:)`` throws when no token can be obtained,
     /// ``PassportError/Code-swift.struct/invalidResponse`` when the token is not a valid `b64token`
     /// (RFC 6750 §2.1), and ``PassportError/Code-swift.struct/invalidConfiguration`` when the URL is neither
-    /// `https` (nor `http` on a loopback host, only when the manager's client sets
+    /// `https` (nor `http` on a loopback host, only when the session's client sets
     /// ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), so a token never travels in clear text, when its
     /// origin is not in `allowedOrigins`, or when the token's
     /// ``AccessToken/tokenType`` is not `Bearer` (compared case-insensitively): other types, such as
-    /// sender-constrained `DPoP` tokens, need proof this authorizer cannot produce. Never returns an
-    /// unsigned request.
-    public func sign(
-        _ request: URLRequest,
+    /// sender-constrained `DPoP` tokens, need proof this client cannot produce. Never returns a
+    /// request without the token.
+    public func addingToken(
+        to request: URLRequest,
         for target: TokenTarget = .default
     ) async throws -> (URLRequest, AccessToken) {
         try requireDestination(request.url)
-        let token = try await manager.accessToken(for: target)
+        let token = try await session.accessToken(for: target)
         try Self.requireBearer(token)
-        var signed = request
-        signed.setValue(
+        var prepared = request
+        prepared.setValue(
             "\(AuthenticationScheme.bearer) \(token.value.reveal())",
             forHTTPHeaderField: HTTPField.Name.authorization.rawName)
-        return (signed, token)
+        return (prepared, token)
     }
 
-    /// Adds `Authorization: Bearer <token>` (RFC 6750 §2.1) and returns the token that was used.
+    /// Returns `request` with `Authorization: Bearer <token>` added (RFC 6750 §2.1), and the token that was used.
     ///
     /// Same rules as the `URLRequest` overload. The `Authorization` field is marked never indexed (RFC 7541
     /// §7.1.3). The marking reaches the wire only if the code that sends the request keeps the `indexingStrategy`
     /// of `HTTPFields`; converting to `URLRequest`, as ``URLSessionTransport`` does, drops it.
     ///
-    /// The signed request is your value: `HTTPTypes.HTTPRequest` prints its method, URL with query and, under
-    /// `dump`, every header field including `Authorization`. Never log a signed request.
-    public func sign(
-        _ request: HTTPRequest,
+    /// The returned request is your value: `HTTPTypes.HTTPRequest` prints its method, URL with query and, under
+    /// `dump`, every header field including `Authorization`. Never log a request that carries a token.
+    public func addingToken(
+        to request: HTTPRequest,
         for target: TokenTarget = .default
     ) async throws -> (HTTPRequest, AccessToken) {
         try requireDestination(request.url)
-        let token = try await manager.accessToken(for: target)
+        let token = try await session.accessToken(for: target)
         try Self.requireBearer(token)
-        var signed = request
-        signed.headerFields.setSensitive(.authorization, "\(AuthenticationScheme.bearer) \(token.value.reveal())")
-        return (signed, token)
+        var prepared = request
+        prepared.headerFields.setSensitive(.authorization, "\(AuthenticationScheme.bearer) \(token.value.reveal())")
+        return (prepared, token)
     }
 
     /// Decides what to do with a response to a request sent with `token` (RFC 6750 §3.1).
     ///
     /// - A 401 with `error="insufficient_scope"` fails with ``PassportError/Code-swift.struct/insufficientScope``.
-    /// - A 401 with `error="invalid_token"` or without a Bearer error code, at `attempt` 0, invalidates
+    /// - A 401 with `error="invalid_token"` or without a Bearer error code, at `attempt` 0, discards
     ///   `token` and answers ``RetryDecision/retry``. Only that exact token is dropped, so concurrent
     ///   requests that were rejected with it cause one refresh.
     /// - A 401 whose challenges are all for another scheme (`Basic`, `DPoP`) is delivered at `attempt` 0: a
@@ -115,7 +117,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         }
         let code = challenge?.parameters[ErrorResponseField.error]
         if code == PassportError.Code.insufficientScope.rawValue {
-            manager.client.logger.notice("The resource answered insufficient_scope")
+            session.client.logger.notice("The resource answered insufficient_scope")
             return .fail(
                 PassportError(
                     .insufficientScope, statusCode: statusCode,
@@ -123,19 +125,20 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
                 ).redacting([token.value.reveal()]))
         }
         guard attempt == 0 else {
-            manager.client.logger.notice("The resource rejected a renewed access token")
+            session.client.logger.notice("The resource rejected a renewed access token")
             return .fail(PassportError(.unauthorized, recovery: .resourceDenied, statusCode: statusCode))
         }
         if !challenges.isEmpty, !challenges.contains(where: { AuthenticationScheme.isBearer($0.scheme) }) {
             return .deliver
         }
         guard code == nil || code == PassportError.Code.invalidToken.rawValue else { return .deliver }
-        manager.client.logger.notice("The resource answered 401; retrying once with a new access token")
-        await manager.discard(token)
+        session.client.logger.notice("The resource answered 401; retrying once with a new access token")
+        await session.discard(token)
         return .retry
     }
 
-    /// Signs, sends on the transport given at creation, evaluates and, after a rejected token, retries once with a fresh one.
+    /// Adds the token, sends on the transport given at creation, evaluates and, after a rejected token, retries once
+    /// with a new one.
     ///
     /// Returns the response and its body for every status the decision table delivers, including 403.
     public func send(
@@ -145,8 +148,8 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     ) async throws -> (HTTPResponse, Data) {
         var attempt = 0
         while true {
-            let (signed, token) = try await sign(request, for: target)
-            let (response, responseBody) = try await transport.send(signed, body: body)
+            let (prepared, token) = try await addingToken(to: request, for: target)
+            let (response, responseBody) = try await transport.send(prepared, body: body)
             switch await evaluate(
                 statusCode: response.status.code, headers: response.headerFields, token: token, attempt: attempt)
             {
@@ -157,27 +160,27 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         }
     }
 
-    /// Like ``send(_:body:for:)`` for `URLSession`, with the session supplied by the caller: the library
+    /// Like ``send(_:body:for:)`` for `URLSession`, with the URL session supplied by the caller: the library
     /// never reaches for `URLSession.shared`.
     ///
     /// Redirects follow the same rules as ``URLSessionTransport``: never from HTTPS to HTTP, and a redirect to
     /// another scheme, host or port drops every header but `Accept`, `Accept-Language` and `User-Agent`, so the
-    /// token does not follow. This holds whatever the session's own delegate does.
+    /// token does not follow. This holds whatever the URL session's own delegate does.
     ///
     /// A transport failure is reported as ``PassportError/Code-swift.struct/transportFailure``; cancellation
     /// propagates unchanged.
     public func data(
         for request: URLRequest,
         target: TokenTarget = .default,
-        session: URLSession
+        urlSession: URLSession
     ) async throws -> (Data, HTTPURLResponse) {
         var attempt = 0
         while true {
-            let (signed, token) = try await sign(request, for: target)
+            let (prepared, token) = try await addingToken(to: request, for: target)
             let data: Data
             let response: URLResponse
             do {
-                (data, response) = try await session.data(for: signed, delegate: RedirectPolicyDelegate())
+                (data, response) = try await urlSession.data(for: prepared, delegate: RedirectPolicyDelegate())
             } catch let error as CancellationError {
                 throw error
             } catch {
@@ -224,7 +227,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
 
     private func requireDestination(_ url: URL?) throws {
         let scheme = url?.scheme?.lowercased()
-        let allowsLoopback = manager.client.configuration.allowsInsecureLoopbackEndpoints
+        let allowsLoopback = session.client.configuration.allowsInsecureLoopbackEndpoints
         guard scheme == "https" || (scheme == "http" && allowsLoopback && LoopbackHost.isLoopback(url?.host)) else {
             throw PassportError(
                 .invalidConfiguration,
