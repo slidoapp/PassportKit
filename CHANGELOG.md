@@ -7,14 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The names of the main objects follow ADR 0016. Each rename breaks source compatibility, and no deprecated aliases
-are kept.
+## [1.1.0] - 2026-11-19
+
+This release renames the main objects so that each one says which OAuth party it talks to (ADR 0016):
+`OAuthClient` for the authorization server, `OAuthSession` for the signed-in user and `ProtectedResourceClient` for
+the protected resource. The renames break source compatibility in a minor release. This is a deliberate exception to
+the promise of 1.0.0, made while the library has no known consumers, and no deprecated aliases are kept. Protocol
+behaviour and the format of stored credentials are unchanged, so signed-in users stay signed in after the update.
 
 ### Added
 
 - `CredentialStore` lists its built-in stores as static members, so `store: .keychain()` and `store: .inMemory()`
   appear in autocomplete. They take the parameters of the `KeychainCredentialStore` and `InMemoryCredentialStore`
   initializers.
+- Documentation of what signing in and out leave at the server: `OAuthSession.signIn(with:requestedScope:)` adopts
+  tokens and authenticates nobody, and `signOut(revoke:)` leaves the person signed in at the authorization server.
+  The session article and the spec name an ephemeral browser session as the only control the client enforces, and
+  say that `prompt=login` (OpenID Connect Core §3.1.2.1) is a request that the server may ignore.
 
 ### Changed
 
@@ -441,7 +450,8 @@ unchanged: macOS 14, iOS 17, tvOS 17, watchOS 10 and visionOS 1.
 - `FakeAuthorizationServer.authorizeInteractively` decodes the authorization request query as form data, so a `+` in
   `scope` is a space.
 
-[Unreleased]: https://github.com/slidoapp/PassportKit/compare/1.0.1...HEAD
+[Unreleased]: https://github.com/slidoapp/PassportKit/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/slidoapp/PassportKit/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/slidoapp/PassportKit/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/slidoapp/PassportKit/compare/0.3.2...1.0.0
 [0.3.2]: https://github.com/slidoapp/PassportKit/compare/0.3.1...0.3.2
