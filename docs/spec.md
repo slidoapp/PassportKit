@@ -956,7 +956,7 @@ public enum RequestEvent: Sendable {
 }
 extension RequestEvent {
     public struct Endpoint: RawRepresentable, Sendable, Hashable {   // open
-        public static let token, deviceAuthorization, revocation, metadata, resource: Endpoint
+        public static let token, deviceAuthorization, revocation, metadata: Endpoint
     }
 }
 ```

@@ -39,6 +39,10 @@ are kept.
   report requests and the `Passport` prefix said only which library they come from. `EndpointKind` is
   `RequestEvent.Endpoint`. `PassportError` is the only type left with the library prefix.
 
+### Removed
+
+- **Breaking:** `EndpointKind.resource`. No code emitted it, so an observer never received it.
+
 ## [1.0.1] - 2026-11-01
 
 ### Fixed

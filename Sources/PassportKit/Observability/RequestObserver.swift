@@ -24,7 +24,7 @@ public enum RequestEvent: Sendable, Equatable {
 }
 
 extension RequestEvent {
-    /// Which kind of server endpoint a request targets. An open set: new endpoints can be added
+    /// Which endpoint of the authorization server a request targets. An open set: new endpoints can be added
     /// without breaking source compatibility.
     public struct Endpoint: RawRepresentable, Sendable, Hashable {
         /// A short, stable name of the endpoint.
@@ -43,7 +43,5 @@ extension RequestEvent {
         public static let revocation = Endpoint(rawValue: "revocation")
         /// The authorization server metadata endpoint (RFC 8414 §3).
         public static let metadata = Endpoint(rawValue: "metadata")
-        /// A protected resource.
-        public static let resource = Endpoint(rawValue: "resource")
     }
 }
