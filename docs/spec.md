@@ -781,9 +781,9 @@ public actor InMemoryCredentialStore: CredentialStore {
     public func failNextSaves(_ count: Int = 1)       // injected save failures for tests
 }
 /// Versioned JSON for stores that write bytes: the credential's members plus `"version": 1`.
-public enum CredentialCoding {
-    public static func encode(_ credential: Credential) throws -> Data
-    public static func decode(_ data: Data) throws -> Credential   // .storageFailure for malformed data or an unknown version
+extension Credential {
+    public func serializedData() throws -> Data
+    public init(serializedData data: Data) throws   // .storageFailure for malformed data or an unknown version
 }
 ```
 
@@ -979,7 +979,7 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
 - `KeychainCredentialStore(accessGroup: String? = nil, accessibility: Accessibility = .afterFirstUnlockThisDeviceOnly, logger: Logger = Logger(label: "PassportKit"))`:
   built on SwiftKeychain (ADR 0009); generic password items, `kSecAttrService` = `account.service`,
   `kSecAttrAccount` = `account.account`; the versioned JSON payload
-  (`CredentialCoding`) is one value in SwiftKeychain's archived
+  (`Credential.serializedData()`) is one value in SwiftKeychain's archived
   dictionary. `load` returns `nil` for `errSecItemNotFound`; an
   undecodable payload and any other status are `.storageFailure` (the
   status number in the description, never item data);

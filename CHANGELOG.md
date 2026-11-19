@@ -21,6 +21,9 @@ are kept.
 - **Breaking:** the event `refreshed(target:)` is `accessTokenUpdated(target:)`, because a token exchange emits it
   too. Its documentation states that the session caches the token only when its lifetime is known, and that a
   sign-in and `exchangeRefreshToken` do not emit it.
+- **Breaking:** `CredentialCoding.encode(_:)` and `CredentialCoding.decode(_:)` are `Credential.serializedData()`
+  and `Credential(serializedData:)`. The record format and its version are unchanged, so credentials stored by 1.0
+  stay readable.
 
 ## [1.0.1] - 2026-11-01
 

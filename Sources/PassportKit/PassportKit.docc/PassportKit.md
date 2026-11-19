@@ -98,7 +98,6 @@ appear in descriptions, errors or events.
 - ``CredentialAccount``
 - ``KeychainCredentialStore``
 - ``InMemoryCredentialStore``
-- ``CredentialCoding``
 
 ### Calling protected resources
 

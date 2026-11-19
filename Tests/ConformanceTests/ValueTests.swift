@@ -50,24 +50,24 @@ struct ValueTests {
             clientID: "app", issuer: URL(string: "https://as.example.com"), refreshToken: Secret("rt"),
             idToken: Secret("id"), grantedScope: ["read", "write"],
             updatedAt: Date(timeIntervalSince1970: 1_700_000_000.5))
-        let data = try CredentialCoding.encode(credential)
+        let data = try credential.serializedData()
         let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(object["version"] as? Int == 1)
         #expect(object["refreshToken"] as? String == "rt")
-        #expect(try CredentialCoding.decode(data) == credential)
+        #expect(try Credential(serializedData: data) == credential)
 
         var future = object
         future["version"] = 2
         let error = #expect(throws: PassportError.self) {
-            try CredentialCoding.decode(JSONSerialization.data(withJSONObject: future))
+            try Credential(serializedData: JSONSerialization.data(withJSONObject: future))
         }
         #expect(error?.code == .storageFailure)
-        #expect(throws: PassportError.self) { try CredentialCoding.decode(Data("[]".utf8)) }
+        #expect(throws: PassportError.self) { try Credential(serializedData: Data("[]".utf8)) }
 
         // A record written by 0.3, which could carry application fields, still decodes; the fields are ignored.
         var older = object
         older["additionalFields"] = ["note": "x"]
-        #expect(try CredentialCoding.decode(JSONSerialization.data(withJSONObject: older)) == credential)
+        #expect(try Credential(serializedData: JSONSerialization.data(withJSONObject: older)) == credential)
     }
 
     @Test("a scope policy needs one of its scopes only for the targets it applies to")
