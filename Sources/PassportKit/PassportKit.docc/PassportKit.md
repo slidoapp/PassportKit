@@ -18,7 +18,7 @@ Two layers fit together:
 
 - ``OAuthClient`` is stateless. Each method sends one protocol request and
   returns the parsed result or throws a ``PassportError``.
-- ``TokenManager`` is the session. It owns the refresh token, keeps it safe
+- ``OAuthSession`` is the session. It owns the refresh token, keeps it safe
   across rotation and concurrency, caches access tokens per
   ``TokenTarget`` and applies your acceptance policy before a token is used.
   ``RequestAuthorizer`` signs requests with its tokens.
@@ -72,15 +72,15 @@ appear in descriptions, errors or events.
 
 ### Sessions
 
-- ``TokenManager``
+- ``OAuthSession``
 - ``TokenTarget``
 - ``AccessToken``
 - ``Credential``
-- ``PendingSignOut``
-- ``SignOutResult``
+- ``OAuthSession/PendingSignOut``
+- ``OAuthSession/SignOutResult``
 - ``RevocationOutcome``
-- ``SignOutReason``
-- ``SessionEvent``
+- ``OAuthSession/SignOutReason``
+- ``OAuthSession/Event``
 
 ### Accepting tokens
 

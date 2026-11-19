@@ -68,7 +68,7 @@ struct RequestAuthorizerConformanceTests {
         #expect(rejection.status == .unauthorized)
 
         // Another caller notices first and refreshes.
-        await harness.manager.invalidate(stale)
+        await harness.manager.discard(stale)
         let fresh = try await harness.manager.accessToken()
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
 

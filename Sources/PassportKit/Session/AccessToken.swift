@@ -17,7 +17,7 @@ public struct AccessToken: Sendable, Hashable, CustomStringConvertible, CustomDe
     /// The target the token was issued for.
     public var target: TokenTarget
     /// Changes whenever the cached token for ``target`` changes. Pass the token to
-    /// ``TokenManager/invalidate(_:)`` after a 401 and only this exact token is dropped.
+    /// ``OAuthSession/discard(_:)`` after a 401 and only this exact token is dropped.
     public internal(set) var generation: Int
     /// Every other member of the token response, preserved without interpretation.
     public var additionalFields: [String: JSONValue]

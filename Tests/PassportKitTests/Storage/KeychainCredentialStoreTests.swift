@@ -226,7 +226,7 @@ struct KeychainCredentialStoreTests {
             transport: server, wallClock: wallClock, clock: ManualClock(), random: SequenceRandomSource())
         let store = KeychainCredentialStore()
 
-        let manager = TokenManager(client: client, store: store, account: account)
+        let manager = OAuthSession(client: client, store: store, account: account)
         let response = try await client.authorize(
             AuthorizationRequest(
                 redirectURI: try #require(URL(string: "https://app.example.com/callback")), scope: ["read"]),
@@ -239,8 +239,8 @@ struct KeychainCredentialStoreTests {
         let rotated = try await #require(store.load(account)?.refreshToken?.reveal())
         #expect(rotated != first)
 
-        let restarted = TokenManager(client: client, store: store, account: account)
-        let restored = try await restarted.load()
+        let restarted = OAuthSession(client: client, store: store, account: account)
+        let restored = try await restarted.restore()
         #expect(restored?.refreshToken?.reveal() == rotated)
         wallClock.advance(by: .seconds(1000))
         _ = try await restarted.accessToken()

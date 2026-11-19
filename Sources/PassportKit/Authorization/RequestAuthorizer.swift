@@ -12,7 +12,7 @@ import Logging
 /// A bearer token is sent to whatever host the request names. When requests are built from URLs that a server
 /// or a user can influence (links in a response, a redirect target stored earlier), pass `allowedOrigins`.
 public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
-    private let manager: TokenManager
+    private let manager: OAuthSession
     private let transport: any HTTPTransport
     private let allowedOrigins: Set<OriginKey>?
 
@@ -28,7 +28,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
     ///     ``PassportError/Code-swift.struct/invalidConfiguration`` before a token is obtained. An entry
     ///     without a scheme and host allows nothing.
     public init(
-        manager: TokenManager,
+        manager: OAuthSession,
         transport: any HTTPTransport = URLSessionTransport(),
         allowedOrigins: Set<URL>? = nil
     ) {
@@ -48,7 +48,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
 
     /// Adds `Authorization: Bearer <token>` (RFC 6750 §2.1) and returns the token that was used.
     ///
-    /// Throws what ``TokenManager/accessToken(for:)`` throws when no token can be obtained,
+    /// Throws what ``OAuthSession/accessToken(for:)`` throws when no token can be obtained,
     /// ``PassportError/Code-swift.struct/invalidResponse`` when the token is not a valid `b64token`
     /// (RFC 6750 §2.1), and ``PassportError/Code-swift.struct/invalidConfiguration`` when the URL is neither
     /// `https` (nor `http` on a loopback host, only when the manager's client sets
@@ -131,7 +131,7 @@ public struct RequestAuthorizer: Sendable, CustomStringConvertible, CustomDebugS
         }
         guard code == nil || code == PassportError.Code.invalidToken.rawValue else { return .deliver }
         manager.client.logger.notice("The resource answered 401; retrying once with a new access token")
-        await manager.invalidate(token)
+        await manager.discard(token)
         return .retry
     }
 

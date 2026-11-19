@@ -6,13 +6,13 @@
 ## Context
 
 ADR 0005 made every refresh-token operation run in one lane and discard
-results of ended sessions. An adversarial review of `TokenManager` found
+results of ended sessions. An adversarial review of `OAuthSession` found
 interleavings that this left open, all caused by work that suspends:
 
 - A store may take long for a save and a delete, and the manager awaited
   both concurrently. A save issued by a refresh could take effect after
   the delete of a later sign-out and bring the session back on the next
-  `load()`.
+  `restore()`.
 - `signOut(revoke:)` revokes the refresh token it read before suspending.
   A request already sending that token rotates it at the server, and the
   manager discards the response as stale, so the live token is never
@@ -65,4 +65,4 @@ non-cooperative operation that outlives its time limit keeps running in
 the background until it ends. Two sessions can talk to the server
 concurrently, each on its own token chain. The cost of the negative
 cache is that a resource that becomes accessible within the window is not
-retried until `invalidate(_:)`, a sign-in or the window passes.
+retried until `discard(_:)`, a sign-in or the window passes.

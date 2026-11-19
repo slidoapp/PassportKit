@@ -3,7 +3,7 @@ import os
 
 /// A one-shot result that any number of callers can await, and stop awaiting when they are cancelled.
 ///
-/// This is how an in-flight operation is shared: the operation runs in a task the manager owns, and every
+/// This is how an in-flight operation is shared: the operation runs in a task the `OAuthSession` owns, and every
 /// caller (including the one that started it) only waits here. Cancelling a waiter resumes that waiter with
 /// `CancellationError` and does nothing to the operation.
 final class Completion<Value: Sendable>: Sendable {

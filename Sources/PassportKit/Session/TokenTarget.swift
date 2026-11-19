@@ -1,6 +1,6 @@
 import Foundation
 
-/// What an access token is for: the key under which `TokenManager` caches and coalesces tokens.
+/// What an access token is for: the key under which `OAuthSession` caches and coalesces tokens.
 ///
 /// Two targets are equal when their derivation, scope, set of `resources` and set of `audiences` are equal: the
 /// order and repetition of resources and audiences do not matter, because they name a set (RFC 8707 §2.1,

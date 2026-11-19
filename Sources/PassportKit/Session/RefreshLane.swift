@@ -6,7 +6,7 @@ import os
 /// calls even though the operations start later on their own tasks. The operation reads the refresh token
 /// when its turn starts, never when it was queued, so it sees what the previous turn persisted.
 ///
-/// Turns are held by tasks the manager owns and never cancels, so a reserved turn is always used and left.
+/// Turns are held by tasks the session owns and never cancels, so a reserved turn is always used and left.
 /// Each session has a lane of its own (ADR 0007): turns of an ended session finish on its old lane, so a
 /// request of that session that never answers cannot hold up the next one.
 final class RefreshLane: Sendable {
@@ -29,7 +29,7 @@ final class RefreshLane: Sendable {
         var queue: [Completion<Void>] = []
     }
 
-    // Turns are reserved and finished on the owning `TokenManager` actor, so the lock is never contended; it
+    // Turns are reserved and finished on the owning `OAuthSession` actor, so the lock is never contended; it
     // makes the lane `Sendable` so that a turn can be carried into the tasks that run on that actor.
     private let state = OSAllocatedUnfairLock(initialState: State())
 

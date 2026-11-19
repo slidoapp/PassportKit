@@ -19,7 +19,7 @@ struct DeviceFlowTests {
         try await approval
 
         let account = CredentialAccount(service: "IntegrationTests.\(UUID())", account: "user")
-        let manager = TokenManager(client: client, store: InMemoryCredentialStore(), account: account)
+        let manager = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
         try await manager.signIn(with: response, requestedScope: IntegrationServer.fullScope)
         let token = try await manager.accessToken()
         #expect(token.grantedScope?.contains("api:read") == true)

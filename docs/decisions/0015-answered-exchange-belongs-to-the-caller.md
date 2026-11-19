@@ -8,7 +8,7 @@
 
 ADR 0005 and ADR 0007 discard the result of any lane operation that finishes after its session ended or was
 replaced, and hand the rotated refresh token to the ended session's revocation. For a refresh that is right: its
-access token belongs to the session. `TokenManager.exchangeRefreshToken` is different. The token it obtains (RFC 8693
+access token belongs to the session. `OAuthSession.exchangeRefreshToken` is different. The token it obtains (RFC 8693
 §2.2.1, in `access_token`) is issued for another audience, usually another client, and the manager never caches it;
 it belongs to the application. Discarding the response threw that token away while it stayed valid at the server.
 

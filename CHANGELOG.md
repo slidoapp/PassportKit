@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The names of the main objects follow ADR 0016. Each rename breaks source compatibility, and no deprecated aliases
+are kept.
+
+### Changed
+
+- **Breaking:** `TokenManager` is `OAuthSession`, so the two entry points `OAuthClient` and `OAuthSession` appear
+  together in autocomplete. `load()` is `restore()`. `invalidate(_:)` is `discard(_:)`, because it drops a cached
+  token and sends nothing to the server.
+- **Breaking:** the types that belong to the session are nested in it. `SessionEvent` is `OAuthSession.Event`, and
+  `SignOutReason`, `SignOutResult` and `PendingSignOut` are `OAuthSession.SignOutReason`,
+  `OAuthSession.SignOutResult` and `OAuthSession.PendingSignOut`.
+- **Breaking:** the event `refreshed(target:)` is `accessTokenUpdated(target:)`, because a token exchange emits it
+  too. Its documentation states that the session caches the token only when its lifetime is known, and that a
+  sign-in and `exchangeRefreshToken` do not emit it.
+
 ## [1.0.1] - 2026-11-01
 
 ### Fixed

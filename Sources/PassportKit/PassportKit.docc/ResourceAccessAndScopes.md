@@ -17,7 +17,7 @@ cause.
 ## The acceptance policy
 
 A ``TokenAcceptancePolicy`` is your hook between "the server issued a token"
-and "the token becomes current". It runs on every token ``TokenManager``
+and "the token becomes current". It runs on every token ``OAuthSession``
 issues, before the token is cached or returned. A rejected token is thrown
 away, the rotated refresh token from the same response is still saved, and
 the session stays signed in.
@@ -27,7 +27,7 @@ only if at least one of the scopes you name was granted:
 
 ```swift
 let policy = RequireAnyScope(["items.read", "items.write"])
-let manager = TokenManager(
+let session = OAuthSession(
     client: client, store: InMemoryCredentialStore(), account: account, acceptancePolicy: policy)
 ```
 
@@ -41,7 +41,7 @@ where servers narrow scope when the person cannot use the resource. Pass
 `forTargets:` with ``TargetSelector/all`` or ``TargetSelector/matching(_:)``
 to choose other targets. A token whose granted scope is unknown is rejected.
 
-``TokenManager`` accepts every token when you pass no policy, scope
+``OAuthSession`` accepts every token when you pass no policy, scope
 narrowing included. Pass one whenever your app depends on a scope or a
 resource.
 
@@ -50,7 +50,7 @@ or implement the protocol. The policy has a time limit, and no answer in
 time counts as a rejection.
 
 ```swift
-let manager = TokenManager(
+let session = OAuthSession(
     client: client, store: InMemoryCredentialStore(), account: account,
     acceptancePolicy: .custom { context in
         context.token.grantedScope?.scopes.contains("items.read") == true
@@ -63,7 +63,7 @@ prefix, is a closure too. This one accepts a token that carries at least one
 scope starting with `items.`, and rejects one whose scope is unknown:
 
 ```swift
-let manager = TokenManager(
+let session = OAuthSession(
     client: client, store: InMemoryCredentialStore(), account: account,
     acceptancePolicy: .custom { context in
         guard let granted = context.token.grantedScope else {
@@ -85,16 +85,16 @@ practice, and both end up in the same place for the caller:
 - **401 `access_denied`.** A token exchange for a resource the person may
   not use answers 401 with `access_denied`.
 
-Either way ``TokenManager/accessToken(for:)`` throws a ``PassportError``
+Either way ``OAuthSession/accessToken(for:)`` throws a ``PassportError``
 whose recovery is ``PassportError/Recovery-swift.enum/resourceDenied``: the
 rejection comes as ``PassportError/Code-swift.struct/tokenRejected`` in the
 first case and as ``PassportError/Code-swift.struct/accessDenied`` in the
 second. The session is intact. Handle both with one branch:
 
 ```swift
-func items(using manager: TokenManager) async throws -> Data? {
+func items(using session: OAuthSession) async throws -> Data? {
     do {
-        let token = try await manager.accessToken(
+        let token = try await session.accessToken(
             for: .refreshGrant(resources: [URL(string: "https://api.example.com/items")!]))
         // Use the token.
         _ = token
@@ -108,7 +108,7 @@ func items(using manager: TokenManager) async throws -> Data? {
 
 A rejected token is remembered for 5 seconds by default
 (`rejectedTokenCacheDuration`), so a view that retries in a loop does not
-make the manager rotate the refresh token again and again. The window is
+make the session rotate the refresh token again and again. The window is
 short on purpose: it only has to absorb tight retry loops, and a long one
 makes a permission that was just granted look denied. Set it to `.zero`
 to ask the server every time.
@@ -138,7 +138,7 @@ origins you trust, so the token is never sent anywhere else:
 
 ```swift
 let authorizer = RequestAuthorizer(
-    manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
+    manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
 ```
 
 A request for another origin fails with

@@ -96,7 +96,7 @@ can be added later without breaking the API.
 - **swift-nio or AsyncHTTPClient as the default transport:** the default
   stays `URLSession`; a transport on AsyncHTTPClient is possible now that the
   currency types match (ADR 0010).
-- **swift-async-algorithms:** no stable multicast, which `TokenManager.events`
+- **swift-async-algorithms:** no stable multicast, which `OAuthSession.events`
   needs.
 - **`Synchronization.Mutex`:** needs macOS 15; the floor is macOS 14
   (ADR 0002), so shared state stays in actors and in classes behind

@@ -80,13 +80,13 @@ let authorization = try await client.beginDeviceAuthorization(scope: ["openid", 
 print("Open \(authorization.verificationURI) and enter \(authorization.userCode)")
 let tokens = try await client.completeDeviceAuthorization(authorization)
 
-// 2. Keep the session: the manager stores, rotates and refreshes.
+// 2. Keep the session. It stores, rotates and refreshes the tokens.
 let account = CredentialAccount(service: "com.example.app", account: "default")
-let manager = TokenManager(client: client, store: InMemoryCredentialStore(), account: account)
-try await manager.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
+let session = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
+try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
 // 3. Call an API. The authorizer adds the token and refreshes once if the server rejects it.
-let authorizer = RequestAuthorizer(manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
+let authorizer = RequestAuthorizer(manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
 let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
 let (data, response) = try await authorizer.data(for: request, session: URLSession(configuration: .ephemeral))
 ```
@@ -97,7 +97,7 @@ where a token may be sent. The `passportkit-example` executable runs the device 
 ## Logging
 
 The library logs through [swift-log](https://github.com/apple/swift-log) with a logger labelled `PassportKit`, so
-whatever `LoggingSystem.bootstrap` your app configured applies. Pass `logger:` to `OAuthClient`, `TokenManager`,
+whatever `LoggingSystem.bootstrap` your app configured applies. Pass `logger:` to `OAuthClient`, `OAuthSession`,
 `Discovery.fetchMetadata`, `KeychainCredentialStore` or the user agents to choose the label or metadata. Tokens,
 codes, verifiers and URLs with queries are never logged. `PassportObserver` is the channel for typed events. See the
 [getting started](Sources/PassportKit/PassportKit.docc/GettingStarted.md) article for the levels.

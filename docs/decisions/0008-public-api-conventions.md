@@ -24,7 +24,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   `AuthorizationRequest.Prompt`, `TargetSelector`. A type that describes a
   closed outcome the caller must handle stays an enum and is documented
   as not frozen, so callers switch with a `default`: `Recovery`,
-  `RetryDecision`, `SessionEvent`, `SignOutReason`,
+  `RetryDecision`, `OAuthSession.Event`, `OAuthSession.SignOutReason`,
   `RevocationOutcome`.
 - **Factories and names that cannot collide.** A case that would be
   called `none` is named for what it does: `.publicClient(clientID:)`,

@@ -5,19 +5,19 @@ import Logging
 ///
 /// ## Concurrency
 ///
-/// The manager is an actor, and every operation that takes time (a request to the authorization server, a
+/// The session is an actor, and every operation that takes time (a request to the authorization server, a
 /// store call, the acceptance policy) suspends it, so other calls run in between. Four rules keep that safe:
 ///
 /// - Bookkeeping that other callers must see (registering an in-flight operation, reserving a lane turn,
 ///   bumping the generation) happens synchronously, before the first `await` of the call.
-/// - In-flight work runs in an unstructured task the manager owns and never cancels. Callers only wait on a
+/// - In-flight work runs in an unstructured task the session owns and never cancels. Callers only wait on a
 ///   `Completion`; cancelling a caller stops that caller waiting, nothing else.
 /// - Every suspension is followed by a generation check before results are written or published, so work
 ///   started under a session that has since ended or been replaced is discarded.
 /// - Changes to the store are queued in the order they are decided (`changeStore(_:)`), and each session has
 ///   a lane of its own, so what one session's slow operations do never reorders or blocks another's.
-public actor TokenManager {
-    /// Thrown inside the manager when work finds that its session ended or was replaced. The public methods
+public actor OAuthSession {
+    /// Thrown inside the actor when work finds that its session ended or was replaced. The public methods
     /// never let it escape: they resolve again on the session that exists now, or report ``superseded``.
     struct SessionSuperseded: Error {}
 
@@ -51,7 +51,7 @@ public actor TokenManager {
     /// one that was live when the user signed out (see ``spendRefreshToken(turn:session:adoptsIDToken:adoptsScope:returnsAnsweredResponse:send:)``).
     var revocableTokens: [Int: Secret] = [:]
 
-    /// Creates a manager with no session. Call ``load()`` to restore one from `store`.
+    /// Creates a session that is signed out. Call ``restore()`` to restore the one saved in `store`.
     ///
     /// `account` names where the credential is stored. `acceptancePolicy` judges every issued access token
     /// (ADR 0004).
@@ -60,13 +60,13 @@ public actor TokenManager {
     /// the server narrowed below what the app needs (RFC 6749 §3.3). An app that depends on a scope or a
     /// resource should pass a policy such as ``RequireAnyScope``.
     ///
-    /// `logger` receives session lifecycle and storage log lines; by default the manager uses the logger of
+    /// `logger` receives session lifecycle and storage log lines; by default the session uses the logger of
     /// `client`. Logs never contain tokens or credentials (see <doc:GettingStarted>).
     ///
     /// A policy that has not answered after `acceptancePolicyTimeLimit` rejects the token.
     /// A rejected token is remembered for `rejectedTokenCacheDuration`: asking for the same target again within
     /// that time throws the same rejection without a request, so a caller that retries in a loop cannot make the
-    /// manager rotate the refresh token over and over. The default is short on purpose: the window only has to
+    /// session rotate the refresh token over and over. The default is short on purpose: the window only has to
     /// absorb tight retry loops, and a long one makes a permission that was just granted look denied. Pass
     /// `.zero` to ask the server every time.
     public init(
@@ -92,12 +92,12 @@ public actor TokenManager {
     }
 
     /// Session events. Each access returns a new stream that sees every event from then on; earlier events
-    /// are not replayed, so subscribe before ``load()`` or ``signIn(with:requestedScope:)``.
+    /// are not replayed, so subscribe before ``restore()`` or ``signIn(with:requestedScope:)``.
     ///
     /// A stream keeps the newest 64 events it has not yielded yet and drops older ones, so a subscriber that
-    /// stops reading costs bounded memory. Streams end when the manager is released; signing out does not end
-    /// them, because the manager can sign in again.
-    public nonisolated var events: AsyncStream<SessionEvent> {
+    /// stops reading costs bounded memory. Streams end when the `OAuthSession` is released; signing out does not
+    /// end them, because the same `OAuthSession` can sign in again.
+    public nonisolated var events: AsyncStream<Event> {
         eventHub.subscribe()
     }
 
@@ -110,7 +110,7 @@ public actor TokenManager {
     /// nothing when a session is already active. The store is read after every save and delete decided before
     /// this call, so a sign-out whose delete is still running cannot be undone by a load. Throws
     /// ``PassportError`` with code ``PassportError/Code-swift.struct/storageFailure`` when the store fails.
-    public func load() async throws -> Credential? {
+    public func restore() async throws -> Credential? {
         let session = generation
         let pendingChange = lastStoreChange
         let stored: Credential?
@@ -141,7 +141,7 @@ public actor TokenManager {
     ///
     /// The previous session, if any, is replaced without revoking it: results of its in-flight operations are
     /// discarded. The credential is saved before this returns; if saving fails the session continues in memory
-    /// and ``SessionEvent/storageFailed`` is emitted. The access token of `response` becomes the cached
+    /// and ``OAuthSession/Event/storageFailed`` is emitted. The access token of `response` becomes the cached
     /// default token when its lifetime is known. `requestedScope` is the scope of the grant request, used when
     /// the response omits `scope` (RFC 6749 §5.1).
     ///
@@ -185,19 +185,19 @@ public actor TokenManager {
     /// Starts a session from a refresh token the app already holds, without a grant response.
     ///
     /// It behaves like ``signIn(with:requestedScope:)``: the previous session, if any, is replaced without
-    /// revoking it and its in-flight operations are discarded, ``SessionEvent/signedIn`` is emitted, and the
+    /// revoking it and its in-flight operations are discarded, ``OAuthSession/Event/signedIn`` is emitted, and the
     /// credential is saved before this returns (a store failure leaves the session in memory and emits
-    /// ``SessionEvent/storageFailed``). No access token is cached and nothing is sent to the authorization
+    /// ``OAuthSession/Event/storageFailed``). No access token is cached and nothing is sent to the authorization
     /// server: the first ``accessToken(for:)`` refreshes with `refreshToken` (RFC 6749 §6), and the acceptance
     /// policy judges the token that returns.
     ///
     /// Use it when another party hands over a refresh token, for example the one an audience exchange issued
-    /// for another client (``exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``): sign a manager configured for that client in
+    /// for another client (``exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``): sign a session configured for that client in
     /// with it. `grantedScope` is what the grant is known to carry; pass `nil` when it is not known, and the
     /// scope of the first refresh response is recorded instead.
     ///
     /// - Parameters:
-    ///   - refreshToken: The refresh token of the client this manager is configured for.
+    ///   - refreshToken: The refresh token of the client this session is configured for.
     ///   - grantedScope: The scope the grant carries, if known.
     ///   - idToken: An ID token that belongs to the session, if there is one.
     /// - Throws: ``PassportError`` with ``PassportError/Code-swift.struct/invalidConfiguration`` when
@@ -226,7 +226,7 @@ public actor TokenManager {
     /// The cached token of the target is dropped only if it is still `token`, so many concurrent 401s for
     /// the same token cause one refresh, and a late report cannot discard a newer token. A remembered rejection
     /// of the target is forgotten, so the next call asks the server again.
-    public func invalidate(_ token: AccessToken) {
+    public func discard(_ token: AccessToken) {
         cache.remove(target: token.target, generation: token.generation)
         cache.forgetRejection(of: token.target)
     }
@@ -237,11 +237,11 @@ public actor TokenManager {
     /// limited to ``OAuthClient/revocationTimeLimit``. In-flight operations of the ended session are
     /// discarded, but the revocation targets the newest refresh token the session was issued, including one
     /// rotated by a request that was already in flight. If the store cannot delete the credential,
-    /// ``SignOutResult/isStoredCredentialDeleted`` is false, ``SessionEvent/storageFailed`` is emitted, and
-    /// ``load()`` would restore the session.
+    /// ``OAuthSession/SignOutResult/isStoredCredentialDeleted`` is false, ``OAuthSession/Event/storageFailed`` is emitted, and
+    /// ``restore()`` would restore the session.
     ///
     /// Returns once the delete and the revocation finished. To carry on as soon as local state is cleared, use
-    /// ``beginSignOut(revoke:)``; this method is that call followed by ``PendingSignOut/result``.
+    /// ``beginSignOut(revoke:)``; this method is that call followed by ``OAuthSession/PendingSignOut/result``.
     public func signOut(revoke: Bool = true) async -> SignOutResult {
         await beginSignOut(revoke: revoke).result
     }
@@ -249,8 +249,8 @@ public actor TokenManager {
     /// Ends the session like ``signOut(revoke:)`` but returns as soon as local state is cleared, with a handle
     /// to await the store delete and the revocation (RFC 7009 §2).
     ///
-    /// Nothing here suspends the manager, so when this returns the session is gone: ``credential`` is `nil`,
-    /// ``SessionEvent/signedOut(reason:)`` with ``SignOutReason/userInitiated`` was emitted, the delete of the
+    /// Nothing here suspends the actor, so when this returns the session is gone: ``credential`` is `nil`,
+    /// ``OAuthSession/Event/signedOut(reason:)`` with ``OAuthSession/SignOutReason/userInitiated`` was emitted, the delete of the
     /// stored credential is queued ahead of any save a later sign-in makes, and the revocation has its turn on
     /// the ended session's lane. A ``signIn(with:requestedScope:)`` right after it starts a session that the
     /// pending revocation neither waits for nor blocks. See ADR 0014.
@@ -276,7 +276,7 @@ public actor TokenManager {
         let outcome = Completion<RevocationOutcome>()
         let clock = client.clock
         let logger = self.logger
-        // Owned by the manager and never cancelled, so the limit and the log line do not depend on who waits.
+        // Owned by the session and never cancelled, so the limit and the log line do not depend on who waits.
         Task {
             _ = await deletion.value
             let result =
@@ -310,10 +310,10 @@ public actor TokenManager {
     ///
     /// Saves and deletes are decided in the actor, in order, but a store may take a long time for each and
     /// finish them in any order if they overlap. Running them one after the other, in the order they were
-    /// requested, means the store always ends in the state the manager last decided: a sign-out is never undone
+    /// requested, means the store always ends in the state the session last decided: a sign-out is never undone
     /// by a save that was still on its way. The change is registered before this returns and runs in a task of
     /// its own, so cancelling the caller neither skips it nor interrupts it. A failure is reported as
-    /// ``SessionEvent/storageFailed``.
+    /// ``OAuthSession/Event/storageFailed``.
     func changeStore(_ operation: String, _ change: @escaping @Sendable () async throws -> Void) -> Task<Bool, Never> {
         let previous = lastStoreChange
         let task = Task {
@@ -374,7 +374,7 @@ public actor TokenManager {
     }
 }
 
-extension SignOutReason {
+extension OAuthSession.SignOutReason {
     /// The `reason` metadata value of a sign-out log line.
     var logValue: String {
         switch self {

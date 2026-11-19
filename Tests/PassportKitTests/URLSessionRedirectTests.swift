@@ -68,7 +68,7 @@ struct URLSessionRedirectTests {
     func authorizerAppliesThePolicy() async throws {
         let session = URLSession(configuration: Self.configuration())
         defer { session.invalidateAndCancel() }
-        let manager = TokenManager(
+        let manager = OAuthSession(
             client: try ClientFixtures.client(RecordingTransport()), store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "unit", account: "user"))
         try await manager.signIn(

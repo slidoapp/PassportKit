@@ -22,6 +22,6 @@ public API, adds a dependency or changes a module boundary.
 | [0011](0011-apple-platforms-only.md) | Apple platforms only: one module, CryptoKit, macOS 14 and iOS 17 | accepted |
 | [0012](0012-strict-https-for-endpoints.md) | Endpoints must be `https`; loopback `http` needs the explicit `allowsInsecureLoopbackEndpoints` opt-in | accepted |
 | [0013](0013-code-flow-requires-an-issuer.md) | The authorization code flow requires a configured issuer, so `iss` is never accepted unchecked | accepted |
-| [0014](0014-begin-sign-out.md) | `beginSignOut` returns once local state is cleared, with a `PendingSignOut` to await the delete and the revocation | accepted |
+| [0014](0014-begin-sign-out.md) | `beginSignOut` returns once local state is cleared, with a `OAuthSession.PendingSignOut` to await the delete and the revocation | accepted |
 | [0015](0015-answered-exchange-belongs-to-the-caller.md) | An exchange the server answered returns its token even if the session ended meanwhile | accepted |
 | [0016](0016-public-api-naming.md) | Public API naming: types named after the OAuth party they talk to, nesting of subordinate types, `addingToken(to:for:)` replaces `sign` | accepted |

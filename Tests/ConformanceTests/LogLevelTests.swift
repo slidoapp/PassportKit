@@ -30,7 +30,7 @@ struct LogLevelTests {
         let server: FakeAuthorizationServer
         let transport: ScriptedTransport
         let client: OAuthClient
-        let manager: TokenManager
+        let manager: OAuthSession
 
         init() async throws {
             let registration = FakeAuthorizationServer.ClientRegistration(
@@ -47,7 +47,7 @@ struct LogLevelTests {
                     authentication: .publicClient(clientID: "app"), issuer: FakeAuthorizationServer.issuer),
                 transport: transport, wallClock: wallClock, clock: clock, random: SequenceRandomSource(),
                 logger: logs.logger)
-            manager = TokenManager(
+            manager = OAuthSession(
                 client: client, store: InMemoryCredentialStore(),
                 account: CredentialAccount(service: "levels", account: "user"))
             let grant = try await client.authorize(

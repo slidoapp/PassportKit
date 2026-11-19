@@ -8,7 +8,7 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct RequestAuthorizerTests {
     private func authorizer(allowsInsecureLoopback: Bool = false) throws -> RequestAuthorizer {
-        let manager = TokenManager(
+        let manager = OAuthSession(
             client: try ClientFixtures.client(
                 RecordingTransport(), allowsInsecureLoopback: allowsInsecureLoopback),
             store: InMemoryCredentialStore(),
@@ -111,7 +111,7 @@ struct RequestAuthorizerTests {
         token: String = "opaque", tokenType: String = "Bearer", allowedOrigins: Set<URL>? = nil,
         allowsInsecureLoopback: Bool = false
     ) async throws -> RequestAuthorizer {
-        let manager = TokenManager(
+        let manager = OAuthSession(
             client: try ClientFixtures.client(
                 RecordingTransport(), allowsInsecureLoopback: allowsInsecureLoopback),
             store: InMemoryCredentialStore(),

@@ -188,9 +188,9 @@ struct RedactionCanaryTests {
         Self.assertNoCanary(rig)
     }
 
-    private static func collect(_ stream: AsyncStream<SessionEvent>) -> Task<[SessionEvent], Never> {
+    private static func collect(_ stream: AsyncStream<OAuthSession.Event>) -> Task<[OAuthSession.Event], Never> {
         Task {
-            var events: [SessionEvent] = []
+            var events: [OAuthSession.Event] = []
             for await event in stream {
                 events.append(event)
                 if case .signedOut = event { break }
@@ -199,12 +199,12 @@ struct RedactionCanaryTests {
         }
     }
 
-    @Test("TokenManager, RequestAuthorizer and the credential store")
+    @Test("OAuthSession, RequestAuthorizer and the credential store")
     func sessionFlows() async throws {
         let rig = try await Rig { .clientSecretPost(clientID: "app", secret: $0) }
         let store = InMemoryCredentialStore()
         let account = CredentialAccount(service: "canary", account: "user")
-        let manager = TokenManager(client: rig.client, store: store, account: account)
+        let manager = OAuthSession(client: rig.client, store: store, account: account)
         let events = Self.collect(manager.events)
         let authorizer = RequestAuthorizer(manager: manager, transport: rig.server)
         let resource = HTTPRequest(method: .get, url: URL(string: "https://api.example.com/items")!)
@@ -230,7 +230,7 @@ struct RedactionCanaryTests {
         let (_, token) = try await authorizer.sign(resource)
         rig.renderings.look(token)
         await rig.renderings.observe { try await authorizer.send(resource) }
-        await manager.invalidate(root)
+        await manager.discard(root)
 
         // The resource answers with a challenge that repeats the bearer token.
         rig.harvest.challenging(true)
@@ -265,7 +265,7 @@ struct RedactionCanaryTests {
     @Test("Long tokens echoed by a server are redacted by the description rules too")
     func longTokens() async throws {
         let rig = try await Rig { .clientSecretBasic(clientID: "app", secret: $0) }
-        let manager = TokenManager(
+        let manager = OAuthSession(
             client: rig.client, store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "canary", account: "long"))
         let events = Self.collect(manager.events)
@@ -284,7 +284,7 @@ struct RedactionCanaryTests {
     @Test("The lifecycle is logged with structured metadata and no secrets")
     func lifecycleLogLines() async throws {
         let rig = try await Rig { .clientSecretPost(clientID: "app", secret: $0) }
-        let manager = TokenManager(
+        let manager = OAuthSession(
             client: rig.client, store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "canary", account: "lines"))
         try await manager.signIn(with: try await rig.authorize(), requestedScope: ["read", "write"])

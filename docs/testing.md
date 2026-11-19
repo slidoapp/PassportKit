@@ -65,7 +65,7 @@ secret and every token, code, verifier and device code that crosses the wire
 treated as a canary. Error paths make the server repeat the secrets it was
 sent in `error_description` and in `WWW-Authenticate`. The test then renders
 every public value and error (`String(describing:)`, `String(reflecting:)`,
-`dump`, `localizedDescription`), every `PassportEvent` and `SessionEvent`, and every log line (`LogCapture`),
+`dump`, `localizedDescription`), every `PassportEvent` and `OAuthSession.Event`, and every log line (`LogCapture`),
 and fails if any canary appears. A new flow, public value or log line that could carry a secret gets coverage here.
 `Foundation`'s own `URLRequest` is excluded: it prints the headers it carries.
 

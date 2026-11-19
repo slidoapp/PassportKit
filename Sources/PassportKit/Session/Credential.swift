@@ -70,7 +70,7 @@ public struct CredentialAccount: Sendable, Hashable {
 /// Persistence for the root credential. Implementations must be safe to call concurrently.
 ///
 /// Implementations should throw ``PassportError`` with code ``PassportError/Code-swift.struct/storageFailure``;
-/// the manager wraps any other error. `load` returns `nil` for "not found" and throws for every other failure.
+/// the session wraps any other error. `load` returns `nil` for "not found" and throws for every other failure.
 public protocol CredentialStore: Sendable {
     /// The stored credential, or `nil` when there is none.
     func load(_ account: CredentialAccount) async throws -> Credential?

@@ -12,7 +12,7 @@ struct TokenCache {
     private var rejections: [TokenTarget: (error: PassportError, until: Date)] = [:]
     private var lastGeneration = 0
 
-    /// A new generation, unique for the life of the manager, so a token from a cleared session never matches.
+    /// A new generation, unique for the life of the `OAuthSession`, so a token from a cleared session never matches.
     mutating func nextGeneration() -> Int {
         lastGeneration += 1
         return lastGeneration

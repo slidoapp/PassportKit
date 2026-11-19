@@ -13,7 +13,7 @@ struct HangingPolicy: TokenAcceptancePolicy {
     }
 }
 
-@Suite("TokenManager: acceptance policy time limit and rejected tokens", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: acceptance policy time limit and rejected tokens", .timeLimit(.minutes(1)))
 struct AcceptanceTests {
     @Test("invariant 4: a policy that never answers rejects the token and does not wedge the session")
     func hungPolicy() async throws {
@@ -59,7 +59,8 @@ struct AcceptanceTests {
         #expect(
             await Harness.take(4, from: harness.events) == [
                 .signedIn, .tokenRejected(target: denied, grantedScope: ["none"]),
-                .refreshed(target: TokenTarget.refreshGrant(resources: [apiA])), .signedOut(reason: .userInitiated),
+                .accessTokenUpdated(target: TokenTarget.refreshGrant(resources: [apiA])),
+                .signedOut(reason: .userInitiated),
             ])
 
         // After the window the server is asked again.
@@ -74,7 +75,7 @@ struct AcceptanceTests {
         #expect(await later.tokenRequests(.refreshToken).count == 2)
     }
 
-    @Test("invariant 4: signing in again, and invalidate, forget a rejection; a zero duration disables it")
+    @Test("invariant 4: signing in again, and discard, forget a rejection; a zero duration disables it")
     func rejectionIsForgotten() async throws {
         let denied = TokenTarget.refreshGrant(resources: [deniedResource])
         let harness = try await Harness(policy: RequireAnyScope(["read"]))
@@ -83,7 +84,7 @@ struct AcceptanceTests {
         _ = await thrownError { try await harness.manager.accessToken(for: denied) }
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
 
-        await harness.manager.invalidate(AccessToken(value: Secret("unused"), tokenType: "Bearer", target: denied))
+        await harness.manager.discard(AccessToken(value: Secret("unused"), tokenType: "Bearer", target: denied))
         _ = await thrownError { try await harness.manager.accessToken(for: denied) }
         #expect(await harness.tokenRequests(.refreshToken).count == 2)
 

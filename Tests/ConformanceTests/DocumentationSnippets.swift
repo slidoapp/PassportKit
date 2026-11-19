@@ -21,16 +21,16 @@ enum DocumentationSnippets {
         let tokens = try await client.completeDeviceAuthorization(authorization)
 
         let account = CredentialAccount(service: "com.example.app", account: "default")
-        let manager = TokenManager(client: client, store: InMemoryCredentialStore(), account: account)
-        try await manager.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
+        let session = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
+        try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
-        let token = try await manager.accessToken()
+        let token = try await session.accessToken()
         _ = token
 
-        let authorizer = RequestAuthorizer(manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
-        let session = URLSession(configuration: .ephemeral)
+        let authorizer = RequestAuthorizer(manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
+        let urlSession = URLSession(configuration: .ephemeral)
         let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
-        let (data, response) = try await authorizer.data(for: request, session: session)
+        let (data, response) = try await authorizer.data(for: request, session: urlSession)
         _ = (data, response)
     }
 
@@ -57,13 +57,13 @@ enum DocumentationSnippets {
         print("Open \(authorization.verificationURI) and enter \(authorization.userCode)")
         let tokens = try await client.completeDeviceAuthorization(authorization)
 
-        // 2. Keep the session: the manager stores, rotates and refreshes.
+        // 2. Keep the session. It stores, rotates and refreshes the tokens.
         let account = CredentialAccount(service: "com.example.app", account: "default")
-        let manager = TokenManager(client: client, store: InMemoryCredentialStore(), account: account)
-        try await manager.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
+        let session = OAuthSession(client: client, store: InMemoryCredentialStore(), account: account)
+        try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
         // 3. Call an API. The authorizer adds the token and refreshes once if the server rejects it.
-        let authorizer = RequestAuthorizer(manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
+        let authorizer = RequestAuthorizer(manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
         let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
         let (data, response) = try await authorizer.data(for: request, session: URLSession(configuration: .ephemeral))
         _ = (data, response)
@@ -85,25 +85,25 @@ enum DocumentationSnippets {
     }
 
     // SessionsAndTokenTargets.md
-    static func targets(manager: TokenManager) async throws {
+    static func targets(session: OAuthSession) async throws {
         let items = URL(string: "https://api.example.com/items")!
 
-        let general = try await manager.accessToken()
-        let bound = try await manager.accessToken(
+        let general = try await session.accessToken()
+        let bound = try await session.accessToken(
             for: .refreshGrant(resources: [items], scope: ["items.read"]))
-        let exchanged = try await manager.accessToken(
+        let exchanged = try await session.accessToken(
             for: .exchange(audiences: ["reports"]))
         _ = (general, bound, exchanged)
     }
 
     // SessionsAndTokenTargets.md
     static func seededSession(
-        manager: TokenManager, reportsClient: OAuthClient, reportsStore: any CredentialStore,
+        session: OAuthSession, reportsClient: OAuthClient, reportsStore: any CredentialStore,
         reportsAccount: CredentialAccount
     ) async throws {
-        let reports = TokenManager(client: reportsClient, store: reportsStore, account: reportsAccount)
+        let reports = OAuthSession(client: reportsClient, store: reportsStore, account: reportsAccount)
 
-        let issued = try await manager.exchangeRefreshToken(audiences: ["reports"])
+        let issued = try await session.exchangeRefreshToken(audiences: ["reports"])
         try await reports.signIn(refreshToken: issued.accessToken, grantedScope: ["reports.read"])
 
         let token = try await reports.accessToken()
@@ -115,30 +115,30 @@ enum DocumentationSnippets {
     static func deleteLegacyItem() {}
 
     // MigratingStoredTokens.md
-    static func migratedManager(client: OAuthClient) async throws -> TokenManager {
+    static func migratedSession(client: OAuthClient) async throws -> OAuthSession {
         // A different service than the old item used.
         let account = CredentialAccount(service: "com.example.app.passportkit", account: "default")
-        let manager = TokenManager(client: client, store: KeychainCredentialStore(), account: account)
-        _ = try await manager.load()
+        let session = OAuthSession(client: client, store: KeychainCredentialStore(), account: account)
+        _ = try await session.restore()
 
-        guard let legacyRefreshToken = loadLegacyRefreshToken() else { return manager }
-        if await manager.credential == nil {
-            try await manager.signIn(
+        guard let legacyRefreshToken = loadLegacyRefreshToken() else { return session }
+        if await session.credential == nil {
+            try await session.signIn(
                 refreshToken: Secret(legacyRefreshToken), grantedScope: ["openid", "offline_access"])
         }
         do {
-            _ = try await manager.accessToken()
+            _ = try await session.accessToken()
             deleteLegacyItem()
         } catch {
             // Keep the old item: a transient failure must not sign the user out. The next launch tries again.
         }
-        return manager
+        return session
     }
 
     // ResourceAccessAndScopes.md
-    static func origins(manager: TokenManager) {
+    static func origins(session: OAuthSession) {
         let authorizer = RequestAuthorizer(
-            manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
+            manager: session, allowedOrigins: [URL(string: "https://api.example.com")!])
         _ = authorizer
     }
 
@@ -154,13 +154,13 @@ enum DocumentationSnippets {
     // ResourceAccessAndScopes.md
     static func policy(client: OAuthClient, account: CredentialAccount) {
         let policy = RequireAnyScope(["items.read", "items.write"])
-        let manager = TokenManager(
+        let session = OAuthSession(
             client: client, store: InMemoryCredentialStore(), account: account, acceptancePolicy: policy)
-        _ = manager
+        _ = session
     }
 
     static func prefixPolicy(client: OAuthClient, account: CredentialAccount) {
-        let manager = TokenManager(
+        let session = OAuthSession(
             client: client, store: InMemoryCredentialStore(), account: account,
             acceptancePolicy: .custom { context in
                 guard let granted = context.token.grantedScope else {
@@ -169,22 +169,22 @@ enum DocumentationSnippets {
                 return granted.scopes.contains { $0.hasPrefix("items.") }
                     ? .accept : .reject(reason: "No items scope was granted.")
             })
-        _ = manager
+        _ = session
     }
 
     static func customPolicy(client: OAuthClient, account: CredentialAccount) {
-        let manager = TokenManager(
+        let session = OAuthSession(
             client: client, store: InMemoryCredentialStore(), account: account,
             acceptancePolicy: .custom { context in
                 context.token.grantedScope?.scopes.contains("items.read") == true
                     ? .accept : .reject(reason: "The items scope is missing.")
             })
-        _ = manager
+        _ = session
     }
 
-    static func items(using manager: TokenManager) async throws -> Data? {
+    static func items(using session: OAuthSession) async throws -> Data? {
         do {
-            let token = try await manager.accessToken(
+            let token = try await session.accessToken(
                 for: .refreshGrant(resources: [URL(string: "https://api.example.com/items")!]))
             // Use the token.
             _ = token
@@ -216,8 +216,8 @@ enum DocumentationSnippets {
         }
     }
 
-    static func watch(_ manager: TokenManager) async {
-        for await event in manager.events {
+    static func watch(_ session: OAuthSession) async {
+        for await event in session.events {
             if case .signedOut(let reason) = event {
                 print("Signed out: \(reason)")
             }

@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: sign-in window, replaced sessions and grants without a refresh token", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: sign-in window, replaced sessions and grants without a refresh token", .timeLimit(.minutes(1)))
 struct SessionReplacementTests {
     @Test("invariant 6: a caller during sign-in joins its token instead of refreshing with the grant's first token")
     func signInWindow() async throws {

@@ -44,7 +44,7 @@ DPoP and PAR (see §11).
 
 | Product / target | Contents | Imports |
 |---|---|---|
-| `PassportKit` | Everything: types, client, token manager, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store, and the Apple integrations (§13): `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | Foundation, CryptoKit, swift-http-types, swift-log, SwiftKeychain, Security, AuthenticationServices, Network, AppKit/UIKit |
+| `PassportKit` | Everything: types, client, session, request authorizer, discovery, device flow, PKCE, challenge parsing, in-memory store, and the Apple integrations (§13): `KeychainCredentialStore`, `WebAuthenticationSessionUserAgent` (`ASWebAuthenticationSession`), `LoopbackRedirectListener` and `LoopbackUserAgent` (Network framework listener + system browser) | Foundation, CryptoKit, swift-http-types, swift-log, SwiftKeychain, Security, AuthenticationServices, Network, AppKit/UIKit |
 | `PassportKitTesting` | `FakeAuthorizationServer`, `ManualClock`, `ManualWallClock`, `SequenceRandomSource`, `RecordingTransport` | `PassportKit` |
 
 Test targets: `PassportKitTests` (unit), `PassportKitTestingTests` (the
@@ -358,7 +358,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     // `timeLimit` on the client's clock, .cancelled when the caller is cancelled (both cancel the request)
     public func revokeBestEffort(_ token: Secret, typeHint: TokenTypeHint? = nil,
                                  timeLimit: Duration = OAuthClient.revocationTimeLimit) async -> RevocationOutcome
-    public static let revocationTimeLimit: Duration   // 5 s, the limit TokenManager applies on sign-out
+    public static let revocationTimeLimit: Duration   // 5 s, the limit OAuthSession applies on sign-out
     // RFC 8628
     public func beginDeviceAuthorization(scope: ScopeSet? = nil, resources: [URL] = [],
                                          additionalParameters: AdditionalParameters = [:]) async throws -> DeviceAuthorization
@@ -516,31 +516,31 @@ throws `.invalidConfiguration`. A callback rejected earlier (wrong redirect or
 cancel the flow. Expiry is measured on the client's injected clock (ADR 0006).
 `description` shows only the redirect target and age.
 
-## 9. `TokenManager` — the session
+## 9. `OAuthSession` — the session
 
 One actor per signed-in root grant.
 
 ```swift
-public actor TokenManager {
+public actor OAuthSession {
     public init(client: OAuthClient, store: any CredentialStore, account: CredentialAccount,
                 acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
                 acceptancePolicyTimeLimit: Duration = .seconds(10),    // no answer in time = rejection
                 rejectedTokenCacheDuration: Duration = .seconds(5),    // .zero: ask the server every time; short, so a newly granted permission is not hidden
                 logger: Logger? = nil)                                 // nil: the client's logger
 
-    public func load() async throws -> Credential?                 // restores from the store
+    public func restore() async throws -> Credential?                 // restores from the store
     public func signIn(with response: TokenResponse, requestedScope: ScopeSet? = nil) async throws  // adopt a grant result; throws .tokenRejected if the policy rejects its access token (the session still exists)
     public func signIn(refreshToken: Secret, grantedScope: ScopeSet? = nil, idToken: Secret? = nil) async throws  // start a session from an existing refresh token; no access token is cached, the first accessToken(for:) refreshes; throws .invalidConfiguration for an empty token
     public var credential: Credential? { get }
 
     public func accessToken(for target: TokenTarget = .default) async throws -> AccessToken
-    public func invalidate(_ token: AccessToken)                    // after a 401 with this token
+    public func discard(_ token: AccessToken)                    // after a 401 with this token
     public func exchangeRefreshToken(audiences: [String] = [], resources: [URL] = [], scope: ScopeSet? = nil,
                                      requestedTokenType: TokenTypeIdentifier = .refreshToken) async throws -> TokenResponse
     public func signOut(revoke: Bool = true) async -> SignOutResult   // beginSignOut(revoke:) then await result
     public func beginSignOut(revoke: Bool = true) -> PendingSignOut   // clears local state without suspending (ADR 0014)
 
-    public nonisolated var events: AsyncStream<SessionEvent> { get }   // multiple subscribers supported
+    public nonisolated var events: AsyncStream<Event> { get }   // multiple subscribers supported
 }
 
 public struct TokenTarget: Sendable, Hashable {   // == and hash: derivation, scope and the SETS of resources and audiences
@@ -566,7 +566,7 @@ public struct AccessToken: Sendable, Hashable, CustomStringConvertible, CustomDe
     public var target: TokenTarget
     public internal(set) var generation: Int   // changes whenever the cached token for this target changes
     public var additionalFields: [String: JSONValue]
-    // The initializer is `package`: tokens come from the manager.
+    // The initializer is `package`: tokens come from the session.
 }
 
 public struct Credential: Sendable, Codable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {   // descriptions never show values
@@ -614,14 +614,14 @@ Invariants (each has a conformance test):
    carrying `refresh_token`, including token exchanges whose subject is
    the refresh token) is saved to the store before the access token is
    returned. If saving fails, the new credential is kept in memory, the
-   token is returned, and `SessionEvent.storageFailed` is emitted.
+   token is returned, and `OAuthSession.Event.storageFailed` is emitted.
    Saves and deletes of the stored credential are applied one after the
-   other in the order the manager decided them, whatever the store's
-   speed, so a late save never undoes a sign-out. `load()` reads the
+   other in the order the session decided them, whatever the store's
+   speed, so a late save never undoes a sign-out. `restore()` reads the
    store only after the saves and deletes decided before it, so it cannot
    restore a session whose delete is still running. If a delete fails the
-   stored credential survives and `load()` would restore it:
-   `SignOutResult.isStoredCredentialDeleted` is false and
+   stored credential survives and `restore()` would restore it:
+   `OAuthSession.SignOutResult.isStoredCredentialDeleted` is false and
    `.storageFailed` is emitted.
 4. **Acceptance.** Every issued access token goes through the
    `TokenAcceptancePolicy` before it is cached or returned. The policy
@@ -632,16 +632,16 @@ Invariants (each has a conformance test):
    and the session stays signed in. The rejection is remembered per
    target for `rejectedTokenCacheDuration`: asking again within that time
    throws the same error without a request and without a second
-   `.tokenRejected` event, so a retrying caller cannot make the manager
+   `.tokenRejected` event, so a retrying caller cannot make the session
    rotate the refresh token in a loop. A sign-in, a sign-out, the end of
-   the session and `invalidate(_:)` for the target forget it.
+   the session and `discard(_:)` for the target forget it.
 5. **Session end.** Only an error with recovery `.reauthenticate` on a
    lane operation ends the session, which in practice means `invalid_grant`
    for the refresh token, whether the refresh was narrowed to resources or
    a scope or not (RFC 6749 §5.2 defines `invalid_grant` as a problem with
    the grant; `invalid_client` is `.fixConfiguration`, `invalid_scope` is
    `.fixConfiguration` and `invalid_target` is `.resourceDenied`, none of
-   them ends it). The credential is deleted, `SessionEvent.signedOut`
+   them ends it). The credential is deleted, `OAuthSession.Event.signedOut`
    with reason `.refreshTokenRejected` is emitted, and subsequent calls
    throw `.notAuthenticated` (recovery `.reauthenticate`). An
    `invalid_grant` that arrives after the session was replaced is ignored
@@ -656,20 +656,20 @@ Invariants (each has a conformance test):
    waiting for such an operation asks again once on the session that
    exists now, if there is one, instead of failing; with none it throws
    `.notAuthenticated`. `.signedOut` and `.signedIn` are emitted before
-   the manager first suspends, so their order is the order of the calls.
+   the actor first suspends, so their order is the order of the calls.
    `beginSignOut` does not suspend at all: when it returns, the session is
    cleared, `.signedOut` was emitted, the delete of the stored credential is
    queued and the revocation has its lane turn. `signOut` is `beginSignOut`
-   followed by `await PendingSignOut.result`.
+   followed by `await OAuthSession.PendingSignOut.result`.
 7. **Cancellation.** Cancelling a caller only stops it waiting. A
    request that was already sent is allowed to finish and its result is
    persisted. A caller that is cancelled before it starts never starts
    one. A cancelled `exchangeRefreshToken` whose request was sent gives
    up its issued token: nobody receives it, and it stays valid at the
    server until it expires. A cancelled `signOut` clears the session and reports the
-   revocation as `.cancelled`; so does `PendingSignOut.result` for the
+   revocation as `.cancelled`; so does `OAuthSession.PendingSignOut.result` for the
    caller that was cancelled. The revocation's time limit runs in a task
-   the manager owns, from when the delete finished, whoever waits.
+   the session owns, from when the delete finished, whoever waits.
 8. **Expiry.** A cached token is used while
    `expiresAt - minimumTokenLifetime > now`. Tokens without expiry use
    `defaultTokenLifetime`, or are refreshed on every use when nil.
@@ -687,7 +687,7 @@ Invariants (each has a conformance test):
    root grant. An `invalid_grant` from the exchange drops the cached default
    token it used (the server no longer accepts it) and leaves the session
    intact.
-10. **Invalidation.** `invalidate(token)` drops the cached token only if
+10. **Discarding.** `discard(token)` drops the cached token only if
    its `generation` is still current, so N concurrent 401s for the same
    token cause one refresh.
    The cached tokens and the remembered rejections are each limited to
@@ -725,7 +725,7 @@ public struct TokenAcceptanceContext: Sendable {   // evolvable; the initializer
     public var target: TokenTarget { get }          // token.target
 }
 public enum TokenAcceptance: Sendable { case accept; case reject(reason: String) }
-/// The default: accepts everything, scope narrowing included (documented hazard on `TokenManager.init`).
+/// The default: accepts everything, scope narrowing included (documented hazard on `OAuthSession.init`).
 public struct AcceptAnyToken: TokenAcceptancePolicy {}
 /// Which targets a policy applies to. Open struct.
 public struct TargetSelector: Sendable {
@@ -746,23 +746,25 @@ extension TokenAcceptancePolicy where Self == ClosureTokenAcceptancePolicy {
     public static func custom(_ body: @escaping @Sendable (TokenAcceptanceContext) async -> TokenAcceptance) -> ClosureTokenAcceptancePolicy
 }
 
-public struct PendingSignOut: Sendable {           // copies share one sign-out
-    public var result: SignOutResult { get async }   // the same outcome for every reader; a cancelled reader gets .cancelled
+extension OAuthSession {
+    public struct PendingSignOut: Sendable {             // copies share one sign-out
+        public var result: SignOutResult { get async }   // the same outcome for every reader; a cancelled reader gets .cancelled
+    }
+    public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected, expiredWithoutRefreshToken }
+    public struct SignOutResult: Sendable, Equatable {
+        public var isStoredCredentialDeleted: Bool       // memory is always cleared
+        public var revocation: RevocationOutcome         // .skipped: not requested, no refresh token or no revocation endpoint
+    }
+
+    public enum Event: Sendable, Hashable {
+        case signedIn
+        case accessTokenUpdated(target: TokenTarget)     // after a refresh grant or token exchange the policy accepted; not for sign-in or exchangeRefreshToken
+        case tokenRejected(target: TokenTarget, grantedScope: ScopeSet?)
+        case storageFailed
+        case signedOut(reason: SignOutReason)            // .userInitiated, .refreshTokenRejected, .expiredWithoutRefreshToken
+    }
 }
 public enum RevocationOutcome: Sendable, Equatable { case skipped, revoked, failed(PassportError), timedOut, cancelled }
-public enum SignOutReason: Sendable, Hashable { case userInitiated, refreshTokenRejected, expiredWithoutRefreshToken }
-public struct SignOutResult: Sendable, Equatable {
-    public var isStoredCredentialDeleted: Bool     // memory is always cleared
-    public var revocation: RevocationOutcome              // .skipped: not requested, no refresh token or no revocation endpoint
-}
-
-public enum SessionEvent: Sendable, Hashable {
-    case signedIn
-    case refreshed(target: TokenTarget)
-    case tokenRejected(target: TokenTarget, grantedScope: ScopeSet?)
-    case storageFailed
-    case signedOut(reason: SignOutReason)     // .userInitiated, .refreshTokenRejected, .expiredWithoutRefreshToken
-}
 ```
 
 ### Storage
@@ -789,14 +791,14 @@ The library has no default service or account names. Only the root
 credential is persisted; access tokens stay in memory. Stored records
 are versioned JSON (`{"version": 1, ...}`).
 
-`TokenManager.load()` ignores (and does not delete) a stored credential
+`OAuthSession.restore()` ignores (and does not delete) a stored credential
 whose `clientID` or `issuer` differ from the configuration. It does nothing
 when a session is already active. `accessToken(for:)` does not load: with no
 session it throws `.notAuthenticated`.
 
 `events` returns a new stream per access, delivers events from then on (no
-replay) and finishes when the manager is released (sign-out does not finish
-it: the manager can sign in again). A stream buffers the newest 64 events it
+replay) and finishes when the `OAuthSession` is released (sign-out does not finish
+it: the same `OAuthSession` can sign in again). A stream buffers the newest 64 events it
 has not yielded; older ones are dropped. `OAuthClient.configuration`
 and `OAuthClient.wallClock` are public read-only properties.
 
@@ -805,7 +807,7 @@ and `OAuthClient.wallClock` are public read-only properties.
 ```swift
 public struct RequestAuthorizer: Sendable {
     /// `allowedOrigins`: when not nil, the only origins (scheme, host, port; path ignored) a request may name.
-    public init(manager: TokenManager, transport: any HTTPTransport = URLSessionTransport(), allowedOrigins: Set<URL>? = nil)
+    public init(manager: OAuthSession, transport: any HTTPTransport = URLSessionTransport(), allowedOrigins: Set<URL>? = nil)
     /// Adds `Authorization: Bearer <token>`. Throws if no token can be obtained; never returns an unsigned request.
     public func sign(_ request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
     public func sign(_ request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)   // the request is the caller's value: never log it
@@ -842,7 +844,7 @@ challenge yields an empty array.
 |---|---|
 | not 401 | `.deliver` (403 is never refreshed) |
 | 401 with `Bearer error="insufficient_scope"` | `.fail(.insufficientScope)` |
-| 401 with `error="invalid_token"` or no Bearer error, `attempt == 0` | invalidate `token`, `.retry` |
+| 401 with `error="invalid_token"` or no Bearer error, `attempt == 0` | discard `token`, `.retry` |
 | 401, `attempt >= 1` | `.fail(.unauthorized, recovery: .resourceDenied)` |
 | 401 at `attempt == 0` with any other Bearer error (`invalid_request`) | `.deliver` |
 | 401 at `attempt == 0` whose challenges are all for another scheme (`Basic`, `DPoP`) | `.deliver` |
@@ -950,7 +952,7 @@ tests. `OAuthClient.init`, `Discovery.fetchMetadata`,
 `KeychainCredentialStore.init`, `LoopbackRedirectListener.start` and
 `WebAuthenticationSessionUserAgent.init` take `logger: Logger =
 Logger(label: "PassportKit")`; with the default label the lines go to the
-`LoggingSystem` the host app bootstrapped. `TokenManager.init` takes
+`LoggingSystem` the host app bootstrapped. `OAuthSession.init` takes
 `logger: Logger? = nil` and uses its client's logger when `nil`;
 `RequestAuthorizer` uses its manager's client's. `OAuthClient.logger` is
 public.
@@ -1003,7 +1005,7 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   with a continuation. The store reads and writes only its own format: an
   item it cannot decode is a `.storageFailure`, and there is no migration
   hook (apps move credentials from another library with
-  `TokenManager.signIn(refreshToken:)`, see the "Migrating stored tokens" article). `save` updates an
+  `OAuthSession.signIn(refreshToken:)`, see the "Migrating stored tokens" article). `save` updates an
   existing item's value in place (`SecItemUpdate`) and adds an item only
   on `errSecItemNotFound`, so a failed save leaves the previous
   credential stored and stores writing one item at once do not lose it

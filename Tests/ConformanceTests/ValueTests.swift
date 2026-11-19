@@ -97,7 +97,7 @@ struct ValueTests {
         #expect(Set([authorization, authorization]).count == 1)
         let exchange = TokenExchangeRequest(subjectToken: Secret("a"), subjectTokenType: .accessToken)
         #expect(Set([exchange, exchange]).count == 1)
-        #expect(Set([SessionEvent.signedIn, .signedIn, .storageFailed]).count == 2)
+        #expect(Set([OAuthSession.Event.signedIn, .signedIn, .storageFailed]).count == 2)
     }
 
     @Test("target selectors and closure policies")

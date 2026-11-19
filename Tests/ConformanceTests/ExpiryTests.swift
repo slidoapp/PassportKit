@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: expiry and derived tokens", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: expiry and derived tokens", .timeLimit(.minutes(1)))
 struct ExpiryTests {
     @Test("invariant 8: a cached token is used until it has less than the minimum lifetime left")
     func minimumTokenLifetime() async throws {

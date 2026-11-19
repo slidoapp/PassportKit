@@ -2,7 +2,7 @@ import Foundation
 import Logging
 
 // Access tokens per target: cache lookup, coalescing, and the two ways of issuing a token.
-extension TokenManager {
+extension OAuthSession {
     /// Returns a token for `target`: the cached one while it has at least `minimumTokenLifetime` left,
     /// otherwise a new one.
     ///
@@ -13,7 +13,7 @@ extension TokenManager {
     /// Cancelling the caller stops waiting only; the operation finishes and its results are persisted.
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/notAuthenticated`` when there is
-    /// no session (call ``load()`` or ``signIn(with:requestedScope:)`` first) and
+    /// no session (call ``restore()`` or ``signIn(with:requestedScope:)`` first) and
     /// ``PassportError/Code-swift.struct/tokenRejected`` with recovery
     /// ``PassportError/Recovery-swift.enum/resourceDenied`` when the acceptance policy rejects the token; the
     /// session stays signed in. An error whose recovery is ``PassportError/Recovery-swift.enum/reauthenticate``
@@ -93,7 +93,7 @@ extension TokenManager {
                     }
                 guard session == generation else { throw SessionSuperseded() }
                 publish(token)
-                eventHub.emit(.refreshed(target: target))
+                eventHub.emit(.accessTokenUpdated(target: target))
                 result = .success(token)
             } catch {
                 result = .failure(error)

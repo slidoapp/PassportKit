@@ -15,7 +15,7 @@ an exchange response does the same.
 
 ## Decision
 
-`TokenManager` runs every operation that sends the refresh token in one
+`OAuthSession` runs every operation that sends the refresh token in one
 FIFO lane, reading the token when the operation starts. Concurrent
 requests for the same target coalesce. Any response carrying
 `refresh_token` for the root grant is persisted before results are
