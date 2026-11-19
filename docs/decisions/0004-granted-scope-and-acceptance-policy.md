@@ -18,7 +18,7 @@ requested scopes may be meta-scopes the server never echoes.
 
 - Every token records its granted scope (`scope` from the response, or
   the requested scope when omitted, RFC 6749 §5.1).
-- `TokenManager` runs a `TokenAcceptancePolicy` on every issued access
+- `OAuthSession` runs a `TokenAcceptancePolicy` on every issued access
   token before caching or returning it. The default accepts everything;
   `RequireAnyScope` covers the common case.
 - A rejected token is discarded, a rotated refresh token from the same

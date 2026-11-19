@@ -27,11 +27,11 @@ Testing depends on the core, never the reverse. External dependencies follow ADR
 | `HTTP` | `HTTPTransport`, `URLSessionTransport`, redirect policy, form encoding, `AuthenticationChallenge`, redaction helpers |
 | `Discovery` | `Discovery` and `AuthorizationServerMetadata` (RFC 8414) |
 | `PKCE` | Verifier, S256 challenge, base64url |
-| `Session` | `TokenManager` and everything it owns: refresh lane, token cache, acceptance policies, events, `Credential`, `CredentialStore`, `InMemoryCredentialStore` |
-| `Authorization` | `RequestAuthorizer` and `RetryDecision` |
+| `Session` | `OAuthSession` and everything it owns: refresh lane, token cache, acceptance policies, events, `Credential`, `CredentialStore`, `InMemoryCredentialStore` |
+| `ProtectedResources` | `ProtectedResourceClient` and `ProtectedResourceClient.RetryDecision` |
 | `Storage` | `KeychainCredentialStore` |
 | `UserAgents` | `WebAuthenticationSessionUserAgent`, `LoopbackRedirectListener`, `LoopbackUserAgent` |
-| `Observability` | `PassportObserver`, `PassportEvent`, logging keys |
+| `Observability` | `RequestObserver`, `RequestEvent`, logging keys |
 
 Tests mirror this: `PassportKitTests` (units), `PassportKitTestingTests` (the fake server), `ConformanceTests`
 (scenarios), `IntegrationTests` (real server). See `docs/testing.md`.

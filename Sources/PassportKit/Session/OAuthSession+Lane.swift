@@ -3,13 +3,13 @@ import Logging
 
 // Operations that send the refresh token. They are the only code that reads `current.refreshToken` to send it,
 // and they only run inside a lane turn (ADR 0005).
-extension TokenManager {
+extension OAuthSession {
     /// Exchanges the refresh token for tokens of another audience or resource (RFC 8693 §2.1).
     ///
     /// The subject is the current refresh token. The issued token (for the default `requestedTokenType`, a
     /// refresh token bound to `audiences`) is in `accessToken` of the returned response, whatever its type; the
-    /// manager does not cache or judge it. A `refresh_token` in the server's response is the session's rotated
-    /// subject: the manager saves it before this returns (persist before publish) and returns the response with
+    /// session does not cache or judge it. A `refresh_token` in the server's response is the session's rotated
+    /// subject: the session saves it before this returns (persist before publish) and returns the response with
     /// ``TokenResponse/refreshToken`` set to `nil`, because that token belongs to the session alone. Using it
     /// elsewhere would present it twice and could make the server revoke the grant (RFC 9700 §4.14.2).
     ///
@@ -25,7 +25,7 @@ extension TokenManager {
     ///   rotated subject is then not stored: it goes to the ended session's revocation, if it has one, and the
     ///   current session is not touched. A caller that must not use a token of an ended session checks its own
     ///   state when this returns and discards the token, revoking it as the client it was issued to (RFC 7009
-    ///   §2.1); this manager cannot, because the token's audience need not be a client of its configuration.
+    ///   §2.1); this session cannot, because the token's audience need not be a client of its configuration.
     ///   A call whose session ended before its request was sent throws
     ///   ``PassportError/Code-swift.struct/notAuthenticated``, and a failure that arrives after the session
     ///   ended is reported the same way, so it never ends a newer session.
@@ -126,7 +126,7 @@ extension TokenManager {
     }
 
     /// Stores the refresh token, and with `adoptsScope` the scope, carried by `response`: in memory first, so that `current` is always the newest
-    /// token the manager knows, then in the store. A failing store is reported, not thrown: the session continues
+    /// token the session knows, then in the store. A failing store is reported, not thrown: the session continues
     /// from memory.
     private func persistRotation(from response: TokenResponse, adoptsIDToken: Bool, adoptsScope: Bool) async {
         guard var credential = current, response.refreshToken != nil || (adoptsScope && response.scope != nil)

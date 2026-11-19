@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The names of the main objects follow ADR 0016. Each rename breaks source compatibility, and no deprecated aliases
+are kept.
+
+### Added
+
+- `CredentialStore` lists its built-in stores as static members, so `store: .keychain()` and `store: .inMemory()`
+  appear in autocomplete. They take the parameters of the `KeychainCredentialStore` and `InMemoryCredentialStore`
+  initializers.
+
+### Changed
+
+- **Breaking:** `TokenManager` is `OAuthSession`, so the two entry points `OAuthClient` and `OAuthSession` appear
+  together in autocomplete. `load()` is `restore()`. `invalidate(_:)` is `discard(_:)`, because it drops a cached
+  token and sends nothing to the server.
+- **Breaking:** the types that belong to the session are nested in it. `SessionEvent` is `OAuthSession.Event`, and
+  `SignOutReason`, `SignOutResult` and `PendingSignOut` are `OAuthSession.SignOutReason`,
+  `OAuthSession.SignOutResult` and `OAuthSession.PendingSignOut`.
+- **Breaking:** the event `refreshed(target:)` is `accessTokenUpdated(target:)`, because a token exchange emits it
+  too. Its documentation states that the session caches the token only when its lifetime is known, and that a
+  sign-in and `exchangeRefreshToken` do not emit it.
+- **Breaking:** `CredentialCoding.encode(_:)` and `CredentialCoding.decode(_:)` are `Credential.serializedData()`
+  and `Credential(serializedData:)`. The record format and its version are unchanged, so credentials stored by 1.0
+  stay readable.
+- **Breaking:** `RequestAuthorizer` is `ProtectedResourceClient`, because it talks to a protected resource (RFC 6749
+  §1.1) and "authorize" names the sign-in flow. Its initializer takes `session:` instead of `manager:`.
+  `sign(_:for:)` is `addingToken(to:for:)`, because a bearer token is not a signature.
+  `data(for:target:session:)` is `data(for:target:urlSession:)`, because "session" means the OAuth session.
+  `RetryDecision` is `ProtectedResourceClient.RetryDecision`.
+- **Breaking:** `PassportObserver` is `RequestObserver` and `PassportEvent` is `RequestEvent`, because the events
+  report requests and the `Passport` prefix said only which library they come from. `EndpointKind` is
+  `RequestEvent.Endpoint`. `PassportError` is the only type left with the library prefix.
+
+### Removed
+
+- **Breaking:** `EndpointKind.resource`. No code emitted it, so an observer never received it.
+
 ## [1.0.1] - 2026-11-01
 
 ### Fixed

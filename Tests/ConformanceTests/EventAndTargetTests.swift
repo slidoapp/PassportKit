@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: event buffering, cancelled sign-out and target identity", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: event buffering, cancelled sign-out and target identity", .timeLimit(.minutes(1)))
 struct EventAndTargetTests {
     @Test("events: a subscriber that does not read keeps the newest 64 events, not all of them")
     func boundedEventBuffer() async throws {
@@ -30,7 +30,7 @@ struct EventAndTargetTests {
         signOut.cancel()
         let result = await signOut.value
 
-        #expect(result == SignOutResult(isStoredCredentialDeleted: true, revocation: .cancelled))
+        #expect(result == OAuthSession.SignOutResult(isStoredCredentialDeleted: true, revocation: .cancelled))
         #expect(await harness.manager.credential == nil)
         #expect(await harness.storedRefreshToken() == nil)
         harness.clock.advance(by: .seconds(60))

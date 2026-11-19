@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: session end, generations, cancellation and sign-out", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: session end, generations, cancellation and sign-out", .timeLimit(.minutes(1)))
 struct LifecycleTests {
     @Test("invariant 5: a rejected refresh token ends the session")
     func refreshTokenRejected() async throws {
@@ -70,7 +70,7 @@ struct LifecycleTests {
         _ = await harness.manager.signOut()
         #expect(
             await Harness.take(3, from: harness.events) == [
-                .signedIn, .refreshed(target: .default), .signedOut(reason: .userInitiated),
+                .signedIn, .accessTokenUpdated(target: .default), .signedOut(reason: .userInitiated),
             ])
     }
 
@@ -111,7 +111,7 @@ struct LifecycleTests {
         try await harness.clock.waitForSleeper()
 
         let result = await harness.manager.signOut(revoke: false)
-        #expect(result == SignOutResult(isStoredCredentialDeleted: true, revocation: .skipped))
+        #expect(result == OAuthSession.SignOutResult(isStoredCredentialDeleted: true, revocation: .skipped))
         harness.clock.advance(by: .seconds(10))
 
         #expect(await thrownError { try await inFlight.value }?.code == .notAuthenticated)
@@ -152,7 +152,7 @@ struct LifecycleTests {
         let harness = try await Harness()
         let refreshToken = try #require(await harness.currentRefreshToken())
         let result = await harness.manager.signOut()
-        #expect(result == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
+        #expect(result == OAuthSession.SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
         #expect(await harness.server.revoked.contains(refreshToken))
         #expect(await harness.manager.credential == nil)
         #expect(await harness.storedRefreshToken() == nil)
@@ -183,8 +183,9 @@ struct LifecycleTests {
         // The wait limit, the request limit and the server's own delay.
         #expect(await waitUntil { harness.clock.sleeperCount >= 3 })
         harness.clock.advance(by: .seconds(2))
-        #expect(await result.value == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
-        #expect(await pending.result == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
+        #expect(await result.value == OAuthSession.SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
+        #expect(
+            await pending.result == OAuthSession.SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
         #expect(await harness.server.requests(to: "/revoke").compactMap { $0.value("token") } == [refreshToken])
         #expect(await harness.storedRefreshToken() == nil)
     }
@@ -194,7 +195,7 @@ struct LifecycleTests {
         let skipped = try await Harness()
         #expect(
             await skipped.manager.beginSignOut(revoke: false).result
-                == SignOutResult(isStoredCredentialDeleted: true, revocation: .skipped))
+                == OAuthSession.SignOutResult(isStoredCredentialDeleted: true, revocation: .skipped))
         #expect(await skipped.server.requests(to: "/revoke").isEmpty)
 
         let failing = try await Harness()
@@ -218,9 +219,12 @@ struct LifecycleTests {
         // The wait limit, the request limit and the server's own delay.
         #expect(await waitUntil { harness.clock.sleeperCount >= 3 })
         cancelled.cancel()
-        #expect(await cancelled.value == SignOutResult(isStoredCredentialDeleted: true, revocation: .cancelled))
+        #expect(
+            await cancelled.value == OAuthSession.SignOutResult(isStoredCredentialDeleted: true, revocation: .cancelled)
+        )
         harness.clock.advance(by: .seconds(2))
-        #expect(await patient.value == SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
+        #expect(
+            await patient.value == OAuthSession.SignOutResult(isStoredCredentialDeleted: true, revocation: .revoked))
         #expect(await pending.result.revocation == .revoked)
     }
 
@@ -278,8 +282,8 @@ struct LifecycleTests {
         #expect(await hanging.storedRefreshToken() == nil)
     }
 
-    @Test("load restores a stored credential and ignores one for another client or issuer")
-    func load() async throws {
+    @Test("restore restores a stored credential and ignores one for another client or issuer")
+    func restore() async throws {
         let harness = try await Harness(signedIn: false)
         let response = try await harness.grant()
         let credential = Credential(
@@ -294,13 +298,13 @@ struct LifecycleTests {
                 refreshToken: credential.refreshToken, updatedAt: credential.updatedAt),
         ] {
             try await harness.store.save(foreign, for: harness.account)
-            #expect(try await harness.manager.load() == nil)
+            #expect(try await harness.manager.restore() == nil)
             #expect(await harness.manager.credential == nil)
             #expect(try await harness.store.load(harness.account) == foreign, "an ignored credential is not deleted")
         }
 
         try await harness.store.save(credential, for: harness.account)
-        #expect(try await harness.manager.load() == credential)
+        #expect(try await harness.manager.restore() == credential)
         #expect(await harness.manager.credential == credential)
         #expect(await Harness.take(1, from: harness.events) == [.signedIn])
         // Nothing is cached after a restart, so the first token is a refresh on the stored token.
@@ -308,7 +312,7 @@ struct LifecycleTests {
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
     }
 
-    @Test("every subscriber receives every event, and streams end when the manager is released")
+    @Test("every subscriber receives every event, and streams end when the session is released")
     func events() async throws {
         let harness = try await Harness()
         let first = harness.manager.events
@@ -317,7 +321,7 @@ struct LifecycleTests {
         #expect(await Harness.take(1, from: first) == [.signedOut(reason: .userInitiated)])
         #expect(await Harness.take(1, from: second) == [.signedOut(reason: .userInitiated)])
 
-        let stream = try await { () -> AsyncStream<SessionEvent> in
+        let stream = try await { () -> AsyncStream<OAuthSession.Event> in
             let temporary = try await Harness(signedIn: false)
             return temporary.manager.events
         }()

@@ -66,12 +66,12 @@ who dismisses the sign-in sheet gets
 
 ## Sessions
 
-``TokenManager`` reports the end of a session as an event as well as an
+``OAuthSession`` reports the end of a session as an event as well as an
 error, so one place can react. Observe it instead of checking every call:
 
 ```swift
-func watch(_ manager: TokenManager) async {
-    for await event in manager.events {
+func watch(_ session: OAuthSession) async {
+    for await event in session.events {
         if case .signedOut(let reason) = event {
             print("Signed out: \(reason)")
         }
@@ -82,6 +82,6 @@ func watch(_ manager: TokenManager) async {
 ## Logging
 
 Descriptions of errors, events and every public value hide credentials. Use
-a ``PassportObserver`` to see requests, response codes and durations without
+a ``RequestObserver`` to see requests, response codes and durations without
 bodies or secrets. The library also logs through swift-log with the same rules;
 see <doc:GettingStarted>.

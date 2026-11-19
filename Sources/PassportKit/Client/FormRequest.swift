@@ -4,7 +4,7 @@ import HTTPTypes
 /// A form-encoded POST to an authorization server endpoint, built from standard parameters, client
 /// authentication and additional parameters (in that order).
 struct FormRequest {
-    var endpoint: EndpointKind
+    var endpoint: RequestEvent.Endpoint
     var url: URL
     var grantType: GrantType?
     /// Standard parameters in wire order.
@@ -20,7 +20,7 @@ struct FormRequest {
     }
 
     /// A request to a non-token endpoint.
-    init(endpoint: EndpointKind, url: URL) {
+    init(endpoint: RequestEvent.Endpoint, url: URL) {
         self.endpoint = endpoint
         self.url = url
     }

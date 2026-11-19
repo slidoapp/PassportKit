@@ -1,6 +1,6 @@
 # 0008. Public API conventions
 
-- Status: accepted
+- Status: accepted; amended by [0016](0016-public-api-naming.md)
 - Date: 2026-10-08
 
 ## Context
@@ -20,11 +20,11 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   whose values come from a registry, a specification that adds values,
   or the library's own roadmap is a struct with a `rawValue` or private
   storage and `static` members, like `GrantType`: `ClientAuthentication`,
-  `TokenTarget.Derivation`, `EndpointKind`, `TokenTypeHint`,
+  `TokenTarget.Derivation`, `RequestEvent.Endpoint`, `TokenTypeHint`,
   `AuthorizationRequest.Prompt`, `TargetSelector`. A type that describes a
   closed outcome the caller must handle stays an enum and is documented
   as not frozen, so callers switch with a `default`: `Recovery`,
-  `RetryDecision`, `SessionEvent`, `SignOutReason`,
+  `ProtectedResourceClient.RetryDecision`, `OAuthSession.Event`, `OAuthSession.SignOutReason`,
   `RevocationOutcome`.
 - **Factories and names that cannot collide.** A case that would be
   called `none` is named for what it does: `.publicClient(clientID:)`,
@@ -41,7 +41,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   phrase about it (`refresh(_ refreshToken:)`, `sign(_ request:for:)`);
   `for:` names a target, `using:` a collaborator that does the work for
   one call, and collaborators that live as long as the value are
-  initializer parameters (`RequestAuthorizer(manager:transport:)`).
+  initializer parameters (`ProtectedResourceClient(session:transport:)`).
   Parameters that hold several values are plural (`audiences`,
   `resources`) and arrays default to `[]`.
 - **Verb pairs.** A flow that spans user interaction has `begin...` and
@@ -73,7 +73,7 @@ Protocol wire names are named constants, chosen by what kind of value they are.
 | Kind | Construct |
 |---|---|
 | Closed set the code switches over (CLI options) | `enum X: String, CaseIterable` |
-| Open, extensible protocol values (grant types, error codes, token types) | `struct X: RawRepresentable` with `static let` members (`GrantType`, `PassportError.Code`, `TokenTypeIdentifier`, `TokenTypeHint`, `EndpointKind`, `Prompt`) |
+| Open, extensible protocol values (grant types, error codes, token types) | `struct X: RawRepresentable` with `static let` members (`GrantType`, `PassportError.Code`, `TokenTypeIdentifier`, `TokenTypeHint`, `RequestEvent.Endpoint`, `Prompt`) |
 | Names that only appear on the wire (form and query parameters, JSON members) | caseless `enum` namespace with `static let` members and the RFC section in a trailing comment |
 | JSON decoded through `Codable` | `CodingKeys` |
 | HTTP header names | `HTTPField.Name` constants; `rawName` where `URLRequest` needs a string |
@@ -95,7 +95,7 @@ Callers can rely on source-compatible minor releases when types grow, and
 switch statements over non-frozen enums need a `default`. Open structs
 lose exhaustiveness checking for their own members, which is the price of
 evolvability and is why only registries and roadmap-driven sets use them.
-Types that hold a transport (`RequestAuthorizer`) must keep a fixed
+Types that hold a transport (`ProtectedResourceClient`) must keep a fixed
 description, because the canary test dumps them around fakes that hold
 secrets. The one-time cost was a breaking change to every call site, test,
 article and snippet before the first release.

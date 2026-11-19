@@ -120,18 +120,18 @@ func run() async throws {
     let response = try await signIn(arguments: arguments, client: client)
     print("Signed in.\n\(describe(response))")
 
-    // The manager owns the refresh token and rotates it; a real app passes a persistent store.
+    // The session owns the refresh token and rotates it; a real app passes a persistent store.
     let account = CredentialAccount(service: "passportkit-example", account: arguments.clientID)
-    let manager = TokenManager(client: client, store: InMemoryCredentialStore(), account: account)
-    try await manager.signIn(with: response, requestedScope: arguments.scope)
+    let session = OAuthSession(client: client, store: .inMemory(), account: account)
+    try await session.signIn(with: response, requestedScope: arguments.scope)
 
-    guard let before = await manager.credential?.refreshToken else {
+    guard let before = await session.credential?.refreshToken else {
         print("The server issued no refresh token, so there is nothing to refresh.")
         return
     }
     // A target with an explicit scope is a different token than the one from sign-in, so it is refreshed.
-    let token = try await manager.accessToken(for: TokenTarget.refreshGrant(scope: arguments.scope))
-    let after = await manager.credential?.refreshToken
+    let token = try await session.accessToken(for: TokenTarget.refreshGrant(scope: arguments.scope))
+    let after = await session.credential?.refreshToken
     let remaining = token.expiresAt.map { "\(Int($0.timeIntervalSince(client.wallClock.now())))s" } ?? "(not reported)"
     print(
         "Refreshed once.\nscope: \(token.grantedScope.map { display($0.rawValue) } ?? "(not reported)")\nexpires in: \(remaining)"

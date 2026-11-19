@@ -5,12 +5,12 @@ import os
 @testable import PassportKit
 
 /// Test-only observer that keeps every event.
-final class RecordingObserver: PassportObserver, Sendable {
-    private let stored = OSAllocatedUnfairLock(initialState: [PassportEvent]())
+final class RecordingObserver: RequestObserver, Sendable {
+    private let stored = OSAllocatedUnfairLock(initialState: [RequestEvent]())
 
-    var events: [PassportEvent] { stored.withLock { $0 } }
+    var events: [RequestEvent] { stored.withLock { $0 } }
 
-    func record(_ event: PassportEvent) {
+    func record(_ event: RequestEvent) {
         stored.withLock { $0.append(event) }
     }
 }
@@ -56,7 +56,7 @@ enum ClientFixtures {
         allowsInsecureLoopback: Bool = false,
         clock: any Clock<Duration> = ContinuousClock(),
         random: any RandomSource = SystemRandomSource(),
-        observer: (any PassportObserver)? = nil
+        observer: (any RequestObserver)? = nil
     ) throws -> OAuthClient {
         try OAuthClient(
             configuration: configuration(

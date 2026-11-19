@@ -29,13 +29,13 @@ public struct TokenAcceptanceContext: Sendable {
 /// Decides whether an issued access token is good enough to become current (ADR 0004).
 ///
 /// An HTTP 200 is not proof of access: a server may narrow the scope and still answer 200 (RFC 6749 §3.3).
-/// The policy runs on every token ``TokenManager`` issues, before the token is cached or returned.
+/// The policy runs on every token ``OAuthSession`` issues, before the token is cached or returned.
 public protocol TokenAcceptancePolicy: Sendable {
-    /// Judges the token in `context`. Must not call back into the manager that is evaluating it.
+    /// Judges the token in `context`. Must not call back into the session that is evaluating it.
     func evaluate(_ context: TokenAcceptanceContext) async -> TokenAcceptance
 }
 
-/// Accepts every token. The default policy of ``TokenManager``, which therefore does not check scope.
+/// Accepts every token. The default policy of ``OAuthSession``, which therefore does not check scope.
 public struct AcceptAnyToken: TokenAcceptancePolicy {
     /// Creates the policy.
     public init() {}

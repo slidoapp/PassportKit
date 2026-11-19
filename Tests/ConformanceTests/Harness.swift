@@ -59,9 +59,9 @@ struct Harness {
     let store: any CredentialStore
     let account = CredentialAccount(service: "conformance", account: "user")
     let client: OAuthClient
-    let manager: TokenManager
+    let manager: OAuthSession
     /// Subscribed before signing in, so it starts with `.signedIn`.
-    let events: AsyncStream<SessionEvent>
+    let events: AsyncStream<OAuthSession.Event>
 
     init(
         rotates: Bool = true,
@@ -91,7 +91,7 @@ struct Harness {
         client = try OAuthClient(
             configuration: configuration, transport: GaugedTransport(server: server, gauge: gauge),
             wallClock: wallClock, clock: clock, random: SequenceRandomSource())
-        manager = TokenManager(
+        manager = OAuthSession(
             client: client, store: store, account: account, acceptancePolicy: policy,
             rejectedTokenCacheDuration: rejectedTokenCacheDuration)
         events = manager.events
@@ -166,9 +166,9 @@ struct Harness {
     }
 
     /// The next `count` events.
-    static func take(_ count: Int, from stream: AsyncStream<SessionEvent>) async -> [SessionEvent] {
+    static func take(_ count: Int, from stream: AsyncStream<OAuthSession.Event>) async -> [OAuthSession.Event] {
         var iterator = stream.makeAsyncIterator()
-        var taken: [SessionEvent] = []
+        var taken: [OAuthSession.Event] = []
         while taken.count < count, let event = await iterator.next() { taken.append(event) }
         return taken
     }

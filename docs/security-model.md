@@ -25,7 +25,7 @@ HTTP header values can carry credentials (`Authorization`, `Cookie`, API keys), 
 `HTTPFields` shows every value in `description`, `debugDescription` and `dump`, and `HTTPRequest` shows its URL with
 query. Public PassportKit types that store header fields (`ClientConfiguration`, `RecordedRequest` and the scripted
 responses of `PassportKitTesting`) therefore have redacting descriptions and mirrors that show header names only.
-A signed `HTTPRequest` or a response that the library returns is the caller's value and prints like any
+An `HTTPRequest` with a token or a response that the library returns is the caller's value and prints like any
 `HTTPTypes` value: do not log it. The library marks `Authorization` as never indexed (RFC 7541 §7.1.3); the marking
 reaches the wire only through an `HTTPTransport` that keeps the indexing strategy of `HTTPFields`.
 `URLSessionTransport` converts to `URLRequest`, which has no indexing strategy, so there `URLSession` decides.
@@ -70,12 +70,12 @@ follow the same rules as errors and events:
 | Mix-up attacks | The code flow needs a configured issuer and compares the response `iss` with it exactly (RFC 9207 §2.4); the response parameter is required when the server advertises it. Servers without RFC 9207 need another defence (a distinct redirect URI per authorization server, RFC 9700 §4.4.2); the device flow has no authorization response and is not affected |
 | Open redirect / redirect injection | Exact redirect URI matching; loopback listener binds to loopback interfaces only |
 | Web page races or floods the loopback listener | The listener claims only a `GET` for its path with the loopback `Host`, `state` and `code` or `error`, no background `Sec-Fetch-*` metadata and an `accept` match on `state`; at most 8 connections, closed after 5 s, on `cancel()` and on delivery; a released listener stops (RFC 8252 §8.3) |
-| Token sent to an attacker-chosen host | `RequestAuthorizer` sends only over `https` (loopback `http` only with the opt-in `allowsInsecureLoopbackEndpoints`); `allowedOrigins` limits the hosts, and must be set when request URLs come from untrusted data; redirects never leave HTTPS and drop credential headers across origins, also for `data(for:target:session:)` |
+| Token sent to an attacker-chosen host | `ProtectedResourceClient` sends only over `https` (loopback `http` only with the opt-in `allowsInsecureLoopbackEndpoints`); `allowedOrigins` limits the hosts, and must be set when request URLs come from untrusted data; redirects never leave HTTPS and drop credential headers across origins, also for `data(for:target:urlSession:)` |
 | Header injection through a token | A token that is not a `b64token` (RFC 6750 §2.1) is refused before it reaches a header |
 | Memory growth from many targets | The token cache and the remembered rejections are limited to 256 entries each |
 | Server text shown to a person | Error text is sanitized; a device `user_code` with control or invisible characters, or over 64 characters, is an invalid response; apps show it themselves (RFC 8628 §3.3), and the example executable prints server text through a sanitizer |
 | Token theft from logs | Redaction rules above, enforced by tests and by the redaction canary, which searches every error, event, log line and description of every flow for the secrets it used |
-| Token sent with the wrong scheme | Only `Bearer` tokens are sent by `RequestAuthorizer`; sender-constrained types fail before any request |
+| Token sent with the wrong scheme | Only `Bearer` tokens are sent by `ProtectedResourceClient`; sender-constrained types fail before any request |
 | Token theft from storage | Platform secure storage (Keychain) with the strictest workable accessibility class, enforced on iOS; the macOS login keychain does not enforce it (Known limits) |
 | Refresh token replay after rotation | Persist rotated refresh token before use; serialize refresh-token-consuming operations |
 | Token used for the wrong resource | Tokens bound to their resource indicator; never reused across resources |
@@ -117,4 +117,4 @@ follow the same rules as errors and events:
 - **401-triggered invalidation is not rate limited.** A resource that answers 401 `invalid_token` to every fresh
   token makes each request cost one refresh (a request retries once; concurrent requests for the same token share
   one refresh). A rate limit needs a policy for what to do over the limit and is left to the app, which can wrap
-  `RequestAuthorizer.evaluate` or stop on repeated `unauthorized` errors.
+  `ProtectedResourceClient.evaluate` or stop on repeated `unauthorized` errors.

@@ -18,8 +18,8 @@ struct KeychainTests {
             #expect(try await store.load(account)?.refreshToken == rotated)
 
             // A new manager restores the session from the Keychain alone and can refresh with it.
-            let restored = TokenManager(client: session.client, store: store, account: account)
-            #expect(try await restored.load()?.refreshToken == rotated)
+            let restored = OAuthSession(client: session.client, store: store, account: account)
+            #expect(try await restored.restore()?.refreshToken == rotated)
             _ = try await restored.accessToken()
             #expect(await restored.credential?.refreshToken != rotated)
         }

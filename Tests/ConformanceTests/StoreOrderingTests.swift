@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: store ordering, revocation and event order", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: store ordering, revocation and event order", .timeLimit(.minutes(1)))
 struct StoreOrderingTests {
     enum RotatingOperation: CaseIterable { case refresh, exchange }
 
@@ -89,7 +89,7 @@ struct StoreOrderingTests {
         }
         #expect(await waitUntil { await store.suspendedCount(.delete) == 1 })
 
-        let load = Task { try await manager.load() }
+        let load = Task { try await manager.restore() }
         await store.release(.delete)
         #expect(try await load.value == nil)
         await ending?.value
@@ -118,7 +118,7 @@ struct StoreOrderingTests {
 
         #expect(store.log.entries.suffix(2) == ["save", "delete"])
         #expect(try await store.load(harness.account) == nil, "the signed-out session was restored by a late save")
-        #expect(try await Harness(store: store, signedIn: false).manager.load() == nil)
+        #expect(try await Harness(store: store, signedIn: false).manager.restore() == nil)
     }
 
     @Test("invariant 3: persist before publish: the access token is returned only after the store has the rotation")
@@ -150,7 +150,7 @@ struct StoreOrderingTests {
         let harness = try await Harness(store: store)
         await store.failNextDeletes()
         let result = await harness.manager.signOut(revoke: false)
-        #expect(result == SignOutResult(isStoredCredentialDeleted: false, revocation: .skipped))
+        #expect(result == OAuthSession.SignOutResult(isStoredCredentialDeleted: false, revocation: .skipped))
         #expect(await harness.manager.credential == nil)
         #expect(
             await Harness.take(3, from: harness.events) == [

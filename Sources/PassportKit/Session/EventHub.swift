@@ -4,15 +4,15 @@ import os
 /// Fans session events out to any number of `AsyncStream` subscribers.
 ///
 /// Each subscriber buffers at most ``bufferSize`` events it has not read yet; beyond that the oldest are dropped,
-/// so a subscriber that stops reading cannot make the manager hold events for ever.
+/// so a subscriber that stops reading cannot make the session hold events for ever.
 ///
-/// Subscribing must work from nonisolated code (`TokenManager.events`), so the hub is a lock-guarded class
+/// Subscribing must work from nonisolated code (`OAuthSession.events`), so the hub is a lock-guarded class
 /// rather than part of the actor's state.
 final class EventHub: Sendable {
     static let bufferSize = 64
 
     private struct State {
-        var continuations: [Int: AsyncStream<SessionEvent>.Continuation] = [:]
+        var continuations: [Int: AsyncStream<OAuthSession.Event>.Continuation] = [:]
         var nextIdentifier = 0
         var isFinished = false
     }
@@ -21,7 +21,7 @@ final class EventHub: Sendable {
     private let state = OSAllocatedUnfairLock(initialState: State())
 
     /// A new stream that receives every event emitted from now on. It ends when the hub finishes.
-    func subscribe() -> AsyncStream<SessionEvent> {
+    func subscribe() -> AsyncStream<OAuthSession.Event> {
         AsyncStream(bufferingPolicy: .bufferingNewest(Self.bufferSize)) { continuation in
             let identifier = state.withLock { state -> Int? in
                 guard !state.isFinished else { return nil }
@@ -36,14 +36,14 @@ final class EventHub: Sendable {
         }
     }
 
-    func emit(_ event: SessionEvent) {
+    func emit(_ event: OAuthSession.Event) {
         let subscribers = state.withLock { Array($0.continuations.values) }
         for subscriber in subscribers { subscriber.yield(event) }
     }
 
     /// Ends every stream. Later subscriptions end immediately.
     func finish() {
-        let subscribers = state.withLock { state -> [AsyncStream<SessionEvent>.Continuation] in
+        let subscribers = state.withLock { state -> [AsyncStream<OAuthSession.Event>.Continuation] in
             state.isFinished = true
             defer { state.continuations = [:] }
             return Array(state.continuations.values)

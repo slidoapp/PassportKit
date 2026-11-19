@@ -17,7 +17,7 @@ cause.
 ## The acceptance policy
 
 A ``TokenAcceptancePolicy`` is your hook between "the server issued a token"
-and "the token becomes current". It runs on every token ``TokenManager``
+and "the token becomes current". It runs on every token ``OAuthSession``
 issues, before the token is cached or returned. A rejected token is thrown
 away, the rotated refresh token from the same response is still saved, and
 the session stays signed in.
@@ -27,8 +27,8 @@ only if at least one of the scopes you name was granted:
 
 ```swift
 let policy = RequireAnyScope(["items.read", "items.write"])
-let manager = TokenManager(
-    client: client, store: InMemoryCredentialStore(), account: account, acceptancePolicy: policy)
+let session = OAuthSession(
+    client: client, store: .inMemory(), account: account, acceptancePolicy: policy)
 ```
 
 Scopes are compared as exact strings. `*` is not a wildcard:
@@ -41,7 +41,7 @@ where servers narrow scope when the person cannot use the resource. Pass
 `forTargets:` with ``TargetSelector/all`` or ``TargetSelector/matching(_:)``
 to choose other targets. A token whose granted scope is unknown is rejected.
 
-``TokenManager`` accepts every token when you pass no policy, scope
+``OAuthSession`` accepts every token when you pass no policy, scope
 narrowing included. Pass one whenever your app depends on a scope or a
 resource.
 
@@ -50,8 +50,8 @@ or implement the protocol. The policy has a time limit, and no answer in
 time counts as a rejection.
 
 ```swift
-let manager = TokenManager(
-    client: client, store: InMemoryCredentialStore(), account: account,
+let session = OAuthSession(
+    client: client, store: .inMemory(), account: account,
     acceptancePolicy: .custom { context in
         context.token.grantedScope?.scopes.contains("items.read") == true
             ? .accept : .reject(reason: "The items scope is missing.")
@@ -63,8 +63,8 @@ prefix, is a closure too. This one accepts a token that carries at least one
 scope starting with `items.`, and rejects one whose scope is unknown:
 
 ```swift
-let manager = TokenManager(
-    client: client, store: InMemoryCredentialStore(), account: account,
+let session = OAuthSession(
+    client: client, store: .inMemory(), account: account,
     acceptancePolicy: .custom { context in
         guard let granted = context.token.grantedScope else {
             return .reject(reason: "The granted scope is unknown.")
@@ -85,16 +85,16 @@ practice, and both end up in the same place for the caller:
 - **401 `access_denied`.** A token exchange for a resource the person may
   not use answers 401 with `access_denied`.
 
-Either way ``TokenManager/accessToken(for:)`` throws a ``PassportError``
+Either way ``OAuthSession/accessToken(for:)`` throws a ``PassportError``
 whose recovery is ``PassportError/Recovery-swift.enum/resourceDenied``: the
 rejection comes as ``PassportError/Code-swift.struct/tokenRejected`` in the
 first case and as ``PassportError/Code-swift.struct/accessDenied`` in the
 second. The session is intact. Handle both with one branch:
 
 ```swift
-func items(using manager: TokenManager) async throws -> Data? {
+func items(using session: OAuthSession) async throws -> Data? {
     do {
-        let token = try await manager.accessToken(
+        let token = try await session.accessToken(
             for: .refreshGrant(resources: [URL(string: "https://api.example.com/items")!]))
         // Use the token.
         _ = token
@@ -108,14 +108,14 @@ func items(using manager: TokenManager) async throws -> Data? {
 
 A rejected token is remembered for 5 seconds by default
 (`rejectedTokenCacheDuration`), so a view that retries in a loop does not
-make the manager rotate the refresh token again and again. The window is
+make the session rotate the refresh token again and again. The window is
 short on purpose: it only has to absorb tight retry loops, and a long one
 makes a permission that was just granted look denied. Set it to `.zero`
 to ask the server every time.
 
 ## At the resource server
 
-``RequestAuthorizer`` follows RFC 6750 §3.1:
+``ProtectedResourceClient`` follows RFC 6750 §3.1:
 
 - A 401 without a Bearer error code, or with `invalid_token`, drops the token,
   gets a fresh one and retries once.
@@ -137,19 +137,19 @@ from data you do not control (links in a response, stored addresses), pass the
 origins you trust, so the token is never sent anywhere else:
 
 ```swift
-let authorizer = RequestAuthorizer(
-    manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
+let api = ProtectedResourceClient(
+    session: session, allowedOrigins: [URL(string: "https://api.example.com")!])
 ```
 
 A request for another origin fails with
 ``PassportError/Code-swift.struct/invalidConfiguration`` before a token is
 obtained. A token that is not a valid `b64token` (RFC 6750 §2.1) is refused
 with ``PassportError/Code-swift.struct/invalidResponse`` instead of being
-written into a header. `data(for:target:session:)` never lets a redirect take
-the token to another origin or from HTTPS to HTTP, whatever the session's own
+written into a header. `data(for:target:urlSession:)` never lets a redirect take
+the token to another origin or from HTTPS to HTTP, whatever the URL session's own
 delegate does.
 
-Besides `URLRequest`, the authorizer signs and sends the request types of
+Besides `URLRequest`, the resource client adds tokens to and sends the request types of
 [swift-http-types](https://github.com/apple/swift-http-types), the same ones
 an ``HTTPTransport`` receives. The body travels beside the request:
 
@@ -159,12 +159,12 @@ import HTTPTypes
 let request = HTTPRequest(
     method: .post, url: URL(string: "https://api.example.com/items")!,
     headerFields: [.contentType: "application/json"])
-let (response, body) = try await authorizer.send(request, body: Data(#"{"name":"a"}"#.utf8))
+let (response, body) = try await api.send(request, body: Data(#"{"name":"a"}"#.utf8))
 ```
 
-A signed `HTTPRequest` carries the token in its `Authorization` field, and
+An `HTTPRequest` with a token carries it in its `Authorization` field, and
 `HTTPFields` and `HTTPRequest` print their header fields and the URL with its
-query. Treat a signed request as a credential: do not log it, dump it or attach
+query. Treat a request that carries a token as a credential: do not log it, dump it or attach
 it to a crash report. The library marks the field never indexed for HTTP/2 and
 HTTP/3 (RFC 7541 §7.1.3); the marking reaches the wire only through a transport
 that keeps the indexing strategy of `HTTPFields`. ``URLSessionTransport``

@@ -44,7 +44,7 @@ let configuration = try ClientConfiguration(
 ```
 
 The opt-in admits `http` on `localhost`, `127.0.0.1` and `[::1]` only; any other `http` URL is still refused. It also
-applies to the verification URIs of the device flow and to the URLs a ``RequestAuthorizer`` signs. Keep it out of
+applies to the verification URIs of the device flow and to the URLs a ``ProtectedResourceClient`` sends tokens to. Keep it out of
 release builds. It has nothing to do with redirect URIs: the `http` loopback redirect URI of a native app
 (<doc:NativeAppRedirects>) works without it.
 
@@ -107,27 +107,28 @@ needs none of this.
 
 ## Keep the session
 
-A ``TokenResponse`` is a one-time result. Hand it to a ``TokenManager``,
+A ``TokenResponse`` is a one-time result. Hand it to a ``OAuthSession``,
 which saves the refresh token to a ``CredentialStore`` and refreshes access
 tokens when they run low:
 
 ```swift
 let account = CredentialAccount(service: "com.example.app", account: "default")
-let manager = TokenManager(client: client, store: InMemoryCredentialStore(), account: account)
-try await manager.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
+let session = OAuthSession(client: client, store: .inMemory(), account: account)
+try await session.signIn(with: tokens, requestedScope: ["openid", "offline_access"])
 
-let token = try await manager.accessToken()
+let token = try await session.accessToken()
 ```
 
-Use ``InMemoryCredentialStore`` in tests only. Store the credential in the
-Keychain with ``KeychainCredentialStore``. On the next launch call
-``TokenManager/load()`` instead of signing in again. Subscribe to
-``TokenManager/events`` to learn when the session ends.
+Use `.inMemory()`, an ``InMemoryCredentialStore``, in tests only. Store the
+credential in the Keychain with `.keychain()`, a ``KeychainCredentialStore``.
+On the next launch call
+``OAuthSession/restore()`` instead of signing in again. Subscribe to
+``OAuthSession/events`` to learn when the session ends.
 
 ## See what the library does
 
 PassportKit logs through [swift-log](https://github.com/apple/swift-log). A default
-client, manager and user agents log to a logger labelled `PassportKit`, which uses whatever
+client, session and user agents log to a logger labelled `PassportKit`, which uses whatever
 `LoggingSystem.bootstrap` your app configured, so you get logs without wiring. Pass a `logger:` to choose a label
 or metadata:
 
@@ -139,18 +140,18 @@ let client = try OAuthClient(configuration: configuration, logger: logger)
 
 `debug` shows each request with its endpoint, grant type, status and duration, `info` the session lifecycle,
 and `notice` and `warning` storage failures, policy rejections, retries and revocation failures. Logs never contain
-tokens, codes, verifiers, URLs with queries or response bodies. Use a ``PassportObserver`` for typed events.
+tokens, codes, verifiers, URLs with queries or response bodies. Use a ``RequestObserver`` for typed events.
 
 ## Call an API
 
-``RequestAuthorizer`` adds the bearer token, refreshes once when the server
+``ProtectedResourceClient`` adds the bearer token, refreshes once when the server
 rejects it, and never sends a request without a token:
 
 ```swift
-let authorizer = RequestAuthorizer(manager: manager, allowedOrigins: [URL(string: "https://api.example.com")!])
-let session = URLSession(configuration: .ephemeral)
+let api = ProtectedResourceClient(session: session, allowedOrigins: [URL(string: "https://api.example.com")!])
+let urlSession = URLSession(configuration: .ephemeral)
 let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
-let (data, response) = try await authorizer.data(for: request, session: session)
+let (data, response) = try await api.data(for: request, urlSession: urlSession)
 ```
 
 Tokens are only sent over `https` (an `http` loopback URL needs ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), to the origins you

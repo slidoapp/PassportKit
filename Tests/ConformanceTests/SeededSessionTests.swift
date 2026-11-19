@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: a session seeded from a refresh token", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: a session seeded from a refresh token", .timeLimit(.minutes(1)))
 struct SeededSessionTests {
     @Test("the first accessToken() refreshes with the seeded token and persists the rotation")
     func firstTokenIsRefreshed() async throws {

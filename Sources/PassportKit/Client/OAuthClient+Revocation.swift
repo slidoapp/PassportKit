@@ -2,7 +2,7 @@ import Foundation
 import HTTPTypes
 
 extension OAuthClient {
-    /// The time limit ``TokenManager`` applies to the revocation on sign-out, and the default of
+    /// The time limit ``OAuthSession`` applies to the revocation on sign-out, and the default of
     /// ``revokeBestEffort(_:typeHint:timeLimit:)``: five seconds.
     public static let revocationTimeLimit = Duration.seconds(5)
 
@@ -27,7 +27,7 @@ extension OAuthClient {
     /// Revokes a token best effort and gives up after `timeLimit` on the client's clock (RFC 7009 §2).
     ///
     /// For a token that never became a session, for example a refresh token the app obtained but did not hand
-    /// to a ``TokenManager``, so it can be invalidated at the server without holding up the app. Revocation is
+    /// to a ``OAuthSession``, so it can be invalidated at the server without holding up the app. Revocation is
     /// a courtesy to the server, and the token may still be valid whatever the outcome (RFC 7009 §2.2).
     ///
     /// Never throws. Returns ``RevocationOutcome/revoked`` for any 2xx (§2.2), ``RevocationOutcome/failed(_:)``
@@ -36,7 +36,7 @@ extension OAuthClient {
     /// ``RevocationOutcome/skipped`` when no revocation endpoint is configured. A timeout or cancellation cancels
     /// the request; it may still have reached the server.
     ///
-    /// The default `timeLimit` is ``revocationTimeLimit``, the limit ``TokenManager`` uses on sign-out.
+    /// The default `timeLimit` is ``revocationTimeLimit``, the limit ``OAuthSession`` uses on sign-out.
     public func revokeBestEffort(
         _ token: Secret, typeHint: TokenTypeHint? = nil, timeLimit: Duration = OAuthClient.revocationTimeLimit
     ) async -> RevocationOutcome {

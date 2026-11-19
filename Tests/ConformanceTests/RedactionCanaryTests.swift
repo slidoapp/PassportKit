@@ -188,9 +188,9 @@ struct RedactionCanaryTests {
         Self.assertNoCanary(rig)
     }
 
-    private static func collect(_ stream: AsyncStream<SessionEvent>) -> Task<[SessionEvent], Never> {
+    private static func collect(_ stream: AsyncStream<OAuthSession.Event>) -> Task<[OAuthSession.Event], Never> {
         Task {
-            var events: [SessionEvent] = []
+            var events: [OAuthSession.Event] = []
             for await event in stream {
                 events.append(event)
                 if case .signedOut = event { break }
@@ -199,14 +199,14 @@ struct RedactionCanaryTests {
         }
     }
 
-    @Test("TokenManager, RequestAuthorizer and the credential store")
+    @Test("OAuthSession, ProtectedResourceClient and the credential store")
     func sessionFlows() async throws {
         let rig = try await Rig { .clientSecretPost(clientID: "app", secret: $0) }
         let store = InMemoryCredentialStore()
         let account = CredentialAccount(service: "canary", account: "user")
-        let manager = TokenManager(client: rig.client, store: store, account: account)
+        let manager = OAuthSession(client: rig.client, store: store, account: account)
         let events = Self.collect(manager.events)
-        let authorizer = RequestAuthorizer(manager: manager, transport: rig.server)
+        let authorizer = ProtectedResourceClient(session: manager, transport: rig.server)
         let resource = HTTPRequest(method: .get, url: URL(string: "https://api.example.com/items")!)
 
         let grant = try await rig.authorize()
@@ -224,13 +224,13 @@ struct RedactionCanaryTests {
             try await manager.accessToken(for: TokenTarget.exchange(audiences: ["service"]))
         }
         await rig.renderings.observe { try await manager.exchangeRefreshToken(audiences: ["service"]) }
-        // A signed request is the caller's value in Foundation's or swift-http-types' own type, which print their
+        // A request that carries a token is the caller's value in Foundation's or swift-http-types' own type, which print their
         // headers under `dump`; the token that came with it is ours.
-        rig.renderings.look(try await authorizer.sign(URLRequest(url: try #require(resource.url))).1)
-        let (_, token) = try await authorizer.sign(resource)
+        rig.renderings.look(try await authorizer.addingToken(to: URLRequest(url: try #require(resource.url))).1)
+        let (_, token) = try await authorizer.addingToken(to: resource)
         rig.renderings.look(token)
         await rig.renderings.observe { try await authorizer.send(resource) }
-        await manager.invalidate(root)
+        await manager.discard(root)
 
         // The resource answers with a challenge that repeats the bearer token.
         rig.harvest.challenging(true)
@@ -240,7 +240,7 @@ struct RedactionCanaryTests {
         // The resource rejects the renewed token as well, and echoes the token in its challenge.
         let rejecting = AlwaysRejectingResource()
         await rig.renderings.observe {
-            try await RequestAuthorizer(manager: manager, transport: rejecting).send(resource)
+            try await ProtectedResourceClient(session: manager, transport: rejecting).send(resource)
         }
 
         // The server rejects the refresh token and echoes it; the session ends.
@@ -265,7 +265,7 @@ struct RedactionCanaryTests {
     @Test("Long tokens echoed by a server are redacted by the description rules too")
     func longTokens() async throws {
         let rig = try await Rig { .clientSecretBasic(clientID: "app", secret: $0) }
-        let manager = TokenManager(
+        let manager = OAuthSession(
             client: rig.client, store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "canary", account: "long"))
         let events = Self.collect(manager.events)
@@ -284,7 +284,7 @@ struct RedactionCanaryTests {
     @Test("The lifecycle is logged with structured metadata and no secrets")
     func lifecycleLogLines() async throws {
         let rig = try await Rig { .clientSecretPost(clientID: "app", secret: $0) }
-        let manager = TokenManager(
+        let manager = OAuthSession(
             client: rig.client, store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "canary", account: "lines"))
         try await manager.signIn(with: try await rig.authorize(), requestedScope: ["read", "write"])

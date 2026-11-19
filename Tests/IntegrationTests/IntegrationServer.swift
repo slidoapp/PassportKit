@@ -49,7 +49,7 @@ enum IntegrationServer {
     /// A signed-in session obtained through the authorization code flow.
     struct Session {
         let client: OAuthClient
-        let manager: TokenManager
+        let manager: OAuthSession
         let store: any CredentialStore
         let account: CredentialAccount
         let response: TokenResponse
@@ -74,7 +74,7 @@ enum IntegrationServer {
             redirectURI: redirectURI, scope: scope, resources: resources, prompt: [.consent])
         let response = try await client.authorize(request, using: RedirectFollowingUserAgent())
         let account = CredentialAccount(service: "IntegrationTests.\(UUID())", account: "user")
-        let manager = TokenManager(client: client, store: store, account: account, acceptancePolicy: policy)
+        let manager = OAuthSession(client: client, store: store, account: account, acceptancePolicy: policy)
         try await manager.signIn(with: response, requestedScope: scope)
         return Session(client: client, manager: manager, store: store, account: account, response: response)
     }

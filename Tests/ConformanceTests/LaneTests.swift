@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: refresh token lane, coalescing and invalidation", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: refresh token lane, coalescing and invalidation", .timeLimit(.minutes(1)))
 struct LaneTests {
     @Test("invariant 1: refreshes and exchanges of the refresh token run one at a time, each on the latest token")
     func oneLane() async throws {
@@ -74,7 +74,7 @@ struct LaneTests {
         let renewed = try await withThrowingTaskGroup(of: AccessToken.self) { group in
             for _ in 0..<10 {
                 group.addTask {
-                    await manager.invalidate(stale)
+                    await manager.discard(stale)
                     return try await manager.accessToken()
                 }
             }
@@ -86,7 +86,7 @@ struct LaneTests {
         #expect(renewed[0].generation != stale.generation)
 
         // A late report about the old token cannot discard the new one.
-        await manager.invalidate(stale)
+        await manager.discard(stale)
         #expect(try await manager.accessToken().value == renewed[0].value)
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
     }

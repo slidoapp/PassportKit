@@ -3,7 +3,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: persistence and acceptance", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: persistence and acceptance", .timeLimit(.minutes(1)))
 struct PersistenceTests {
     @Test("invariant 3: the rotated refresh token is saved before the access token is returned")
     func persistBeforePublish() async throws {
@@ -29,7 +29,7 @@ struct PersistenceTests {
         #expect(await harness.storedRefreshToken() == before, "the failed save must not have reached the store")
         #expect(
             await Harness.take(3, from: harness.events) == [
-                .signedIn, .storageFailed, .refreshed(target: .default),
+                .signedIn, .storageFailed, .accessTokenUpdated(target: .default),
             ])
 
         // The next refresh spends the in-memory token, so the server does not see a reused one.

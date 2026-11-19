@@ -30,7 +30,7 @@ struct LogLevelTests {
         let server: FakeAuthorizationServer
         let transport: ScriptedTransport
         let client: OAuthClient
-        let manager: TokenManager
+        let manager: OAuthSession
 
         init() async throws {
             let registration = FakeAuthorizationServer.ClientRegistration(
@@ -47,7 +47,7 @@ struct LogLevelTests {
                     authentication: .publicClient(clientID: "app"), issuer: FakeAuthorizationServer.issuer),
                 transport: transport, wallClock: wallClock, clock: clock, random: SequenceRandomSource(),
                 logger: logs.logger)
-            manager = TokenManager(
+            manager = OAuthSession(
                 client: client, store: InMemoryCredentialStore(),
                 account: CredentialAccount(service: "levels", account: "user"))
             let grant = try await client.authorize(
@@ -159,7 +159,7 @@ struct LogLevelTests {
     func renewedTokenRejected() async throws {
         let rig = try await Rig()
         let resource = StaticTransport(status: 401, challenge: #"Bearer error="invalid_token""#)
-        let authorizer = RequestAuthorizer(manager: rig.manager, transport: resource)
+        let authorizer = ProtectedResourceClient(session: rig.manager, transport: resource)
         let error = await thrownError {
             try await authorizer.send(HTTPRequest(method: .get, url: URL(string: "https://api.example.com/items")!))
         }

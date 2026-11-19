@@ -68,14 +68,14 @@ struct URLSessionRedirectTests {
     func authorizerAppliesThePolicy() async throws {
         let session = URLSession(configuration: Self.configuration())
         defer { session.invalidateAndCancel() }
-        let manager = TokenManager(
+        let manager = OAuthSession(
             client: try ClientFixtures.client(RecordingTransport()), store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "unit", account: "user"))
         try await manager.signIn(
             with: TokenResponse(accessToken: Secret("opaque"), tokenType: "Bearer", expiresIn: .seconds(3600)))
-        let authorizer = RequestAuthorizer(manager: manager)
+        let authorizer = ProtectedResourceClient(session: manager)
         let (body, response) = try await authorizer.data(
-            for: URLRequest(url: Self.redirect(to: "https://other.example.com/echo")), session: session)
+            for: URLRequest(url: Self.redirect(to: "https://other.example.com/echo")), urlSession: session)
         #expect(response.url?.host == "other.example.com")
         #expect(!String(decoding: body, as: UTF8.self).contains("authorization"))
     }

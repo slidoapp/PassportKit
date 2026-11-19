@@ -17,8 +17,8 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     public let wallClock: any WallClock
     let clock: any Clock<Duration>
     let random: any RandomSource
-    let observer: (any PassportObserver)?
-    /// The logger of the client, which a ``TokenManager`` created with it uses unless given another.
+    let observer: (any RequestObserver)?
+    /// The logger of the client, which a ``OAuthSession`` created with it uses unless given another.
     public let logger: Logger
 
     /// Creates a client.
@@ -28,14 +28,14 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     ///
     /// `logger` receives the library's log lines (see <doc:GettingStarted>). The default is labelled `PassportKit`,
     /// so it uses the `LoggingSystem` the app bootstrapped. Logs never contain tokens, codes, verifiers, URLs or
-    /// bodies; ``PassportObserver`` stays the channel for typed events.
+    /// bodies; ``RequestObserver`` stays the channel for typed events.
     public init(
         configuration: ClientConfiguration,
         transport: any HTTPTransport = URLSessionTransport(),
         wallClock: any WallClock = SystemWallClock(),
         clock: any Clock<Duration> = ContinuousClock(),
         random: any RandomSource = SystemRandomSource(),
-        observer: (any PassportObserver)? = nil,
+        observer: (any RequestObserver)? = nil,
         logger: Logger = Logger(label: "PassportKit")
     ) throws {
         try configuration.validate()
@@ -62,7 +62,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     /// Sends a request, emitting observer events, and returns any HTTP response.
     ///
     /// Transport failures become ``PassportError/Code-swift.struct/transportFailure`` and are reported to the
-    /// observer as ``PassportEvent/transportFailure(endpoint:grantType:duration:)``; `CancellationError`
+    /// observer as ``RequestEvent/transportFailure(endpoint:grantType:duration:)``; `CancellationError`
     /// propagates unchanged, also when the transport reports cancellation as another error.
     func send(_ request: FormRequest) async throws -> (response: HTTPResponse, body: Data) {
         let (httpRequest, requestBody) = try request.build(configuration: configuration)

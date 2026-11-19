@@ -7,6 +7,18 @@ import Testing
 struct ValueTests {
     static let canaries = ["canary-access-token", "canary-refresh-token", "canary-id-token", "canary-extra-field"]
 
+    @Test("the built-in credential stores are static members of CredentialStore")
+    func storeStaticMembers() async throws {
+        let account = CredentialAccount(service: "com.example.app", account: "default")
+        let credential = Credential(
+            clientID: "app", refreshToken: Secret("rt"), updatedAt: Date(timeIntervalSince1970: 0))
+        let memory: any CredentialStore = .inMemory(credentials: [account: credential])
+        #expect(memory is InMemoryCredentialStore)
+        #expect(try await memory.load(account) == credential)
+        let keychain: any CredentialStore = .keychain(accessibility: .whenUnlockedThisDeviceOnly)
+        #expect(keychain is KeychainCredentialStore)
+    }
+
     @Test("a DeviceAuthorization can be created for previews and keeps its device code private")
     func deviceAuthorizationForPreviews() {
         let clock = ManualClock()
@@ -50,24 +62,24 @@ struct ValueTests {
             clientID: "app", issuer: URL(string: "https://as.example.com"), refreshToken: Secret("rt"),
             idToken: Secret("id"), grantedScope: ["read", "write"],
             updatedAt: Date(timeIntervalSince1970: 1_700_000_000.5))
-        let data = try CredentialCoding.encode(credential)
+        let data = try credential.serializedData()
         let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(object["version"] as? Int == 1)
         #expect(object["refreshToken"] as? String == "rt")
-        #expect(try CredentialCoding.decode(data) == credential)
+        #expect(try Credential(serializedData: data) == credential)
 
         var future = object
         future["version"] = 2
         let error = #expect(throws: PassportError.self) {
-            try CredentialCoding.decode(JSONSerialization.data(withJSONObject: future))
+            try Credential(serializedData: JSONSerialization.data(withJSONObject: future))
         }
         #expect(error?.code == .storageFailure)
-        #expect(throws: PassportError.self) { try CredentialCoding.decode(Data("[]".utf8)) }
+        #expect(throws: PassportError.self) { try Credential(serializedData: Data("[]".utf8)) }
 
         // A record written by 0.3, which could carry application fields, still decodes; the fields are ignored.
         var older = object
         older["additionalFields"] = ["note": "x"]
-        #expect(try CredentialCoding.decode(JSONSerialization.data(withJSONObject: older)) == credential)
+        #expect(try Credential(serializedData: JSONSerialization.data(withJSONObject: older)) == credential)
     }
 
     @Test("a scope policy needs one of its scopes only for the targets it applies to")
@@ -97,7 +109,7 @@ struct ValueTests {
         #expect(Set([authorization, authorization]).count == 1)
         let exchange = TokenExchangeRequest(subjectToken: Secret("a"), subjectTokenType: .accessToken)
         #expect(Set([exchange, exchange]).count == 1)
-        #expect(Set([SessionEvent.signedIn, .signedIn, .storageFailed]).count == 2)
+        #expect(Set([OAuthSession.Event.signedIn, .signedIn, .storageFailed]).count == 2)
     }
 
     @Test("target selectors and closure policies")

@@ -1,19 +1,21 @@
 # Sessions and token targets
 
-One ``TokenManager`` holds one signed-in root grant and every access token
+One ``OAuthSession`` holds one signed-in root grant and every access token
 derived from it.
 
 ## The root grant
 
-``TokenManager/signIn(with:requestedScope:)`` adopts the result of a sign-in
-flow. The refresh token and ID token become the stored ``Credential``; the
+``OAuthSession/signIn(with:requestedScope:)`` adopts the result of a sign-in
+flow. It authenticates nobody and sends nothing to the authorization server:
+the flow of ``OAuthClient`` did that. The refresh token and ID token become
+the stored ``Credential``; the
 access token of the response is cached as the first token of the
 ``TokenTarget/default`` target. Only the credential is persisted. Access
 tokens live in memory and are asked for again after a restart.
 
 A grant that issued no refresh token still works until its access token
 expires. Then the session ends with the reason
-``SignOutReason/expiredWithoutRefreshToken``.
+``OAuthSession/SignOutReason/expiredWithoutRefreshToken``.
 
 The stored ``Credential`` keeps the ID token, if one was issued, without
 validating it: PassportKit is an OAuth 2.0 client, not an OpenID Connect
@@ -21,7 +23,7 @@ relying party. Do not treat it as proof of identity.
 
 ## Asking for a token
 
-``TokenManager/accessToken(for:)`` returns a token that is valid for at least
+``OAuthSession/accessToken(for:)`` returns a token that is valid for at least
 the configured minimum lifetime, refreshing when needed. A ``TokenTarget``
 says what the token is for:
 
@@ -29,18 +31,18 @@ says what the token is for:
 let items = URL(string: "https://api.example.com/items")!
 
 // The default: the root grant's own token.
-let general = try await manager.accessToken()
+let general = try await session.accessToken()
 
 // A token bound to one resource (RFC 8707), refreshed from the root grant.
-let bound = try await manager.accessToken(
+let bound = try await session.accessToken(
     for: .refreshGrant(resources: [items], scope: ["items.read"]))
 
 // A token for another service, exchanged from the default token (RFC 8693).
-let exchanged = try await manager.accessToken(
+let exchanged = try await session.accessToken(
     for: .exchange(audiences: ["reports"]))
 ```
 
-The manager keeps at most 256 tokens and 256 remembered rejections, dropping
+The session keeps at most 256 tokens and 256 remembered rejections, dropping
 expired entries first and then the oldest, so targets built from request URLs
 cannot grow it without bound.
 
@@ -63,11 +65,11 @@ A target with audiences must use the exchange derivation. Use the refresh grant
 when the server issues resource-bound tokens from the refresh token, and the
 exchange when your server requires it.
 
-``TokenManager/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``
+``OAuthSession/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``
 exchanges the refresh token itself, for example to hand a refresh token to
 another component. It is not cached and does not run the acceptance policy;
 the result belongs to your app. The returned response has no `refreshToken`:
-the rotated refresh token of the session is saved by the manager and is not
+the rotated refresh token of the session is saved by the session and is not
 yours to use elsewhere. Once the server answered, the result is returned even
 if the session ended or was replaced meanwhile. If your app must not use a
 token of an ended session, check your own state when the call returns and
@@ -77,20 +79,20 @@ until it expires.
 
 ## A session from a refresh token you already hold
 
-``TokenManager/signIn(refreshToken:grantedScope:idToken:)`` starts a session
+``OAuthSession/signIn(refreshToken:grantedScope:idToken:)`` starts a session
 from a refresh token that did not come from a grant response. It has the
-semantics of ``TokenManager/signIn(with:requestedScope:)`` (the credential is
-saved before it returns and ``SessionEvent/signedIn`` is emitted), but no
-access token is cached: the first ``TokenManager/accessToken(for:)`` refreshes
+semantics of ``OAuthSession/signIn(with:requestedScope:)`` (the credential is
+saved before it returns and ``OAuthSession/Event/signedIn`` is emitted), but no
+access token is cached: the first ``OAuthSession/accessToken(for:)`` refreshes
 with that token. A typical source is the audience exchange above, which
 derives a refresh token for another client; the issued token arrives in
 `accessToken`, whatever its type:
 
 ```swift
-// A manager for the client that the exchanged token was issued to.
-let reports = TokenManager(client: reportsClient, store: reportsStore, account: reportsAccount)
+// A session for the client that the exchanged token was issued to.
+let reports = OAuthSession(client: reportsClient, store: reportsStore, account: reportsAccount)
 
-let issued = try await manager.exchangeRefreshToken(audiences: ["reports"])
+let issued = try await session.exchangeRefreshToken(audiences: ["reports"])
 try await reports.signIn(refreshToken: issued.accessToken, grantedScope: ["reports.read"])
 
 // Refreshes with the issued token; the rotated one is saved for next time.
@@ -98,7 +100,7 @@ let token = try await reports.accessToken()
 ```
 
 Nothing is sent when you seed a session, so an invalid or revoked token
-shows up at the first ``TokenManager/accessToken(for:)``: `invalid_grant`
+shows up at the first ``OAuthSession/accessToken(for:)``: `invalid_grant`
 ends the session as it does for any other.
 
 ## Rotation and the lane
@@ -109,7 +111,7 @@ refresh-token exchange, revocation) therefore runs in one first-in
 first-out lane per session. The lane reads the refresh token when its turn
 starts, so it always sends the newest one, and a rotated token is saved to
 the store before the access token is returned. If saving fails the session
-continues in memory and ``SessionEvent/storageFailed`` is emitted.
+continues in memory and ``OAuthSession/Event/storageFailed`` is emitted.
 
 You do not manage the lane. The consequences for you:
 
@@ -119,7 +121,7 @@ You do not manage the lane. The consequences for you:
   finishes and its rotated token is saved.
 - Results that arrive after a sign-out or a new sign-in are discarded,
   except the issued token of an answered
-  ``TokenManager/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``,
+  ``OAuthSession/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)``,
   which is still returned to you.
   Each session has its own lane, so a request that never answers cannot
   block the next session.
@@ -127,25 +129,35 @@ You do not manage the lane. The consequences for you:
 ## When a session ends
 
 Only the server rejecting the refresh token (`invalid_grant`) ends a
-session: the credential is deleted, ``SessionEvent/signedOut(reason:)`` is
+session: the credential is deleted, ``OAuthSession/Event/signedOut(reason:)`` is
 emitted, and later calls throw ``PassportError/Code-swift.struct/notAuthenticated``
 with recovery ``PassportError/Recovery-swift.enum/reauthenticate``. Failures
 that concern one resource never end it; see <doc:ResourceAccessAndScopes>.
 
-``TokenManager/signOut(revoke:)`` clears the session and, by default,
+``OAuthSession/signOut(revoke:)`` clears the session and, by default,
 revokes the newest refresh token (RFC 7009) with a time limit. The
-``SignOutResult`` reports whether the stored credential was deleted and what
+``OAuthSession/SignOutResult`` reports whether the stored credential was deleted and what
 happened to the revocation; the in-memory session is always cleared.
 
-``TokenManager/beginSignOut(revoke:)`` does the same but returns as soon as
+Signing out ends the session in your app. The person stays signed in at the
+authorization server, and a browser that shares that sign-in can complete the
+next sign-in without a prompt. Only an ephemeral browser session
+(`prefersEphemeralWebBrowserSession`, see <doc:NativeAppRedirects>) prevents
+that, so use one where another person must not get this person's account,
+such as on a shared device. ``AuthorizationRequest/Prompt/login`` in the
+request's `prompt` asks the server to authenticate the person again (OpenID
+Connect Core §3.1.2.1), but a server may ignore it, and PassportKit cannot
+tell whether it did.
+
+``OAuthSession/beginSignOut(revoke:)`` does the same but returns as soon as
 the session is cleared, before the store or the server answer. Await
-``PendingSignOut/result`` for the ``SignOutResult`` when you need it, or
+``OAuthSession/PendingSignOut/result`` for the ``OAuthSession/SignOutResult`` when you need it, or
 never. A sign-in may follow at once: the pending revocation neither waits for
 it nor touches the new session.
 
 ## After a 401
 
-``TokenManager/invalidate(_:)`` drops a cached token that a resource server
+``OAuthSession/discard(_:)`` drops a cached token that a resource server
 rejected. Pass the exact ``AccessToken`` that was used: only that token is
 dropped, so many concurrent 401s for one token cause one refresh.
-``RequestAuthorizer`` does this for you.
+``ProtectedResourceClient`` does this for you.

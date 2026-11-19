@@ -24,8 +24,8 @@ about redirect URIs and does not extend to endpoints that receive the client sec
   `Discovery.fetchMetadata(issuer:allowsInsecureLoopbackEndpoints:…)`, `Endpoints.init(metadata:allowsInsecureLoopbackEndpoints:)` and
   `ClientConfiguration.init(metadata:…allowsInsecureLoopbackEndpoints:)`. Passing it to one does not imply the others,
   but the configuration stores it so the client does not need a second source of truth.
-- Verification URIs of the device flow and the resource URLs a `RequestAuthorizer` signs follow the same rule through
-  the configuration of the manager's client: both put a credential or a code in front of a person or a server, and a
+- Verification URIs of the device flow and the resource URLs a `ProtectedResourceClient` signs follow the same rule through
+  the configuration of the session's client: both put a credential or a code in front of a person or a server, and a
   second, implicit policy would be surprising.
 - Redirect URIs keep the RFC 8252 §7.3 rule (`http` only on a loopback host) and are not affected by the opt-in.
 - Violations throw `.invalidConfiguration`; the message tells the app to opt in to insecure loopback endpoints.

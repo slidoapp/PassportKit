@@ -2,7 +2,7 @@ import PassportKit
 import PassportKitTesting
 import Testing
 
-@Suite("TokenManager: a response without scope", .timeLimit(.minutes(1)))
+@Suite("OAuthSession: a response without scope", .timeLimit(.minutes(1)))
 struct OmittedScopeTests {
     @Test("RFC 6749 §6: a refresh without scope and a response without scope keep the originally granted scope")
     func refreshKeepsTheGrantedScope() async throws {

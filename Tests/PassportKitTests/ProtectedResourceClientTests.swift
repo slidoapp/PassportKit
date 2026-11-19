@@ -6,14 +6,14 @@ import Testing
 @testable import PassportKit
 
 @Suite(.timeLimit(.minutes(1)))
-struct RequestAuthorizerTests {
-    private func authorizer(allowsInsecureLoopback: Bool = false) throws -> RequestAuthorizer {
-        let manager = TokenManager(
+struct ProtectedResourceClientTests {
+    private func authorizer(allowsInsecureLoopback: Bool = false) throws -> ProtectedResourceClient {
+        let manager = OAuthSession(
             client: try ClientFixtures.client(
                 RecordingTransport(), allowsInsecureLoopback: allowsInsecureLoopback),
             store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "unit", account: "user"))
-        return RequestAuthorizer(manager: manager)
+        return ProtectedResourceClient(session: manager)
     }
 
     private let token = AccessToken(value: Secret("opaque"), tokenType: "Bearer")
@@ -23,15 +23,16 @@ struct RequestAuthorizerTests {
         var status: Int
         var challenges: [String]
         var attempt: Int
-        var expected: RetryDecision
+        var expected: ProtectedResourceClient.RetryDecision
         var testDescription: String { name }
     }
 
     private static let invalidToken = #"Bearer error="invalid_token""#
     private static let insufficientScope = #"Bearer error="insufficient_scope", scope="admin""#
-    private static let unauthorized = RetryDecision.fail(
+    private static let unauthorized = ProtectedResourceClient.RetryDecision.fail(
         PassportError(.unauthorized, recovery: .resourceDenied, statusCode: 401))
-    private static let scopeFailure = RetryDecision.fail(PassportError(.insufficientScope, statusCode: 401))
+    private static let scopeFailure = ProtectedResourceClient.RetryDecision.fail(
+        PassportError(.insufficientScope, statusCode: 401))
 
     static let table: [Case] = [
         Case(name: "200", status: 200, challenges: [], attempt: 0, expected: .deliver),
@@ -102,23 +103,24 @@ struct RequestAuthorizerTests {
         let url = try #require(URL(string: text))
         // Signed out: an allowed URL gets as far as the missing token, a rejected one never does.
         let expected: PassportError.Code = allowed ? .notAuthenticated : .invalidConfiguration
-        #expect(await thrownCode { _ = try await authorizer.sign(URLRequest(url: url)) } == expected)
+        #expect(await thrownCode { _ = try await authorizer.addingToken(to: URLRequest(url: url)) } == expected)
         #expect(
-            await thrownCode { _ = try await authorizer.sign(HTTPRequest(method: .get, url: url)) } == expected)
+            await thrownCode { _ = try await authorizer.addingToken(to: HTTPRequest(method: .get, url: url)) }
+                == expected)
     }
 
     private func signedIn(
         token: String = "opaque", tokenType: String = "Bearer", allowedOrigins: Set<URL>? = nil,
         allowsInsecureLoopback: Bool = false
-    ) async throws -> RequestAuthorizer {
-        let manager = TokenManager(
+    ) async throws -> ProtectedResourceClient {
+        let manager = OAuthSession(
             client: try ClientFixtures.client(
                 RecordingTransport(), allowsInsecureLoopback: allowsInsecureLoopback),
             store: InMemoryCredentialStore(),
             account: CredentialAccount(service: "unit", account: "user"))
         try await manager.signIn(
             with: TokenResponse(accessToken: Secret(token), tokenType: tokenType, expiresIn: .seconds(3600)))
-        return RequestAuthorizer(manager: manager, allowedOrigins: allowedOrigins)
+        return ProtectedResourceClient(session: manager, allowedOrigins: allowedOrigins)
     }
 
     @Test(
@@ -133,7 +135,7 @@ struct RequestAuthorizerTests {
         let origins = ["https://api.example.com/ignored/path", "http://localhost:8080"].compactMap { URL(string: $0) }
         let authorizer = try await signedIn(allowedOrigins: Set(origins), allowsInsecureLoopback: true)
         let url = try #require(URL(string: text))
-        let result = await thrownCode { _ = try await authorizer.sign(HTTPRequest(method: .get, url: url)) }
+        let result = await thrownCode { _ = try await authorizer.addingToken(to: HTTPRequest(method: .get, url: url)) }
         #expect(result == (allowed ? nil : .invalidConfiguration))
     }
 
@@ -141,7 +143,7 @@ struct RequestAuthorizerTests {
     func noAllowList() async throws {
         let authorizer = try await signedIn()
         let url = try #require(URL(string: "https://evil.example/"))
-        let (signed, _) = try await authorizer.sign(HTTPRequest(method: .get, url: url))
+        let (signed, _) = try await authorizer.addingToken(to: HTTPRequest(method: .get, url: url))
         #expect(signed.headerFields[.authorization] == "Bearer opaque")
     }
 
@@ -154,7 +156,7 @@ struct RequestAuthorizerTests {
     func tokenSyntax(_ token: String, _ valid: Bool) async throws {
         let authorizer = try await signedIn(token: token)
         let url = try #require(URL(string: "https://api.example.com/x"))
-        let code = await thrownCode { _ = try await authorizer.sign(HTTPRequest(method: .get, url: url)) }
+        let code = await thrownCode { _ = try await authorizer.addingToken(to: HTTPRequest(method: .get, url: url)) }
         #expect(code == (valid ? nil : .invalidResponse))
     }
 
