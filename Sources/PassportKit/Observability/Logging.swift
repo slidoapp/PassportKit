@@ -18,7 +18,7 @@ enum LogKey {
 extension Logger.Metadata {
     /// The metadata of one request to an authorization server endpoint: never a URL, header or body.
     static func request(
-        endpoint: EndpointKind, grantType: GrantType? = nil, status: Int? = nil, errorCode: String? = nil,
+        endpoint: RequestEvent.Endpoint, grantType: GrantType? = nil, status: Int? = nil, errorCode: String? = nil,
         duration: Duration? = nil
     ) -> Logger.Metadata {
         var metadata: Logger.Metadata = [LogKey.endpoint: "\(endpoint.rawValue)"]

@@ -140,7 +140,7 @@ let client = try OAuthClient(configuration: configuration, logger: logger)
 
 `debug` shows each request with its endpoint, grant type, status and duration, `info` the session lifecycle,
 and `notice` and `warning` storage failures, policy rejections, retries and revocation failures. Logs never contain
-tokens, codes, verifiers, URLs with queries or response bodies. Use a ``PassportObserver`` for typed events.
+tokens, codes, verifiers, URLs with queries or response bodies. Use a ``RequestObserver`` for typed events.
 
 ## Call an API
 

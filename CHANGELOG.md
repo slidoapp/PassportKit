@@ -35,6 +35,9 @@ are kept.
   `sign(_:for:)` is `addingToken(to:for:)`, because a bearer token is not a signature.
   `data(for:target:session:)` is `data(for:target:urlSession:)`, because "session" means the OAuth session.
   `RetryDecision` is `ProtectedResourceClient.RetryDecision`.
+- **Breaking:** `PassportObserver` is `RequestObserver` and `PassportEvent` is `RequestEvent`, because the events
+  report requests and the `Passport` prefix said only which library they come from. `EndpointKind` is
+  `RequestEvent.Endpoint`. `PassportError` is the only type left with the library prefix.
 
 ## [1.0.1] - 2026-11-01
 

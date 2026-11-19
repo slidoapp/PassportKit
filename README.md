@@ -99,7 +99,7 @@ where a token may be sent. The `passportkit-example` executable runs the device 
 The library logs through [swift-log](https://github.com/apple/swift-log) with a logger labelled `PassportKit`, so
 whatever `LoggingSystem.bootstrap` your app configured applies. Pass `logger:` to `OAuthClient`, `OAuthSession`,
 `Discovery.fetchMetadata`, `KeychainCredentialStore` or the user agents to choose the label or metadata. Tokens,
-codes, verifiers and URLs with queries are never logged. `PassportObserver` is the channel for typed events. See the
+codes, verifiers and URLs with queries are never logged. `RequestObserver` is the channel for typed events. See the
 [getting started](Sources/PassportKit/PassportKit.docc/GettingStarted.md) article for the levels.
 
 ## Documentation

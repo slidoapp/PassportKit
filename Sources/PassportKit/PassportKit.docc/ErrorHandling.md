@@ -82,6 +82,6 @@ func watch(_ session: OAuthSession) async {
 ## Logging
 
 Descriptions of errors, events and every public value hide credentials. Use
-a ``PassportObserver`` to see requests, response codes and durations without
+a ``RequestObserver`` to see requests, response codes and durations without
 bodies or secrets. The library also logs through swift-log with the same rules;
 see <doc:GettingStarted>.

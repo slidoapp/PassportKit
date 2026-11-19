@@ -53,11 +53,11 @@ final class RenderingLog: Sendable {
     }
 }
 
-/// Collects `PassportEvent`s.
-final class EventLog: PassportObserver, Sendable {
-    private let events = Locked<[PassportEvent]>([])
-    var all: [PassportEvent] { events.read() }
-    func record(_ event: PassportEvent) { events.update { $0.append(event) } }
+/// Collects `RequestEvent`s.
+final class EventLog: RequestObserver, Sendable {
+    private let events = Locked<[RequestEvent]>([])
+    var all: [RequestEvent] { events.read() }
+    func record(_ event: RequestEvent) { events.update { $0.append(event) } }
 }
 
 /// Forwards to the fake server and remembers every secret that crossed the wire in either direction.

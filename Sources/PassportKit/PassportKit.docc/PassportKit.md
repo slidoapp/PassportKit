@@ -111,9 +111,9 @@ appear in descriptions, errors or events.
 
 ### Observability
 
-- ``PassportObserver``
-- ``PassportEvent``
-- ``EndpointKind``
+- ``RequestObserver``
+- ``RequestEvent``
+- ``RequestEvent/Endpoint``
 
 ### HTTP
 

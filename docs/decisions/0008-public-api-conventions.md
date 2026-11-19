@@ -20,7 +20,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   whose values come from a registry, a specification that adds values,
   or the library's own roadmap is a struct with a `rawValue` or private
   storage and `static` members, like `GrantType`: `ClientAuthentication`,
-  `TokenTarget.Derivation`, `EndpointKind`, `TokenTypeHint`,
+  `TokenTarget.Derivation`, `RequestEvent.Endpoint`, `TokenTypeHint`,
   `AuthorizationRequest.Prompt`, `TargetSelector`. A type that describes a
   closed outcome the caller must handle stays an enum and is documented
   as not frozen, so callers switch with a `default`: `Recovery`,
@@ -73,7 +73,7 @@ Protocol wire names are named constants, chosen by what kind of value they are.
 | Kind | Construct |
 |---|---|
 | Closed set the code switches over (CLI options) | `enum X: String, CaseIterable` |
-| Open, extensible protocol values (grant types, error codes, token types) | `struct X: RawRepresentable` with `static let` members (`GrantType`, `PassportError.Code`, `TokenTypeIdentifier`, `TokenTypeHint`, `EndpointKind`, `Prompt`) |
+| Open, extensible protocol values (grant types, error codes, token types) | `struct X: RawRepresentable` with `static let` members (`GrantType`, `PassportError.Code`, `TokenTypeIdentifier`, `TokenTypeHint`, `RequestEvent.Endpoint`, `Prompt`) |
 | Names that only appear on the wire (form and query parameters, JSON members) | caseless `enum` namespace with `static let` members and the RFC section in a trailing comment |
 | JSON decoded through `Codable` | `CodingKeys` |
 | HTTP header names | `HTTPField.Name` constants; `rawName` where `URLRequest` needs a string |

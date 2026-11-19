@@ -339,7 +339,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
                 wallClock: any WallClock = SystemWallClock(),
                 clock: any Clock<Duration> = ContinuousClock(),
                 random: any RandomSource = SystemRandomSource(),
-                observer: (any PassportObserver)? = nil,
+                observer: (any RequestObserver)? = nil,
                 logger: Logger = Logger(label: "PassportKit")) throws
     public let configuration: ClientConfiguration
     public let wallClock: any WallClock
@@ -915,7 +915,7 @@ public enum Discovery {
     /// `.openIDConnect` appends `/.well-known/openid-configuration` instead.
     public static func fetchMetadata(issuer: URL, style: Style = .oauth, validation: IssuerValidation = .strict,
                                      transport: any HTTPTransport = URLSessionTransport(),
-                                     observer: (any PassportObserver)? = nil,
+                                     observer: (any RequestObserver)? = nil,
                                      clock: any Clock<Duration> = ContinuousClock(),
                                      logger: Logger = Logger(label: "PassportKit")) async throws -> AuthorizationServerMetadata
     public enum Style: Sendable { case oauth, openIDConnect }
@@ -925,7 +925,7 @@ public enum Discovery {
 Metadata keys are the RFC's snake_case names; members the type does not model
 are kept in `additionalFields` and re-encoded. `fetchMetadata` reports
 `.request`, `.response` and `.transportFailure` events with
-`EndpointKind.metadata` to the observer, timed on `clock`. It sends `GET` with
+`RequestEvent.Endpoint.metadata` to the observer, timed on `clock`. It sends `GET` with
 `Accept: application/json`; terminating slashes of the issuer path are removed
 before the well-known segment is added (`https://as.example.com/t/` gives
 `https://as.example.com/.well-known/oauth-authorization-server/t`). The issuer
@@ -948,14 +948,16 @@ scheme does not change public types.
 ## 12. Observability
 
 ```swift
-public protocol PassportObserver: Sendable { func record(_ event: PassportEvent) }
-public enum PassportEvent: Sendable {
-    case request(endpoint: EndpointKind, grantType: GrantType?)
-    case response(endpoint: EndpointKind, statusCode: Int, errorCode: String?, duration: Duration)
-    case transportFailure(endpoint: EndpointKind, grantType: GrantType?, duration: Duration)
+public protocol RequestObserver: Sendable { func record(_ event: RequestEvent) }
+public enum RequestEvent: Sendable {
+    case request(endpoint: Endpoint, grantType: GrantType?)
+    case response(endpoint: Endpoint, statusCode: Int, errorCode: String?, duration: Duration)
+    case transportFailure(endpoint: Endpoint, grantType: GrantType?, duration: Duration)
 }
-public struct EndpointKind: RawRepresentable, Sendable, Hashable {   // open
-    public static let token, deviceAuthorization, revocation, metadata, resource: EndpointKind
+extension RequestEvent {
+    public struct Endpoint: RawRepresentable, Sendable, Hashable {   // open
+        public static let token, deviceAuthorization, revocation, metadata, resource: Endpoint
+    }
 }
 ```
 
@@ -966,9 +968,8 @@ secrets.
 
 ### Logging
 
-Logging through swift-log is an additional channel; `PassportObserver` and
-`PassportEvent` are unchanged and remain the interface for metrics and
-tests. `OAuthClient.init`, `Discovery.fetchMetadata`,
+Logging through swift-log is an additional channel; `RequestObserver` and
+`RequestEvent` are the interface for metrics and tests. `OAuthClient.init`, `Discovery.fetchMetadata`,
 `KeychainCredentialStore.init`, `LoopbackRedirectListener.start` and
 `WebAuthenticationSessionUserAgent.init` take `logger: Logger =
 Logger(label: "PassportKit")`; with the default label the lines go to the

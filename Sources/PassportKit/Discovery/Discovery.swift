@@ -41,8 +41,8 @@ public enum Discovery {
     /// The endpoints inside the returned metadata are checked when a ``ClientConfiguration`` or ``Endpoints``
     /// is created from it, with the same opt-in.
     ///
-    /// With an `observer`, the request is reported as ``PassportEvent`` values with
-    /// ``EndpointKind/metadata``; durations are measured on `clock`. `Retry-After` dates are not interpreted
+    /// With an `observer`, the request is reported as ``RequestEvent`` values with
+    /// ``RequestEvent/Endpoint/metadata``; durations are measured on `clock`. `Retry-After` dates are not interpreted
     /// here (no calendar clock): only delta-seconds are honoured. Requests are logged to `logger` the way
     /// ``OAuthClient`` logs its own.
     public static func fetchMetadata(
@@ -51,7 +51,7 @@ public enum Discovery {
         validation: IssuerValidation = .strict,
         allowsInsecureLoopbackEndpoints: Bool = false,
         transport: any HTTPTransport = URLSessionTransport(),
-        observer: (any PassportObserver)? = nil,
+        observer: (any RequestObserver)? = nil,
         clock: any Clock<Duration> = ContinuousClock(),
         logger: Logger = Logger(label: "PassportKit")
     ) async throws -> AuthorizationServerMetadata {

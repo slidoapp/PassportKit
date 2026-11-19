@@ -31,7 +31,7 @@ Testing depends on the core, never the reverse. External dependencies follow ADR
 | `ProtectedResources` | `ProtectedResourceClient` and `ProtectedResourceClient.RetryDecision` |
 | `Storage` | `KeychainCredentialStore` |
 | `UserAgents` | `WebAuthenticationSessionUserAgent`, `LoopbackRedirectListener`, `LoopbackUserAgent` |
-| `Observability` | `PassportObserver`, `PassportEvent`, logging keys |
+| `Observability` | `RequestObserver`, `RequestEvent`, logging keys |
 
 Tests mirror this: `PassportKitTests` (units), `PassportKitTestingTests` (the fake server), `ConformanceTests`
 (scenarios), `IntegrationTests` (real server). See `docs/testing.md`.
