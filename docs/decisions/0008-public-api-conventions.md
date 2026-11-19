@@ -1,6 +1,6 @@
 # 0008. Public API conventions
 
-- Status: accepted
+- Status: accepted; amended by [0016](0016-public-api-naming.md)
 - Date: 2026-10-08
 
 ## Context
