@@ -6,7 +6,9 @@ derived from it.
 ## The root grant
 
 ``OAuthSession/signIn(with:requestedScope:)`` adopts the result of a sign-in
-flow. The refresh token and ID token become the stored ``Credential``; the
+flow. It authenticates nobody and sends nothing to the authorization server:
+the flow of ``OAuthClient`` did that. The refresh token and ID token become
+the stored ``Credential``; the
 access token of the response is cached as the first token of the
 ``TokenTarget/default`` target. Only the credential is persisted. Access
 tokens live in memory and are asked for again after a restart.
@@ -136,6 +138,16 @@ that concern one resource never end it; see <doc:ResourceAccessAndScopes>.
 revokes the newest refresh token (RFC 7009) with a time limit. The
 ``OAuthSession/SignOutResult`` reports whether the stored credential was deleted and what
 happened to the revocation; the in-memory session is always cleared.
+
+Signing out ends the session in your app. The person stays signed in at the
+authorization server, and a browser that shares that sign-in can complete the
+next sign-in without a prompt. Only an ephemeral browser session
+(`prefersEphemeralWebBrowserSession`, see <doc:NativeAppRedirects>) prevents
+that, so use one where another person must not get this person's account,
+such as on a shared device. ``AuthorizationRequest/Prompt/login`` in the
+request's `prompt` asks the server to authenticate the person again (OpenID
+Connect Core §3.1.2.1), but a server may ignore it, and PassportKit cannot
+tell whether it did.
 
 ``OAuthSession/beginSignOut(revoke:)`` does the same but returns as soon as
 the session is cleared, before the store or the server answer. Await

@@ -145,6 +145,9 @@ public actor OAuthSession {
     /// default token when its lifetime is known. `requestedScope` is the scope of the grant request, used when
     /// the response omits `scope` (RFC 6749 §5.1).
     ///
+    /// Signing in adopts tokens that a flow of ``OAuthClient`` obtained. It authenticates nobody and sends nothing to
+    /// the authorization server.
+    ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/tokenRejected`` when the
     /// acceptance policy rejects the access token. The session is still established.
     public func signIn(with response: TokenResponse, requestedScope: ScopeSet? = nil) async throws {
@@ -237,8 +240,16 @@ public actor OAuthSession {
     /// limited to ``OAuthClient/revocationTimeLimit``. In-flight operations of the ended session are
     /// discarded, but the revocation targets the newest refresh token the session was issued, including one
     /// rotated by a request that was already in flight. If the store cannot delete the credential,
-    /// ``OAuthSession/SignOutResult/isStoredCredentialDeleted`` is false, ``OAuthSession/Event/storageFailed`` is emitted, and
-    /// ``restore()`` would restore the session.
+    /// ``OAuthSession/SignOutResult/isStoredCredentialDeleted`` is false, ``OAuthSession/Event/storageFailed`` is
+    /// emitted, and ``restore()`` would restore the session.
+    ///
+    /// Signing out ends the session in the app. The person stays signed in at the authorization server, and a
+    /// browser that shares that sign-in, such as ``WebAuthenticationSessionUserAgent`` without
+    /// `prefersEphemeralWebBrowserSession`, can complete the next sign-in without a prompt. Only an ephemeral
+    /// browser session prevents that, so use one where another person must not get this person's account.
+    /// ``AuthorizationRequest/Prompt/login`` in ``AuthorizationRequest/prompt`` asks the server to authenticate the
+    /// person again (OpenID Connect Core §3.1.2.1), but a server may ignore it, and the library cannot tell whether
+    /// it did.
     ///
     /// Returns once the delete and the revocation finished. To carry on as soon as local state is cleared, use
     /// ``beginSignOut(revoke:)``; this method is that call followed by ``OAuthSession/PendingSignOut/result``.

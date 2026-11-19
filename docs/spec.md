@@ -590,6 +590,17 @@ first refresh also records the grant's scope when `grantedScope` is nil
 leaves the current session untouched. Nothing else is validated until the first
 refresh: an invalid token surfaces then, and `invalid_grant` ends the session.
 
+Neither `signIn` authenticates anyone. Both adopt tokens that a flow of
+`OAuthClient` (§8) or the app obtained, and neither sends a request.
+`signOut` ends the session in the app and, with `revoke: true`, revokes its
+refresh token best effort; the person stays signed in at the authorization
+server. A browser that shares that sign-in (`ASWebAuthenticationSession`
+without `prefersEphemeralWebBrowserSession`, or the system browser of
+`LoopbackUserAgent`) can complete the next sign-in without a prompt. Only an
+ephemeral browser session prevents that. `prompt: [.login]` asks the server
+to authenticate the person again (OpenID Connect Core §3.1.2.1); a server may
+ignore it, and the library does not check that it did.
+
 Invariants (each has a conformance test):
 
 1. **One lane.** Every operation that sends the refresh token (refresh
