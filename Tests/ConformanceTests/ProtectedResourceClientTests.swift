@@ -72,7 +72,7 @@ struct ProtectedResourceClientConformanceTests {
         let fresh = try await harness.manager.accessToken()
         #expect(await harness.tokenRequests(.refreshToken).count == 1)
 
-        let decision = await authorizer.evaluate(
+        let decision = await authorizer.handleResponse(
             statusCode: rejection.status.code, headers: rejection.headerFields, token: stale, attempt: 0)
         #expect(decision == .retry)
         let (retried, token) = try await authorizer.addingToken(to: resource)

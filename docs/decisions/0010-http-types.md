@@ -97,7 +97,7 @@ public protocol HTTPTransport: Sendable {
   `(HTTPResponse, Data)`.
 
 **Names.** Public API that took `HTTPHeaders` takes `HTTPFields`
-(`OAuthClient.Configuration.additionalHeaders`, `ProtectedResourceClient.evaluate`).
+(`OAuthClient.Configuration.additionalHeaders`, `ProtectedResourceClient.handleResponse`).
 `AuthenticationChallenge.parse` keeps `[String]`, which is what
 `fields[values: .wwwAuthenticate]` returns. The recording types of
 `PassportKitTesting` expose `headerFields`, as `HTTPRequest` does.

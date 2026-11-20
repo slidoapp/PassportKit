@@ -40,6 +40,10 @@ aliases are kept.
 - **Breaking:** `Discovery.Style` is `Discovery.WellKnownDocument`, because it chooses which well-known document
   (RFC 8615) is fetched; its cases are unchanged. The labels of `Discovery.fetchMetadata` are `document:` and
   `issuerValidation:` instead of `style:` and `validation:`.
+- **Breaking:** `ProtectedResourceClient.evaluate(statusCode:headers:token:attempt:)` is
+  `handleResponse(statusCode:headers:token:attempt:)`. The method discards the token from the session before it
+  answers `.retry`, and the new name says that it acts on the response. "Evaluate" stays the word for a judgment
+  without side effects, as in `TokenAcceptancePolicy.evaluate(_:)`. The decision table is unchanged.
 - **Breaking:** the members of `AuthorizationServerMetadata` that transliterated RFC 8414 field names have Swift
   names: `codeChallengeMethodsSupported` is `supportedCodeChallengeMethods`, `grantTypesSupported` is
   `supportedGrantTypes` and holds `GrantType` values, and `authorizationResponseIssParameterSupported` is

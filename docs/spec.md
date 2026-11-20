@@ -847,10 +847,10 @@ public struct ProtectedResourceClient: Sendable {
     /// Returns the request with `Authorization: Bearer <token>` added. Throws if no token can be obtained; never returns the request without it.
     public func addingToken(to request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
     public func addingToken(to request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)   // the request is the caller's value: never log it
-    /// Decides what to do with a resource-server response for a request sent with `token`; before it answers
-    /// .retry it discards `token` from the session (OAuthSession.discard(_:)).
-    public func evaluate(statusCode: Int, headers: HTTPFields, token: AccessToken, attempt: Int) async -> RetryDecision
-    /// Convenience: add the token, send on the transport given at creation, evaluate, retry at most once.
+    /// Handles a resource-server response for a request sent with `token`: discards `token` from the session
+    /// (OAuthSession.discard(_:)) when the request should be retried, and returns the decision.
+    public func handleResponse(statusCode: Int, headers: HTTPFields, token: AccessToken, attempt: Int) async -> RetryDecision
+    /// Convenience: add the token, send on the transport given at creation, handle the response, retry at most once.
     public func send(_ request: HTTPRequest, body: Data? = nil, for target: TokenTarget = .default) async throws -> (HTTPResponse, Data)
     /// The same for `URLSession`; the URL session is required, the library never uses `URLSession.shared`.
     public func data(for request: URLRequest, target: TokenTarget = .default, urlSession: URLSession) async throws -> (Data, HTTPURLResponse)
@@ -877,7 +877,7 @@ is the `token68` form. A repeated parameter name keeps its first value. Parsing
 is lenient and total: malformed parts are skipped and input that is not a
 challenge yields an empty array.
 
-`evaluate` rules:
+`handleResponse` rules:
 
 | Response | Decision |
 |---|---|

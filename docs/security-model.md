@@ -117,4 +117,4 @@ follow the same rules as errors and events:
 - **401-triggered invalidation is not rate limited.** A resource that answers 401 `invalid_token` to every fresh
   token makes each request cost one refresh (a request retries once; concurrent requests for the same token share
   one refresh). A rate limit needs a policy for what to do over the limit and is left to the app, which can wrap
-  `ProtectedResourceClient.evaluate` or stop on repeated `unauthorized` errors.
+  `ProtectedResourceClient.handleResponse` or stop on repeated `unauthorized` errors.

@@ -83,7 +83,7 @@ struct ProtectedResourceClientTests {
     func decisionTable(_ row: Case) async throws {
         var headers = HTTPFields()
         for line in row.challenges { headers.append(HTTPField(name: .wwwAuthenticate, value: line)) }
-        let decision = try await authorizer().evaluate(
+        let decision = try await authorizer().handleResponse(
             statusCode: row.status, headers: headers, token: token, attempt: row.attempt)
         #expect(decision == row.expected)
     }
