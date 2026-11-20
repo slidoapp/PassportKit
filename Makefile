@@ -6,7 +6,7 @@ SWIFT_FORMAT_PATHS := $(wildcard Sources Tests Package.swift)
 # depends on PassportKit builds it with warnings suppressed, and Xcode refuses that combination.
 WARNINGS_AS_ERRORS := -Xswiftc -warnings-as-errors
 
-.PHONY: setup format lint build test test-ios check integration docs
+.PHONY: setup format lint build test build-ios test-ios check integration docs
 
 setup:
 	git config core.hooksPath .githooks
@@ -24,7 +24,12 @@ build:
 test:
 	swift test --parallel $(WARNINGS_AS_ERRORS)
 
-# Runs the tests on an iPhone simulator. Needs Xcode with an iOS runtime. Not part of `check`.
+# Compiles both libraries for iOS, so the UIKit code paths compile. Needs Xcode. Not part of `check`.
+build-ios:
+	xcodebuild build -quiet -scheme PassportKitTesting -destination 'generic/platform=iOS' \
+		-derivedDataPath .build/ios-build CODE_SIGNING_ALLOWED=NO
+
+# Runs the tests on an iPhone simulator. Needs Xcode with an iOS runtime. Not part of `check` or CI.
 test-ios:
 	scripts/test-ios.sh
 
@@ -36,7 +41,7 @@ docs:
 	scripts/build-docs.sh
 
 # Runs the integration tests against the local server in Tools/integration-server (needs Node.js and, on the
-# first run, network access for `npm ci`). Not part of `check`.
+# first run, network access for `npm ci`). Not part of `check`. It uses the flags of `build`, so it reuses that build.
 integration:
 	@set -e; \
 	[ -d $(INTEGRATION_SERVER)/node_modules ] || npm ci --prefix $(INTEGRATION_SERVER); \
@@ -51,5 +56,5 @@ integration:
 	done; \
 	[ -n "$$ready" ] || { echo "integration server did not start:"; cat "$$log"; exit 1; }; \
 	status=0; \
-	PASSPORTKIT_INTEGRATION_ISSUER=$$issuer swift test --filter IntegrationTests || status=$$?; \
+	PASSPORTKIT_INTEGRATION_ISSUER=$$issuer swift test --filter IntegrationTests $(WARNINGS_AS_ERRORS) || status=$$?; \
 	exit $$status

@@ -15,10 +15,14 @@ How PassportKit is tested, and how to add a test. Run `make check` for everythin
 
 ## iOS
 
-`make test-ios` runs the offline suites on the newest available iPhone
-simulator; CI runs it in the `ios` job. A package test bundle on the
-simulator has no host app and so no Keychain access group, so the
-Keychain suite skips itself there and runs on macOS only.
+The library and the tests are the same on macOS and iOS except for two
+UIKit code paths in the user agents. CI therefore runs the tests on macOS
+only, and its `build` job also compiles both libraries for iOS
+(`make build-ios`), which needs no simulator. `make test-ios` runs the
+offline suites on the newest available iPhone simulator when a change needs
+it; CI does not. A package test bundle on the simulator has no host app and
+so no Keychain access group, so the Keychain suite skips itself there and
+runs on macOS only.
 
 ## Integration tests
 
@@ -56,7 +60,7 @@ Rules specific to this layer:
 - A scenario that fails because of a library defect is wrapped in
   `withKnownIssue` with a pointer to the defect, not deleted.
 
-CI runs the same target in the `integration` job.
+CI runs the same target in the `build` job, on the build of the offline tests.
 
 ## Redaction canary
 

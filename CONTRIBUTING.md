@@ -112,12 +112,14 @@ Maintainers release by pushing a tag; the release workflow does the rest.
    that commit: `git tag -s 1.2.3 -m 1.2.3`.
 4. Push the tag: `git push origin 1.2.3`.
 
-The tag triggers `.github/workflows/release.yml`. It runs every job of
-`ci.yml` again for the tag, and only if all of them pass it creates the
-GitHub release with the changelog section as notes. It fails without
-creating a release when the changelog has no section for the tag. A
-failed run is fixed by a new commit and a new tag; delete the old tag
-first if it never produced a release.
+The tag triggers `.github/workflows/release.yml`, which creates the
+GitHub release with the changelog section as notes. It runs no tests,
+because every commit on `main` passed CI on the pull request that merged
+it: the ruleset of `main` requires the `lint`, `build` and `docs` checks
+and a branch that is up to date with `main`. The workflow fails
+without creating a release when the changelog has no section for the
+tag. Such a run is fixed by a new commit and a new tag; delete the old
+tag first, since it never produced a release.
 
 ### AI coding agents
 
