@@ -29,7 +29,7 @@ build-ios:
 	xcodebuild build -quiet -scheme PassportKitTesting -destination 'generic/platform=iOS' \
 		-derivedDataPath .build/ios-build CODE_SIGNING_ALLOWED=NO
 
-# Runs the tests on an iPhone simulator. Needs Xcode with an iOS runtime. Not part of `check`.
+# Runs the tests on an iPhone simulator. Needs Xcode with an iOS runtime. Not part of `check` or CI.
 test-ios:
 	scripts/test-ios.sh
 

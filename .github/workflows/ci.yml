@@ -1,9 +1,9 @@
 name: CI
 
+# CI runs on pull requests only. The ruleset of main requires the `lint`, `build` and `docs` checks and a branch that
+# is up to date with main, so the merged commit is the tested one.
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_call:
 
 concurrency:
@@ -20,45 +20,26 @@ jobs:
       - uses: actions/checkout@v7
       - run: make lint
 
-  macos:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v7
-      - run: make build
-      - run: make test
-
-  ios:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v7
-      - run: make test-ios
-      - if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ios-test-results
-          path: .build/ios/TestResults.xcresult
-
-  docs:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v7
-      - run: make docs
-
-  integration:
+  build:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: Tools/integration-server/package-lock.json
-      - run: npm ci --prefix Tools/integration-server
-      - run: make integration
+      - name: Install the integration server
+        run: npm ci --prefix Tools/integration-server
+      - name: Build
+        run: make build
+      - name: Offline tests
+        run: make test
+      - name: Integration tests
+        run: make integration
+      - name: iOS build
+        run: make build-ios
 
-  ci-success:
-    if: always()
-    needs: [lint, macos, ios, docs, integration]
-    runs-on: ubuntu-latest
+  docs:
+    runs-on: macos-26
     steps:
-      - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false"
+      - uses: actions/checkout@v7
+      - run: make docs
