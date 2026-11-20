@@ -39,6 +39,7 @@ make build        # build with tests; warnings are errors
 make test         # all offline tests, in parallel
 make check        # lint + build + test: the gate for every change
 make docs         # DocC archives of both libraries; fails on any warning (needs Xcode)
+make build-ios    # compile both libraries for iOS, no simulator (needs Xcode)
 make test-ios     # offline suites on an iPhone simulator (needs Xcode)
 make integration  # real flows against Tools/integration-server (needs Node.js)
 swift test --filter <Suite>/<test>   # one test

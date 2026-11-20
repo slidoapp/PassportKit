@@ -6,7 +6,7 @@ SWIFT_FORMAT_PATHS := $(wildcard Sources Tests Package.swift)
 # depends on PassportKit builds it with warnings suppressed, and Xcode refuses that combination.
 WARNINGS_AS_ERRORS := -Xswiftc -warnings-as-errors
 
-.PHONY: setup format lint build test test-ios check integration docs
+.PHONY: setup format lint build test build-ios test-ios check integration docs
 
 setup:
 	git config core.hooksPath .githooks
@@ -23,6 +23,11 @@ build:
 
 test:
 	swift test --parallel $(WARNINGS_AS_ERRORS)
+
+# Compiles both libraries for iOS, so the UIKit code paths compile. Needs Xcode. Not part of `check`.
+build-ios:
+	xcodebuild build -quiet -scheme PassportKitTesting -destination 'generic/platform=iOS' \
+		-derivedDataPath .build/ios-build CODE_SIGNING_ALLOWED=NO
 
 # Runs the tests on an iPhone simulator. Needs Xcode with an iOS runtime. Not part of `check`.
 test-ios:
