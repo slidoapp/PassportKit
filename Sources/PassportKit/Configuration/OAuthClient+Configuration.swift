@@ -22,12 +22,14 @@ extension OAuthClient {
         public var minimumTokenLifetime: Duration
         /// The lifetime assumed when `expires_in` is missing; `nil` treats such tokens as expired.
         public var defaultTokenLifetime: Duration?
-        /// Whether an authorization response must carry `iss` (RFC 9207 §2.4). Set it when the server's metadata
-        /// advertises `authorization_response_iss_parameter_supported`. Needs ``issuer``.
+        /// Whether an authorization response must carry `iss` (RFC 9207 §2.4). Set it when
+        /// ``AuthorizationServerMetadata/supportsIssuerInAuthorizationResponse`` is `true`;
+        /// ``init(metadata:authentication:additionalHeaders:minimumTokenLifetime:defaultTokenLifetime:allowsInsecureLoopbackEndpoints:)``
+        /// does that. Needs ``issuer``.
         public var requiresIssuerInAuthorizationResponse: Bool
-        /// Whether endpoints, the issuer and resource URLs on a loopback host (`localhost`, `127.0.0.1`, `[::1]`) may use
-        /// plain `http` (RFC 6749 §3.1, §3.2 require TLS). Off by default; turn it on for local development only.
-        /// A non-loopback `http` URL is always refused. It does not affect redirect URIs: RFC 8252 §7.3 allows an
+        /// Whether endpoints, the issuer, the verification URIs of the device flow and resource URLs on a loopback
+        /// host (`localhost`, `127.0.0.1`, `[::1]`) may use plain `http` (RFC 6749 §3.1, §3.2 require TLS). Off by
+        /// default; turn it on for local development only. A non-loopback `http` URL is always refused. It does not affect redirect URIs: RFC 8252 §7.3 allows an
         /// `http` loopback redirect URI for native apps regardless of this setting.
         public var allowsInsecureLoopbackEndpoints: Bool
 

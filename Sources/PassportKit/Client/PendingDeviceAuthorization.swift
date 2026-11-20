@@ -12,7 +12,10 @@ public struct PendingDeviceAuthorization: Sendable, CustomStringConvertible, Cus
     public internal(set) var userCode: String
     /// Where the user enters ``userCode`` (`verification_uri`; the `verification_url` alias is also accepted).
     public internal(set) var verificationURI: URL
-    /// A verification URI that already contains the user code, for QR codes. Used verbatim.
+    /// A verification URI that already contains the user code (`verification_uri_complete`, RFC 8628 §3.2,
+    /// §3.3.1), for example for a QR code. Used verbatim. `nil` when the server sent none, or sent one that is not
+    /// `https` (or `http` on a loopback host with
+    /// ``OAuthClient/Configuration/allowsInsecureLoopbackEndpoints``).
     public internal(set) var completeVerificationURI: URL?
     /// The lifetime granted by the server (`expires_in`).
     public internal(set) var expiresIn: Duration

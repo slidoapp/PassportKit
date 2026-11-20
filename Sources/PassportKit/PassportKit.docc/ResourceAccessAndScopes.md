@@ -28,18 +28,29 @@ only if at least one of the scopes you name was granted:
 ```swift
 let session = OAuthSession(
     client: client, store: .inMemory(), account: account,
-    acceptancePolicy: .requireAnyScope(["items.read", "items.write"]))
+    acceptancePolicy: .requireAnyScope(["items.read", "items.write"], for: .withResources))
 ```
+
+`for: .withResources` is the default, and the example spells it out because
+it decides which tokens are checked. The policy applies only to targets that
+name resources, which is where servers narrow scope when the person cannot
+use the resource. The tokens of ``TokenTarget/default`` and of token exchange
+targets that name only audiences are accepted without a check. To check every
+token the session issues, pass ``TokenTarget/Selector/all``:
+
+```swift
+let session = OAuthSession(
+    client: client, store: .inMemory(), account: account,
+    acceptancePolicy: .requireAnyScope(["items.read", "items.write"], for: .all))
+```
+
+``TokenTarget/Selector/matching(_:)`` chooses targets with a closure of your
+own. A token whose granted scope is unknown is rejected.
 
 Scopes are compared as exact strings. `*` is not a wildcard:
 `.requireAnyScope(["items.*"])` accepts only a token whose scope is
 literally named `items.*`, not `items.read`. List each scope you
 accept, or write the rule yourself as shown below.
-
-By default the policy applies to targets that name resources, which is
-where servers narrow scope when the person cannot use the resource. Pass
-`for:` with ``TokenTarget/Selector/all`` or ``TokenTarget/Selector/matching(_:)``
-to choose other targets. A token whose granted scope is unknown is rejected.
 
 ``OAuthSession`` accepts every token when you pass no policy, scope
 narrowing included. Pass one whenever your app depends on a scope or a

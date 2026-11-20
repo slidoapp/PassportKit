@@ -30,7 +30,11 @@ public struct TokenTarget: Sendable, Hashable {
     public var derivation: Derivation
     /// Resource indicators the token is bound to (RFC 8707).
     public var resources: [URL]
-    /// Logical target services (RFC 8693 §2.1). Only meaningful for ``Derivation/tokenExchange``.
+    /// Logical target services, sent as `audience` in a token exchange (RFC 8693 §2.1).
+    ///
+    /// Only a ``Derivation/tokenExchange`` target may name audiences: ``OAuthSession/accessToken(for:)`` throws
+    /// ``PassportError/Code-swift.struct/invalidConfiguration`` for a ``Derivation/refreshGrant`` target with
+    /// audiences.
     public var audiences: [String]
     /// The scope requested for the token.
     public var scope: ScopeSet?

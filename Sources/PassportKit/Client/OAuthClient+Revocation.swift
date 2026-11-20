@@ -8,8 +8,9 @@ extension OAuthClient {
 
     /// Revokes a token (RFC 7009 §2).
     ///
-    /// Any 2xx response is success regardless of its body (§2.2: unknown or already revoked tokens also
-    /// answer 200). A 503 is reported as ``PassportError/Code-swift.struct/temporarilyUnavailable`` with
+    /// `hint`, when given, is sent as `token_type_hint` (§2.1) and tells the server which kind of token `token`
+    /// is; the server may ignore it. Any 2xx response is success regardless of its body (§2.2: unknown or already
+    /// revoked tokens also answer 200). A 503 is reported as ``PassportError/Code-swift.struct/temporarilyUnavailable`` with
     /// `Retry-After` honoured (§2.2.1). Throws `invalidConfiguration` when no revocation endpoint is configured.
     public func revoke(_ token: Secret, hint: TokenTypeHint? = nil) async throws {
         var request = FormRequest(
@@ -27,7 +28,7 @@ extension OAuthClient {
     /// Revokes a token best effort and gives up after `timeLimit` on the client's clock (RFC 7009 §2).
     ///
     /// For a token that never became a session, for example a refresh token the app obtained but did not hand
-    /// to a ``OAuthSession``, so it can be invalidated at the server without holding up the app. Revocation is
+    /// to an ``OAuthSession``, so it can be invalidated at the server without holding up the app. Revocation is
     /// a courtesy to the server, and the token may still be valid whatever the outcome (RFC 7009 §2.2).
     ///
     /// Never throws. Returns ``RevocationOutcome/revoked`` for any 2xx (§2.2), ``RevocationOutcome/failed(_:)``

@@ -57,7 +57,10 @@ public struct TokenRequest: Sendable, Hashable {
     /// Exchanges one security token for another (RFC 8693 §2.1), with `audience` (§2.1) and `resource` (RFC 8707 §2)
     /// targets.
     ///
-    /// A response without `token_type` is accepted when `issued_token_type` is not an access token (§2.2.1).
+    /// The issued token is in ``TokenResponse/accessToken`` whatever its type, and
+    /// ``TokenResponse/issuedTokenType`` names the type. A response without `issued_token_type` is
+    /// ``PassportError/Code-swift.struct/invalidResponse``. A response without `token_type` is accepted when
+    /// `issued_token_type` is not an access token (§2.2.1).
     /// `invalid_grant` for a refresh-token subject has recovery ``PassportError/Recovery-swift.enum/reauthenticate``;
     /// a 401 `access_denied` is ``PassportError/Recovery-swift.enum/resourceDenied``.
     ///

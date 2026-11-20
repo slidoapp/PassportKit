@@ -155,7 +155,15 @@ enum DocumentationSnippets {
     static func policy(client: OAuthClient, account: CredentialAccount) {
         let session = OAuthSession(
             client: client, store: .inMemory(), account: account,
-            acceptancePolicy: .requireAnyScope(["items.read", "items.write"]))
+            acceptancePolicy: .requireAnyScope(["items.read", "items.write"], for: .withResources))
+        _ = session
+    }
+
+    // ResourceAccessAndScopes.md
+    static func policyForEveryTarget(client: OAuthClient, account: CredentialAccount) {
+        let session = OAuthSession(
+            client: client, store: .inMemory(), account: account,
+            acceptancePolicy: .requireAnyScope(["items.read", "items.write"], for: .all))
         _ = session
     }
 
@@ -212,6 +220,9 @@ enum DocumentationSnippets {
             break
         case .noAction:
             // Nothing to recover from, for example the person declined.
+            break
+        @unknown default:
+            // A recovery added in a later release. Treat it as a failure to report.
             break
         }
     }

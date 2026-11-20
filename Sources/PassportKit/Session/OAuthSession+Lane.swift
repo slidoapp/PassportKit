@@ -7,9 +7,10 @@ extension OAuthSession {
     /// Exchanges the refresh token for tokens of another audience or resource (RFC 8693 §2.1).
     ///
     /// The subject is the current refresh token. The issued token (for the default `requestedTokenType`, a
-    /// refresh token bound to `audiences`) is in `accessToken` of the returned response, whatever its type; the
-    /// session does not cache or judge it. A `refresh_token` in the server's response is the session's rotated
-    /// subject: the session saves it before this returns (persist before publish) and returns the response with
+    /// refresh token bound to `audiences`) is in ``TokenResponse/accessToken`` of the returned response, whatever
+    /// its type, and ``TokenResponse/issuedTokenType`` names the type. The session does not cache or judge it.
+    /// A `refresh_token` in the server's response is the session's rotated subject: the session saves it before
+    /// this returns (persist before publish) and returns the response with
     /// ``TokenResponse/refreshToken`` set to `nil`, because that token belongs to the session alone. Using it
     /// elsewhere would present it twice and could make the server revoke the grant (RFC 9700 §4.14.2).
     ///

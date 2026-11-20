@@ -6,7 +6,7 @@ import Foundation
     import UIKit
 #endif
 
-/// A `AuthorizationUserAgent` that opens the authorization URL in the system browser and waits for the redirect on
+/// An ``AuthorizationUserAgent`` that opens the authorization URL in the system browser and waits for the redirect on
 /// a running ``LoopbackRedirectListener`` (RFC 8252 §7.3).
 ///
 /// The agent ignores redirects whose `state` differs from the authorization URL's, so a stray request

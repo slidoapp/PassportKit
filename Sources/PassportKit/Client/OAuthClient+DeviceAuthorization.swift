@@ -39,8 +39,9 @@ extension OAuthClient {
     /// 5 seconds permanently (up to one hour); transport errors, 429 and 5xx back off exponentially from the interval up to 30
     /// seconds (a larger `Retry-After` wins) and the delay resets after the next server answer. No request is
     /// sent after the deadline: the call throws `expiredToken` with recovery `reauthenticate` instead.
-    /// `access_denied` throws with recovery `none`; `expired_token` is terminal. Cancellation stops
-    /// immediately with `CancellationError`.
+    /// `access_denied` throws with recovery ``PassportError/Recovery-swift.enum/noAction``, and `expired_token`
+    /// throws with recovery ``PassportError/Recovery-swift.enum/reauthenticate``; both end polling. Cancellation
+    /// stops immediately with `CancellationError`.
     public func completeDeviceAuthorization(
         _ authorization: PendingDeviceAuthorization,
         additionalParameters: AdditionalParameters = [:]

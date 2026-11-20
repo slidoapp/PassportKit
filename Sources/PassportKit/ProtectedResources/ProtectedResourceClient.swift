@@ -93,7 +93,13 @@ public struct ProtectedResourceClient: Sendable, CustomStringConvertible, Custom
         return (prepared, token)
     }
 
-    /// Decides what to do with a response to a request sent with `token` (RFC 6750 §3.1).
+    /// Decides what to do with a response to a request sent with `token` (RFC 6750 §3.1), and discards `token`
+    /// from the session before it answers ``RetryDecision/retry``.
+    ///
+    /// The discard (``OAuthSession/discard(_:)``) changes session state, so the next `addingToken(to:for:)` for
+    /// the target obtains a new token. Pass `attempt` 0 for the response to the first request and 1 for the
+    /// response to the retry.
+    /// ``send(_:body:for:)`` and ``data(for:target:urlSession:)`` call this method for you.
     ///
     /// - A 401 with `error="insufficient_scope"` fails with ``PassportError/Code-swift.struct/insufficientScope``.
     /// - A 401 with `error="invalid_token"` or without a Bearer error code, at `attempt` 0, discards

@@ -7,9 +7,17 @@ import Foundation
 public struct TokenResponse: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible,
     CustomReflectable
 {
-    /// The access token (`access_token`).
+    /// The issued token (`access_token`).
+    ///
+    /// For every grant except a token exchange, this is an access token. A token exchange response carries the
+    /// issued token in this member whatever its type, and ``issuedTokenType`` names the type (RFC 8693 §2.2.1).
+    /// ``OAuthSession/exchangeRefreshToken(audiences:resources:scope:requestedTokenType:)`` asks for a refresh
+    /// token by default, so its response holds a refresh token here.
     public var accessToken: Secret
     /// The token type (`token_type`), for example `Bearer`. Compare case-insensitively.
+    ///
+    /// When a token exchange issued something other than an access token and the response has no `token_type`,
+    /// the value is `N_A` (RFC 8693 §2.2.1).
     public var tokenType: String
     /// The lifetime from `expires_in`, or `nil` when the server omitted it.
     public var expiresIn: Duration?
@@ -19,7 +27,8 @@ public struct TokenResponse: Sendable, Hashable, CustomStringConvertible, Custom
     public var idToken: Secret?
     /// The `scope` as returned; `nil` when omitted. See ``grantedScope(requested:)``.
     public var scope: ScopeSet?
-    /// The `issued_token_type` of a token exchange response (RFC 8693 §2.2.1).
+    /// The type of the token in ``accessToken``, from the `issued_token_type` of a token exchange response
+    /// (RFC 8693 §2.2.1). A token exchange response always has it; other grants usually leave it `nil`.
     public var issuedTokenType: TokenTypeIdentifier?
     /// Every other member of the response, preserved without interpretation.
     public var additionalFields: [String: JSONValue]

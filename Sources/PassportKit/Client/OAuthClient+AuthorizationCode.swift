@@ -90,7 +90,8 @@ extension OAuthClient {
     /// 4. `iss` equals ``OAuthClient/Configuration/issuer`` by exact string comparison (`issuerMismatch`). It is
     ///    checked before `error` because RFC 9207 §2.4 requires it for error responses too. A missing `iss`
     ///    fails only when ``OAuthClient/Configuration/requiresIssuerInAuthorizationResponse`` is set.
-    /// 5. An `error` response becomes the matching error (RFC 6749 §4.1.2.1); `access_denied` has recovery `none`.
+    /// 5. An `error` response becomes the matching error (RFC 6749 §4.1.2.1); `access_denied` has recovery
+    ///    ``PassportError/Recovery-swift.enum/noAction``.
     /// 6. `code` is present (`invalidResponse`).
     ///
     /// Then the code is redeemed with `grant_type`, `code`, `redirect_uri`, `code_verifier`, the request's

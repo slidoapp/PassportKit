@@ -8,7 +8,7 @@ import Logging
     import UIKit
 #endif
 
-/// A `AuthorizationUserAgent` backed by `ASWebAuthenticationSession` (RFC 8252 §6).
+/// An ``AuthorizationUserAgent`` backed by `ASWebAuthenticationSession` (RFC 8252 §6).
 ///
 /// Redirect URIs with a private-use scheme work on every supported version. An `https` redirect URI
 /// (a claimed URL) needs macOS 14.4 or iOS 17.4; on older systems `present` throws

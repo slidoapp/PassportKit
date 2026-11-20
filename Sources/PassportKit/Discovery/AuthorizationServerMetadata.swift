@@ -21,7 +21,9 @@ public struct AuthorizationServerMetadata: Sendable, Codable, Hashable {
     /// The grant types the server supports (`grant_types_supported`, RFC 8414 §2).
     public var supportedGrantTypes: [GrantType]?
     /// Whether the server adds `iss` to authorization responses (`authorization_response_iss_parameter_supported`,
-    /// RFC 9207 §3). When `true`, set ``OAuthClient/Configuration/requiresIssuerInAuthorizationResponse``.
+    /// RFC 9207 §3). When `true`, set ``OAuthClient/Configuration/requiresIssuerInAuthorizationResponse``;
+    /// ``OAuthClient/Configuration/init(metadata:authentication:additionalHeaders:minimumTokenLifetime:defaultTokenLifetime:allowsInsecureLoopbackEndpoints:)``
+    /// does that.
     public var supportsIssuerInAuthorizationResponse: Bool?
     /// Every other member, unchanged, for example vendor extensions.
     public var additionalFields: [String: JSONValue]

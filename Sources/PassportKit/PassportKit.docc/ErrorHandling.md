@@ -32,9 +32,17 @@ func handle(_ error: PassportError) {
     case .noAction:
         // Nothing to recover from, for example the person declined.
         break
+    @unknown default:
+        // A recovery added in a later release. Treat it as a failure to report.
+        break
     }
 }
 ```
+
+The `@unknown default` case keeps the switch compiling when a minor release
+adds a recovery, because ``PassportError/Recovery-swift.enum`` is not frozen.
+The compiler still warns about the new case, so you can handle it when you
+update.
 
 | Recovery | Typical codes | What to do |
 |---|---|---|

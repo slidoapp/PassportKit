@@ -71,7 +71,7 @@ to a terminal unfiltered.
 
 ## Sign in with the authorization code flow
 
-Interactive apps use the authorization code grant with PKCE. A
+Interactive apps use the authorization code grant with PKCE. An
 ``AuthorizationUserAgent`` shows the authorization page and returns the redirect.
 ``WebAuthenticationSessionUserAgent`` and ``LoopbackUserAgent`` are provided; see
 <doc:NativeAppRedirects>.
@@ -98,7 +98,8 @@ mix-up attack). The code flow therefore needs ``OAuthClient/Configuration/issuer
 ``OAuthClient/authorize(_:using:)`` and ``OAuthClient/completeAuthorization(_:callbackURL:additionalParameters:)``
 throw ``PassportError/Code-swift.struct/invalidConfiguration`` without one, and the `iss` of the response (RFC 9207)
 must equal it exactly. ``OAuthClient/Configuration/init(metadata:authentication:additionalHeaders:minimumTokenLifetime:defaultTokenLifetime:allowsInsecureLoopbackEndpoints:)``
-sets the issuer, and requires `iss` when the server advertises `authorization_response_iss_parameter_supported`.
+sets the issuer, and requires `iss` when ``AuthorizationServerMetadata/supportsIssuerInAuthorizationResponse`` is
+`true`, which means that the server advertises `authorization_response_iss_parameter_supported`.
 
 A server that does not support RFC 9207 sends no `iss`, so a response without it is accepted and PassportKit cannot tell
 which server answered. Defend against mix-up another way, for example a distinct redirect URI per authorization server,
@@ -107,7 +108,7 @@ needs none of this.
 
 ## Keep the session
 
-A ``TokenResponse`` is a one-time result. Hand it to a ``OAuthSession``,
+A ``TokenResponse`` is a one-time result. Hand it to an ``OAuthSession``,
 which saves the refresh token to a ``CredentialStore`` and refreshes access
 tokens when they run low:
 

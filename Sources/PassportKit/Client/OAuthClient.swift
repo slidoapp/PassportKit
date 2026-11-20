@@ -18,7 +18,7 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     let clock: any Clock<Duration>
     let random: any RandomSource
     let observer: (any RequestObserver)?
-    /// The logger of the client, which a ``OAuthSession`` created with it uses unless given another.
+    /// The logger of the client, which an ``OAuthSession`` created with it uses unless given another.
     public let logger: Logger
 
     /// Creates a client.

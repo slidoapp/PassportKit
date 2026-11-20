@@ -46,8 +46,11 @@ public struct AcceptAnyToken: TokenAcceptancePolicy {
 
 /// Accepts a token for a selected target only if at least one of the given scopes was granted.
 ///
-/// By default the policy applies to targets with resources, where servers are seen to answer 200 with a
-/// narrowed scope when the user cannot access the resource. A token whose granted scope is unknown is rejected.
+/// By default the policy applies to targets with resources (``TokenTarget/Selector/withResources``), where servers
+/// are seen to answer 200 with a narrowed scope when the user cannot access the resource. The tokens of other
+/// targets are accepted without a check, including ``TokenTarget/default`` and token exchange targets that name
+/// only audiences. Pass ``TokenTarget/Selector/all`` to check every target. A token whose granted scope is unknown
+/// is rejected.
 ///
 /// Scopes are compared as exact strings (RFC 6749 §3.3 defines them as opaque, case-sensitive). `*` is not a
 /// wildcard: `"items.*"` accepts only a scope that is literally named `items.*`. List every scope that
@@ -94,7 +97,8 @@ extension TokenAcceptancePolicy where Self == RequireAnyScope {
     /// `acceptancePolicy: .requireAnyScope(["items.read"])`.
     ///
     /// By default it selects only targets that name resources, so it accepts every token of a target without
-    /// resources, including ``TokenTarget/default``. Pass `for: .all` to check every target. See ``RequireAnyScope``.
+    /// resources, including ``TokenTarget/default`` and token exchange targets that name only audiences. Pass
+    /// `for: .all` to check every target. See ``RequireAnyScope``.
     public static func requireAnyScope(
         _ scopes: ScopeSet, for targets: TokenTarget.Selector = .withResources
     ) -> RequireAnyScope {

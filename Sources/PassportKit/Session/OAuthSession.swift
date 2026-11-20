@@ -58,7 +58,8 @@ public actor OAuthSession {
     ///
     /// The default, ``AcceptAnyToken``, accepts whatever the server answers with, including a token whose scope
     /// the server narrowed below what the app needs (RFC 6749 §3.3). An app that depends on a scope or a
-    /// resource should pass a policy such as ``RequireAnyScope``.
+    /// resource should pass a policy such as ``TokenAcceptancePolicy/requireAnyScope(_:for:)``, which by default
+    /// checks only targets that name resources.
     ///
     /// `logger` receives session lifecycle and storage log lines; by default the session uses the logger of
     /// `client`. Logs never contain tokens or credentials (see <doc:GettingStarted>).
