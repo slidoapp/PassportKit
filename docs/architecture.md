@@ -7,7 +7,7 @@ disagree, fix one of them in the same change. Changing a module boundary needs a
 
 | Module | Purpose | May import |
 |---|---|---|
-| `PassportKit` | Grants, token model, session actor, credential stores (in-memory and Keychain), errors, metadata discovery, request authorization, and the user agents (`ASWebAuthenticationSession`, loopback listener). macOS 14 and iOS 17 only (ADR 0011) | Foundation, CryptoKit, swift-http-types, swift-log, SwiftKeychain, Apple frameworks |
+| `PassportKit` | Grants, token model, session actor, credential stores (in-memory and Keychain), errors, metadata discovery, the protected resource client, and the user agents (`ASWebAuthenticationSession`, loopback listener). macOS 14 and iOS 17 only (ADR 0011) | Foundation, CryptoKit, swift-http-types, swift-log, SwiftKeychain, Apple frameworks |
 | `PassportKitTesting` | Fake authorization server, test clocks and a recording transport; public so consumers can test against it | `PassportKit`, swift-http-types |
 
 Testing depends on the core, never the reverse. External dependencies follow ADR 0009. `passportkit-example`

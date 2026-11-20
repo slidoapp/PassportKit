@@ -23,7 +23,7 @@ of any save a later sign-in makes.
 ## Decision
 
 - `OAuthSession.beginSignOut(revoke:)` is a synchronous actor method that does exactly the part of sign-out before the
-  first suspension and returns a `OAuthSession.PendingSignOut`. Because it does not suspend, every guarantee above holds when it
+  first suspension and returns an `OAuthSession.PendingSignOut`. Because it does not suspend, every guarantee above holds when it
   returns, and the caller knows the session is gone.
 - `OAuthSession.PendingSignOut` is a `Sendable` value with one asynchronous property, `result: OAuthSession.SignOutResult { get async }`,
   shaped like `Task.value`. It waits for the queued delete and for the revocation. It is a value of its own rather than

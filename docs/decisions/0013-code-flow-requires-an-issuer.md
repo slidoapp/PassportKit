@@ -26,6 +26,6 @@ therefore looked protected and was not.
 
 ## Consequences
 
-Apps that assembled a `OAuthClient.Configuration` by hand without `issuer` must set it; discovery already did. An
+Apps that assembled an `OAuthClient.Configuration` by hand without `issuer` must set it; discovery already did. An
 authorization response `iss` is never accepted unchecked. For a server that does not advertise RFC 9207 the library
 cannot detect a mix-up; that gap is documented, not hidden.

@@ -80,7 +80,10 @@ public struct ScopeSet: Sendable, Hashable, Codable, ExpressibleByArrayLiteral, 
 
 /// Ordered parameters that may repeat; used for vendor extensions on every request.
 public struct AdditionalParameters: Sendable, Hashable, ExpressibleByDictionaryLiteral {
-    public private(set) var items: [(name: String, value: String)]   // stored as a Hashable pair struct internally
+    public struct Item: Sendable, Hashable { public var name: String; public var value: String }
+    public private(set) var items: [Item]   // insertion order; names may repeat
+    public init()
+    public var isEmpty: Bool { get }
     public mutating func append(_ name: String, _ value: String)
 }
 
@@ -230,8 +233,8 @@ those URLs use `http` when the host is a loopback address (`localhost`,
 `127.0.0.1`, `::1`), for local development servers only. A non-loopback
 `http` URL is refused with or without the opt-in, always with
 `.invalidConfiguration` (ADR 0012). The opt-in also governs the verification
-URIs of the device flow (§10) and the resource URLs of `ProtectedResourceClient`
-(§15). It does not concern redirect URIs: they are not endpoints, and the
+URIs of the device flow (§8) and the resource URLs of `ProtectedResourceClient`
+(§10). It does not concern redirect URIs: they are not endpoints, and the
 RFC 8252 §7.3 `http` loopback redirect URI works without it.
 `localhost` is also accepted in a redirect URI although RFC 8252 §7.3 says
 NOT RECOMMENDED (registered redirects exist); `LoopbackRedirectListener`
@@ -308,8 +311,8 @@ than four characters are left alone.
 
 ```swift
 public struct TokenResponse: Sendable, Hashable, CustomStringConvertible {
-    public var accessToken: Secret
-    public var tokenType: String                    // compared case-insensitively
+    public var accessToken: Secret                  // the issued token; for a token exchange, of type issuedTokenType
+    public var tokenType: String                    // compared case-insensitively; N_A for some exchanges
     public var expiresIn: Duration?
     public var refreshToken: Secret?
     public var idToken: Secret?
@@ -323,8 +326,11 @@ Parsing tolerates `expires_in` as a number or numeric string, unknown
 members, and `token_type` in any case. It rejects a 2xx response without
 `access_token` or `token_type` (`.invalidResponse`). `token_type` is
 not checked for exchanges whose `issued_token_type` is not an access
-token (RFC 8693 §2.2.1 allows `N_A`). A token exchange response must carry
-`issued_token_type` (RFC 8693 §2.2.1), else `.invalidResponse`.
+token (RFC 8693 §2.2.1 allows `N_A`), and a missing one is reported as `N_A`.
+A token exchange response must carry `issued_token_type` (RFC 8693 §2.2.1),
+else `.invalidResponse`. It carries the issued token in `access_token`
+whatever its type, so `accessToken` can hold a refresh token, an ID token or a
+JWT; `issuedTokenType` says which.
 
 The **granted scope** of a response is `scope` when present, otherwise
 the requested scope (RFC 6749 §5.1). Narrower-than-requested scope is
@@ -484,7 +490,7 @@ RFC 9700 §4.4.2; ADR 0013). A server that does not advertise
 `authorization_response_iss_parameter_supported` may omit `iss`, and the
 library then cannot bind the response to the server: the app needs another
 defence, for example a distinct redirect URI per authorization server. The
-device flow (§10) has no authorization response and is not affected.
+device flow (RFC 8628, above) has no authorization response and is not affected.
 
 `completeAuthorization` checks, in order:
 
@@ -553,11 +559,11 @@ public struct TokenTarget: Sendable, Hashable {   // == and hash: derivation, sc
     }
     public var derivation: Derivation
     public var resources: [URL]
-    public var audiences: [String]
+    public var audiences: [String]                // only for .tokenExchange; accessToken(for:) refuses a refresh grant with audiences
     public var scope: ScopeSet?
     public static let `default`: TokenTarget      // refresh grant, no resources, no scope
     public static func refreshGrant(resources: [URL] = [], scope: ScopeSet? = nil) -> TokenTarget
-    public static func exchange(resources: [URL] = [], audiences: [String] = [], scope: ScopeSet? = nil) -> TokenTarget
+    public static func tokenExchange(resources: [URL] = [], audiences: [String] = [], scope: ScopeSet? = nil) -> TokenTarget
     // The memberwise initializer is `package`: the factories cover every valid combination.
 }
 
@@ -617,7 +623,7 @@ Invariants (each has a conformance test):
    token, hands the new token over (ADR 0007).
 2. **Coalescing.** Concurrent `accessToken(for:)` calls for the same
    target share one in-flight operation. Different targets never receive
-   each other's tokens. Targets are equal when method, scope and the
+   each other's tokens. Targets are equal when derivation, scope and the
    sets of resources and audiences are equal; order and repetition of
    resources and audiences do not matter. A nil scope and an empty scope
    differ. `signIn` registers the operation for the default target
@@ -751,6 +757,7 @@ extension TokenTarget {
     }
 }
 /// Accepts a token for a selected target (default: targets with resources) only if at least one of `scopes` was granted.
+/// With the default, the tokens of `.default` and of audience-only exchange targets are not checked; `for: .all` checks every target.
 public struct RequireAnyScope: TokenAcceptancePolicy {
     public init(_ scopes: ScopeSet, for targets: TokenTarget.Selector = .withResources)
 }
@@ -840,7 +847,8 @@ public struct ProtectedResourceClient: Sendable {
     /// Returns the request with `Authorization: Bearer <token>` added. Throws if no token can be obtained; never returns the request without it.
     public func addingToken(to request: URLRequest, for target: TokenTarget = .default) async throws -> (URLRequest, AccessToken)
     public func addingToken(to request: HTTPRequest, for target: TokenTarget = .default) async throws -> (HTTPRequest, AccessToken)   // the request is the caller's value: never log it
-    /// Decides what to do with a resource-server response for a request sent with `token`.
+    /// Decides what to do with a resource-server response for a request sent with `token`; before it answers
+    /// .retry it discards `token` from the session (OAuthSession.discard(_:)).
     public func evaluate(statusCode: Int, headers: HTTPFields, token: AccessToken, attempt: Int) async -> RetryDecision
     /// Convenience: add the token, send on the transport given at creation, evaluate, retry at most once.
     public func send(_ request: HTTPRequest, body: Data? = nil, for target: TokenTarget = .default) async throws -> (HTTPResponse, Data)
@@ -925,6 +933,7 @@ public enum Discovery {
     /// RFC 8414 §3.1: inserts `/.well-known/oauth-authorization-server` between host and path.
     /// `.openIDConnect` appends `/.well-known/openid-configuration` instead.
     public static func fetchMetadata(issuer: URL, document: WellKnownDocument = .oauth, issuerValidation: IssuerValidation = .strict,
+                                     allowsInsecureLoopbackEndpoints: Bool = false,
                                      transport: any HTTPTransport = URLSessionTransport(),
                                      observer: (any RequestObserver)? = nil,
                                      clock: any Clock<Duration> = ContinuousClock(),
@@ -1061,7 +1070,7 @@ platform guards are the AppKit/UIKit differences between them (ADR 0011).
   releasing a listener cancels it. The
   listener is started first so that its `redirectURI` goes into the
   `AuthorizationRequest`.
-- `LoopbackUserAgent(listener:timeLimit:openURL:)`: a `AuthorizationUserAgent` for a
+- `LoopbackUserAgent(listener:timeLimit:openURL:)`: an `AuthorizationUserAgent` for a
   running listener; opens the URL through an injected
   `@Sendable (URL) async throws -> Void` (default `NSWorkspace` /
   `UIApplication`), then `waitForCallback(timeLimit:accept:)` (default 5 minutes).

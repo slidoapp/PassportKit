@@ -79,7 +79,8 @@ have one meaning. Callers find the built-in stores through static members.
 
 Every rename breaks source compatibility. Apps that depend on 1.0 must rename their call sites when they update.
 
-Some 1.0 names do not follow rules 2, 5, 6 and 9 yet: the token request methods of `OAuthClient`,
-`DeviceAuthorization` and its `verificationURIComplete`, `ClientConfiguration`, `revoke(_:typeHint:)`,
+When this decision was accepted, some 1.0 names did not follow rules 2, 5, 6 and 9: the token request methods of
+`OAuthClient`, `DeviceAuthorization` and its `verificationURIComplete`, `ClientConfiguration`, `revoke(_:typeHint:)`,
 `RequireAnyScope(_:forTargets:)`, `TargetSelector`, the labels of `Discovery.fetchMetadata` and the transliterated
-members of `AuthorizationServerMetadata`. They are renamed in a separate change that follows these rules.
+members of `AuthorizationServerMetadata`. A separate change renamed them by these rules, and `CHANGELOG.md` lists the
+new names.
