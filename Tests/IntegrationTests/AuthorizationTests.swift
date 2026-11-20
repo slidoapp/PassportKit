@@ -13,9 +13,9 @@ struct AuthorizationTests {
         // The local server speaks http: without the opt-in, discovery refuses its issuer.
         await #expect(throws: PassportError.self) { try await Discovery.fetchMetadata(issuer: issuer) }
         let metadata = try await Discovery.fetchMetadata(
-            issuer: issuer, style: .oauth, validation: .strict, allowsInsecureLoopbackEndpoints: true)
+            issuer: issuer, document: .oauth, issuerValidation: .strict, allowsInsecureLoopbackEndpoints: true)
         #expect(metadata.issuer == issuer)
-        #expect(metadata.authorizationResponseIssParameterSupported == true)
+        #expect(metadata.supportsIssuerInAuthorizationResponse == true)
 
         let configuration = try ClientConfiguration(
             metadata: metadata, authentication: .publicClient(clientID: IntegrationServer.publicClientID),

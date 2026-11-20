@@ -28,7 +28,7 @@ extension ClientConfiguration {
             additionalHeaders: additionalHeaders,
             minimumTokenLifetime: minimumTokenLifetime,
             defaultTokenLifetime: defaultTokenLifetime,
-            requiresIssuerInAuthorizationResponse: metadata.authorizationResponseIssParameterSupported == true,
+            requiresIssuerInAuthorizationResponse: metadata.supportsIssuerInAuthorizationResponse == true,
             allowsInsecureLoopbackEndpoints: allowsInsecureLoopbackEndpoints
         )
         try validate()

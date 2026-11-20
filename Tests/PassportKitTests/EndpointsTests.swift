@@ -107,7 +107,7 @@ struct ConfigurationFromMetadataTests {
             issuer: URL(string: "https://as.example.com")!,
             authorizationEndpoint: URL(string: "https://as.example.com/authorize")!,
             tokenEndpoint: URL(string: "https://as.example.com/token")!,
-            authorizationResponseIssParameterSupported: issuerParameter
+            supportsIssuerInAuthorizationResponse: issuerParameter
         )
     }
 

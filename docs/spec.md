@@ -214,7 +214,7 @@ public struct ClientConfiguration: Sendable {
 `ClientConfiguration.init(metadata:authentication:…)` is the discovery path:
 it takes the endpoints and `issuer` from the metadata and sets
 `requiresIssuerInAuthorizationResponse` to
-`metadata.authorizationResponseIssParameterSupported == true` (RFC 9207 §3),
+`metadata.supportsIssuerInAuthorizationResponse == true` (RFC 9207 §3),
 then validates. Prefer it over assembling a configuration by hand so the
 mix-up defence follows what the server advertises.
 
@@ -904,21 +904,21 @@ public struct AuthorizationServerMetadata: Sendable, Codable, Hashable {
     public var tokenEndpoint: URL?
     public var deviceAuthorizationEndpoint: URL?
     public var revocationEndpoint: URL?
-    public var codeChallengeMethodsSupported: [String]?
-    public var grantTypesSupported: [String]?
-    public var authorizationResponseIssParameterSupported: Bool?
+    public var supportedCodeChallengeMethods: [String]?          // code_challenge_methods_supported
+    public var supportedGrantTypes: [GrantType]?                 // grant_types_supported
+    public var supportsIssuerInAuthorizationResponse: Bool?      // authorization_response_iss_parameter_supported
     public var additionalFields: [String: JSONValue]
 }
 public enum IssuerValidation: Sendable { case strict; case expected(URL); case disabled }
 public enum Discovery {
     /// RFC 8414 §3.1: inserts `/.well-known/oauth-authorization-server` between host and path.
     /// `.openIDConnect` appends `/.well-known/openid-configuration` instead.
-    public static func fetchMetadata(issuer: URL, style: Style = .oauth, validation: IssuerValidation = .strict,
+    public static func fetchMetadata(issuer: URL, document: WellKnownDocument = .oauth, issuerValidation: IssuerValidation = .strict,
                                      transport: any HTTPTransport = URLSessionTransport(),
                                      observer: (any RequestObserver)? = nil,
                                      clock: any Clock<Duration> = ContinuousClock(),
                                      logger: Logger = Logger(label: "PassportKit")) async throws -> AuthorizationServerMetadata
-    public enum Style: Sendable { case oauth, openIDConnect }
+    public enum WellKnownDocument: Sendable { case oauth, openIDConnect }   // RFC 8615 well-known document
 }
 ```
 

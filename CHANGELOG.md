@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The remaining names of the public API follow ADR 0016. Each rename breaks source compatibility, and no deprecated
+aliases are kept.
+
+### Changed
+
+- **Breaking:** `Discovery.Style` is `Discovery.WellKnownDocument`, because it chooses which well-known document
+  (RFC 8615) is fetched; its cases are unchanged. The labels of `Discovery.fetchMetadata` are `document:` and
+  `issuerValidation:` instead of `style:` and `validation:`.
+- **Breaking:** the members of `AuthorizationServerMetadata` that transliterated RFC 8414 field names have Swift
+  names: `codeChallengeMethodsSupported` is `supportedCodeChallengeMethods`, `grantTypesSupported` is
+  `supportedGrantTypes` and holds `GrantType` values, and `authorizationResponseIssParameterSupported` is
+  `supportsIssuerInAuthorizationResponse`. The JSON field names are unchanged.
+
 ## [1.1.0] - 2026-11-19
 
 This release renames the main objects so that each one says which OAuth party it talks to (ADR 0016):

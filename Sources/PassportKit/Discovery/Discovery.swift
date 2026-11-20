@@ -19,10 +19,10 @@ public enum IssuerValidation: Sendable {
 
 /// Authorization server metadata discovery (RFC 8414).
 public enum Discovery {
-    /// Where the well-known document is looked up.
+    /// Which well-known document is fetched (RFC 8615).
     ///
     /// Cases may be added in a minor release: the enumeration is not frozen, so a `switch` over it needs a `default`.
-    public enum Style: Sendable {
+    public enum WellKnownDocument: Sendable {
         /// RFC 8414 §3.1: `/.well-known/oauth-authorization-server` inserted between host and path.
         case oauth
         /// OpenID Connect Discovery §4: `/.well-known/openid-configuration` appended to the issuer path.
@@ -35,7 +35,7 @@ public enum Discovery {
     /// (``PassportError/Code-swift.struct/temporarilyUnavailable`` for 429 and 5xx, otherwise the body's
     /// `error` or ``PassportError/Code-swift.struct/invalidResponse``). A body that is not a JSON object with
     /// an `issuer` and well-formed members is ``PassportError/Code-swift.struct/invalidResponse``; an issuer
-    /// that fails `validation` is ``PassportError/Code-swift.struct/issuerMismatch``. The issuer must be an
+    /// that fails `issuerValidation` is ``PassportError/Code-swift.struct/issuerMismatch``. The issuer must be an
     /// `https` URL without query or fragment, else `invalidConfiguration`; with `allowsInsecureLoopbackEndpoints`
     /// it may be an `http` URL on a loopback host, for local development only (RFC 8414 §3 requires TLS).
     /// The endpoints inside the returned metadata are checked when a ``ClientConfiguration`` or ``Endpoints``
@@ -47,8 +47,8 @@ public enum Discovery {
     /// ``OAuthClient`` logs its own.
     public static func fetchMetadata(
         issuer: URL,
-        style: Style = .oauth,
-        validation: IssuerValidation = .strict,
+        document: WellKnownDocument = .oauth,
+        issuerValidation: IssuerValidation = .strict,
         allowsInsecureLoopbackEndpoints: Bool = false,
         transport: any HTTPTransport = URLSessionTransport(),
         observer: (any RequestObserver)? = nil,
@@ -58,7 +58,7 @@ public enum Discovery {
         let request = HTTPRequest(
             method: .get,
             url: try metadataURL(
-                for: issuer, style: style, allowsInsecureLoopbackEndpoints: allowsInsecureLoopbackEndpoints),
+                for: issuer, document: document, allowsInsecureLoopbackEndpoints: allowsInsecureLoopbackEndpoints),
             headerFields: [.accept: MediaType.json]
         )
         let response: HTTPResponse
@@ -110,7 +110,7 @@ public enum Discovery {
         } catch {
             throw PassportError(.invalidResponse, detail: "The metadata response is not valid metadata.")
         }
-        switch validation {
+        switch issuerValidation {
         case .strict: try require(metadata.issuer, equals: issuer)
         case .expected(let expected): try require(metadata.issuer, equals: expected)
         case .disabled: break
@@ -121,10 +121,10 @@ public enum Discovery {
     /// The well-known URL for `issuer` (RFC 8414 §3.1).
     ///
     /// Terminating slashes of the issuer path are removed first. For `https://as.example.com/tenant/a`
-    /// the `oauth` style gives `https://as.example.com/.well-known/oauth-authorization-server/tenant/a` and the
-    /// `openIDConnect` style `https://as.example.com/tenant/a/.well-known/openid-configuration`.
+    /// the `oauth` document gives `https://as.example.com/.well-known/oauth-authorization-server/tenant/a` and the
+    /// `openIDConnect` document `https://as.example.com/tenant/a/.well-known/openid-configuration`.
     static func metadataURL(
-        for issuer: URL, style: Style, allowsInsecureLoopbackEndpoints: Bool = false
+        for issuer: URL, document: WellKnownDocument, allowsInsecureLoopbackEndpoints: Bool = false
     ) throws -> URL {
         try Endpoints.validateSecureTransport(
             of: issuer, name: "issuer", allowsInsecureLoopback: allowsInsecureLoopbackEndpoints)
@@ -138,7 +138,7 @@ public enum Discovery {
         }
         var path = components.percentEncodedPath
         while path.hasSuffix("/") { path.removeLast() }
-        switch style {
+        switch document {
         case .oauth: components.percentEncodedPath = "/.well-known/oauth-authorization-server" + path
         case .openIDConnect: components.percentEncodedPath = path + "/.well-known/openid-configuration"
         }

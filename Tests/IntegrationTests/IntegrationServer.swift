@@ -30,7 +30,7 @@ enum IntegrationServer {
 
     static func metadata() async throws -> AuthorizationServerMetadata {
         try await Discovery.fetchMetadata(
-            issuer: try requireIssuer(), validation: .strict, allowsInsecureLoopbackEndpoints: true)
+            issuer: try requireIssuer(), issuerValidation: .strict, allowsInsecureLoopbackEndpoints: true)
     }
 
     static func client(
