@@ -1,7 +1,7 @@
 name: Release
 
-# Pushing a version tag runs the whole CI workflow for it, and publishes the GitHub release only when
-# every job passes. See "Releasing" in CONTRIBUTING.md.
+# Pushing a version tag publishes the GitHub release with the tag's changelog section as notes. It runs no tests:
+# every commit on main passed CI on the pull request that merged it. See "Releasing" in CONTRIBUTING.md.
 on:
   push:
     tags: ['[0-9]+.[0-9]+.[0-9]+']
@@ -10,11 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  ci:
-    uses: ./.github/workflows/ci.yml
-
   release:
-    needs: ci
     runs-on: ubuntu-latest
     permissions:
       contents: write

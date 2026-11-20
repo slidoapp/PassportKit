@@ -4,7 +4,6 @@ name: CI
 # is up to date with main, so the merged commit is the tested one.
 on:
   pull_request:
-  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}
