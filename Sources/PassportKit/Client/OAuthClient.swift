@@ -11,7 +11,7 @@ import Logging
 /// any other member, so dumping a client cannot reveal what an injected component holds.
 public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// The configuration the client was created with.
-    public let configuration: ClientConfiguration
+    public let configuration: OAuthClient.Configuration
     let transport: any HTTPTransport
     /// The calendar clock used for expiry decisions.
     public let wallClock: any WallClock
@@ -24,13 +24,13 @@ public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringC
     /// Creates a client.
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when the
-    /// configuration is invalid (an endpoint or the issuer is not `https`, or `http` on loopback without ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), so a misconfigured client never exists.
+    /// configuration is invalid (an endpoint or the issuer is not `https`, or `http` on loopback without ``OAuthClient/Configuration/allowsInsecureLoopbackEndpoints``), so a misconfigured client never exists.
     ///
     /// `logger` receives the library's log lines (see <doc:GettingStarted>). The default is labelled `PassportKit`,
     /// so it uses the `LoggingSystem` the app bootstrapped. Logs never contain tokens, codes, verifiers, URLs or
     /// bodies; ``RequestObserver`` stays the channel for typed events.
     public init(
-        configuration: ClientConfiguration,
+        configuration: OAuthClient.Configuration,
         transport: any HTTPTransport = URLSessionTransport(),
         wallClock: any WallClock = SystemWallClock(),
         clock: any Clock<Duration> = ContinuousClock(),

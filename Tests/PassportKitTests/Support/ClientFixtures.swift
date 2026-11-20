@@ -29,8 +29,8 @@ enum ClientFixtures {
         issuer: URL? = AuthorizationFixtures.issuer,
         requiresIssuer: Bool = false,
         allowsInsecureLoopback: Bool = false
-    ) -> ClientConfiguration {
-        ClientConfiguration(
+    ) -> OAuthClient.Configuration {
+        OAuthClient.Configuration(
             endpoints: Endpoints(
                 authorization: authorization,
                 token: tokenURL,

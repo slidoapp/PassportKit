@@ -5,13 +5,15 @@ import Foundation
 ///
 /// The device code is internal and never printed. The lifetime is tracked on the client's injected clock
 /// (ADR 0006), so ``remainingLifetime`` keeps counting down after this value is created.
-public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+public struct PendingDeviceAuthorization: Sendable, CustomStringConvertible, CustomDebugStringConvertible,
+    CustomReflectable
+{
     /// The code the user types at ``verificationURI`` (`user_code`).
     public internal(set) var userCode: String
     /// Where the user enters ``userCode`` (`verification_uri`; the `verification_url` alias is also accepted).
     public internal(set) var verificationURI: URL
     /// A verification URI that already contains the user code, for QR codes. Used verbatim.
-    public internal(set) var verificationURIComplete: URL?
+    public internal(set) var completeVerificationURI: URL?
     /// The lifetime granted by the server (`expires_in`).
     public internal(set) var expiresIn: Duration
     /// The wall-clock time the authorization expires, for display. Polling uses the injected clock, not this value.
@@ -30,7 +32,7 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
         deviceCode: Secret,
         userCode: String,
         verificationURI: URL,
-        verificationURIComplete: URL? = nil,
+        completeVerificationURI: URL? = nil,
         expiresIn: Duration,
         expiresAt: Date,
         interval: Duration = .seconds(5),
@@ -38,7 +40,7 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
     ) {
         self.init(
             deviceCode: deviceCode, userCode: userCode, verificationURI: verificationURI,
-            verificationURIComplete: verificationURIComplete, expiresIn: expiresIn, expiresAt: expiresAt,
+            completeVerificationURI: completeVerificationURI, expiresIn: expiresIn, expiresAt: expiresAt,
             interval: interval, stopwatch: Stopwatch(clock: clock))
     }
 
@@ -46,7 +48,7 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
         deviceCode: Secret,
         userCode: String,
         verificationURI: URL,
-        verificationURIComplete: URL?,
+        completeVerificationURI: URL?,
         expiresIn: Duration,
         expiresAt: Date,
         interval: Duration,
@@ -55,7 +57,7 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
         self.deviceCode = deviceCode
         self.userCode = userCode
         self.verificationURI = verificationURI
-        self.verificationURIComplete = verificationURIComplete
+        self.completeVerificationURI = completeVerificationURI
         self.expiresIn = expiresIn
         self.expiresAt = expiresAt
         self.interval = interval
@@ -67,7 +69,7 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
 
     /// A summary without the device code.
     public var description: String {
-        "DeviceAuthorization(userCode: \(userCode), verificationURI: \(verificationURI.redactedTarget), expiresIn: \(expiresIn), interval: \(interval))"
+        "PendingDeviceAuthorization(userCode: \(userCode), verificationURI: \(verificationURI.redactedTarget), expiresIn: \(expiresIn), interval: \(interval))"
     }
 
     /// A summary without the device code.
@@ -77,7 +79,7 @@ public struct DeviceAuthorization: Sendable, CustomStringConvertible, CustomDebu
     public var customMirror: Mirror { Mirror(self, children: ["summary": description], displayStyle: .struct) }
 }
 
-extension DeviceAuthorization {
+extension PendingDeviceAuthorization {
     /// The interval used when the server omits `interval` (RFC 8628 §3.2).
     static let defaultInterval = Duration.seconds(5)
     /// The longest `user_code` accepted, in characters.
@@ -156,7 +158,7 @@ extension DeviceAuthorization {
             deviceCode: Secret(deviceCode),
             userCode: userCode,
             verificationURI: verificationURI,
-            verificationURIComplete: url(text(DeviceAuthorizationResponseField.verificationURIComplete)),
+            completeVerificationURI: url(text(DeviceAuthorizationResponseField.verificationURIComplete)),
             expiresIn: expiresIn,
             expiresAt: wallClock.now().addingTimeInterval(expiresIn.timeInterval),
             interval: pollInterval.map { Duration.seconds($0) } ?? Self.defaultInterval,

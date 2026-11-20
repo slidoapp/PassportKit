@@ -26,19 +26,19 @@ the session stays signed in.
 only if at least one of the scopes you name was granted:
 
 ```swift
-let policy = RequireAnyScope(["items.read", "items.write"])
 let session = OAuthSession(
-    client: client, store: .inMemory(), account: account, acceptancePolicy: policy)
+    client: client, store: .inMemory(), account: account,
+    acceptancePolicy: .requireAnyScope(["items.read", "items.write"]))
 ```
 
 Scopes are compared as exact strings. `*` is not a wildcard:
-`RequireAnyScope(["items.*"])` accepts only a token whose scope is
+`.requireAnyScope(["items.*"])` accepts only a token whose scope is
 literally named `items.*`, not `items.read`. List each scope you
 accept, or write the rule yourself as shown below.
 
 By default the policy applies to targets that name resources, which is
 where servers narrow scope when the person cannot use the resource. Pass
-`forTargets:` with ``TargetSelector/all`` or ``TargetSelector/matching(_:)``
+`for:` with ``TokenTarget/Selector/all`` or ``TokenTarget/Selector/matching(_:)``
 to choose other targets. A token whose granted scope is unknown is rejected.
 
 ``OAuthSession`` accepts every token when you pass no policy, scope

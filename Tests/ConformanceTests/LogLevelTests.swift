@@ -39,7 +39,7 @@ struct LogLevelTests {
             server = FakeAuthorizationServer(clients: [registration], wallClock: wallClock, clock: clock)
             transport = ScriptedTransport(server: server)
             client = try OAuthClient(
-                configuration: ClientConfiguration(
+                configuration: OAuthClient.Configuration(
                     endpoints: Endpoints(
                         authorization: FakeAuthorizationServer.authorizationEndpoint,
                         token: FakeAuthorizationServer.tokenEndpoint,

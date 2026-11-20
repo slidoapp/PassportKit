@@ -57,7 +57,7 @@ public struct TokenTarget: Sendable, Hashable {
 
     /// A token obtained by exchanging the default access token for one bound to `resources` and `audiences`
     /// (RFC 8693 §2.1).
-    public static func exchange(
+    public static func tokenExchange(
         resources: [URL] = [],
         audiences: [String] = [],
         scope: ScopeSet? = nil
@@ -86,4 +86,29 @@ extension TokenTarget {
 
     /// Hashes what ``==(_:_:)`` compares.
     public func hash(into hasher: inout Hasher) { hasher.combine(identity) }
+}
+
+extension TokenTarget {
+    /// Chooses the targets a policy applies to, such as those of ``RequireAnyScope``. An open set: new selectors can be
+    /// added without breaking source compatibility.
+    public struct Selector: Sendable {
+        private let selects: @Sendable (TokenTarget) -> Bool
+
+        /// Every target.
+        public static let all = Selector { _ in true }
+        /// Targets that name at least one resource indicator (RFC 8707), where servers are seen to narrow the scope.
+        public static let withResources = Selector { !$0.resources.isEmpty }
+
+        /// The targets for which `predicate` is true.
+        public static func matching(_ predicate: @escaping @Sendable (TokenTarget) -> Bool) -> Selector {
+            Selector(predicate)
+        }
+
+        private init(_ selects: @escaping @Sendable (TokenTarget) -> Bool) {
+            self.selects = selects
+        }
+
+        /// Whether `target` is selected.
+        public func isSelected(_ target: TokenTarget) -> Bool { selects(target) }
+    }
 }

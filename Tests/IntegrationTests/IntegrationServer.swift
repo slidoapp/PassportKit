@@ -30,14 +30,14 @@ enum IntegrationServer {
 
     static func metadata() async throws -> AuthorizationServerMetadata {
         try await Discovery.fetchMetadata(
-            issuer: try requireIssuer(), validation: .strict, allowsInsecureLoopbackEndpoints: true)
+            issuer: try requireIssuer(), issuerValidation: .strict, allowsInsecureLoopbackEndpoints: true)
     }
 
     static func client(
         authentication: ClientAuthentication = .publicClient(clientID: publicClientID),
         minimumTokenLifetime: Duration = .seconds(5)
     ) async throws -> OAuthClient {
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: try await metadata(),
             authentication: authentication,
             minimumTokenLifetime: minimumTokenLifetime,

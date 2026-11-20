@@ -9,14 +9,14 @@ extension OAuthClient {
 
     /// Starts the device authorization grant (RFC 8628 §3.1, §3.2).
     ///
-    /// Show ``DeviceAuthorization/userCode`` and ``DeviceAuthorization/verificationURI`` to the user, then call
+    /// Show ``PendingDeviceAuthorization/userCode`` and ``PendingDeviceAuthorization/verificationURI`` to the user, then call
     /// ``completeDeviceAuthorization(_:additionalParameters:)``. The library never opens a browser.
     /// Throws `invalidConfiguration` when no device authorization endpoint is configured.
     public func beginDeviceAuthorization(
         scope: ScopeSet? = nil,
         resources: [URL] = [],
         additionalParameters: AdditionalParameters = [:]
-    ) async throws -> DeviceAuthorization {
+    ) async throws -> PendingDeviceAuthorization {
         var request = FormRequest(
             endpoint: .deviceAuthorization,
             url: try requireEndpoint(configuration.endpoints.deviceAuthorization, name: "device authorization")
@@ -28,7 +28,7 @@ extension OAuthClient {
         guard response.status.kind == .successful else {
             throw failure(response, body: body, to: request, context: .other)
         }
-        return try DeviceAuthorization(
+        return try PendingDeviceAuthorization(
             parsing: body, allowsInsecureLoopback: configuration.allowsInsecureLoopbackEndpoints,
             wallClock: wallClock, clock: clock)
     }
@@ -42,7 +42,7 @@ extension OAuthClient {
     /// `access_denied` throws with recovery `none`; `expired_token` is terminal. Cancellation stops
     /// immediately with `CancellationError`.
     public func completeDeviceAuthorization(
-        _ authorization: DeviceAuthorization,
+        _ authorization: PendingDeviceAuthorization,
         additionalParameters: AdditionalParameters = [:]
     ) async throws -> TokenResponse {
         let lifetime = authorization.remainingLifetime
@@ -85,7 +85,7 @@ extension OAuthClient {
                 backoff = nil
                 wait = interval
             case .slowDown:
-                interval = min(interval + Self.slowDownIncrement, DeviceAuthorization.maximumInterval)
+                interval = min(interval + Self.slowDownIncrement, PendingDeviceAuthorization.maximumInterval)
                 backoff = nil
                 wait = interval
             case .accessDenied, .expiredToken:

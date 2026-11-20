@@ -20,7 +20,7 @@ extension FakeAuthorizationServer {
         let authentication: ClientAuthentication =
             registration.secret.map { .clientSecretPost(clientID: clientID, secret: $0) }
             ?? .publicClient(clientID: clientID)
-        let configuration = ClientConfiguration(
+        let configuration = OAuthClient.Configuration(
             endpoints: Endpoints(
                 authorization: Self.authorizationEndpoint,
                 token: Self.tokenEndpoint,

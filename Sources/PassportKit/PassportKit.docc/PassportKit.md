@@ -41,7 +41,7 @@ appear in descriptions, errors or events.
 
 ### Configuring a client
 
-- ``ClientConfiguration``
+- ``OAuthClient/Configuration``
 - ``Endpoints``
 - ``ClientAuthentication``
 - ``Discovery``
@@ -57,12 +57,12 @@ appear in descriptions, errors or events.
 - ``WebAuthenticationSessionUserAgent``
 - ``LoopbackRedirectListener``
 - ``LoopbackUserAgent``
-- ``DeviceAuthorization``
+- ``PendingDeviceAuthorization``
 
 ### Token requests and responses
 
 - ``TokenResponse``
-- ``TokenExchangeRequest``
+- ``TokenRequest``
 - ``GrantType``
 - ``TokenTypeIdentifier``
 - ``TokenTypeHint``
@@ -89,7 +89,7 @@ appear in descriptions, errors or events.
 - ``TokenAcceptanceContext``
 - ``AcceptAnyToken``
 - ``RequireAnyScope``
-- ``TargetSelector``
+- ``TokenTarget/Selector``
 - ``ClosureTokenAcceptancePolicy``
 
 ### Credential storage

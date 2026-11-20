@@ -71,7 +71,7 @@ import PassportKit
 
 let issuer = URL(string: "https://as.example.com")!
 let metadata = try await Discovery.fetchMetadata(issuer: issuer)
-let configuration = try ClientConfiguration(
+let configuration = try OAuthClient.Configuration(
     metadata: metadata, authentication: .publicClient(clientID: "my-app"))
 let client = try OAuthClient(configuration: configuration)
 

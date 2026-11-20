@@ -11,7 +11,7 @@ extension OAuthClient {
     ///
     /// Throws ``PassportError`` with code ``PassportError/Code-swift.struct/invalidConfiguration`` when no
     /// authorization endpoint is configured, the endpoint carries a fragment or a query item the request also
-    /// sets, no ``ClientConfiguration/issuer`` is configured (the response `iss` could not be checked, RFC 9207
+    /// sets, no ``OAuthClient/Configuration/issuer`` is configured (the response `iss` could not be checked, RFC 9207
     /// §2.4), the redirect URI is not absolute, has a fragment, or is plain `http` on a non-loopback host
     /// (RFC 8252 §7.3, §8.3), a resource is invalid, the lifetime is not positive, ``AuthorizationRequest/Prompt/noInteraction``
     /// is combined with another `prompt` value (OpenID Connect Core §3.1.2.1), or an additional parameter collides.
@@ -79,7 +79,7 @@ extension OAuthClient {
 
     /// Validates the redirect and redeems the authorization code (RFC 6749 §4.1.2, §4.1.3, RFC 9207 §2.4).
     ///
-    /// Throws `invalidConfiguration`, before anything else, when no ``ClientConfiguration/issuer`` is configured.
+    /// Throws `invalidConfiguration`, before anything else, when no ``OAuthClient/Configuration/issuer`` is configured.
     /// Then checks, in order, each failing with ``PassportError``:
     /// 1. `pending` was not completed before (`invalidConfiguration`) and has not expired (`timedOut`,
     ///    recovery `reauthenticate`).
@@ -87,9 +87,9 @@ extension OAuthClient {
     ///    repeats (`invalidResponse`). The response is read from the query only.
     /// 3. `state` equals the request's, compared in constant time (`stateMismatch`). From here on the
     ///    pending authorization is consumed.
-    /// 4. `iss` equals ``ClientConfiguration/issuer`` by exact string comparison (`issuerMismatch`). It is
+    /// 4. `iss` equals ``OAuthClient/Configuration/issuer`` by exact string comparison (`issuerMismatch`). It is
     ///    checked before `error` because RFC 9207 §2.4 requires it for error responses too. A missing `iss`
-    ///    fails only when ``ClientConfiguration/requiresIssuerInAuthorizationResponse`` is set.
+    ///    fails only when ``OAuthClient/Configuration/requiresIssuerInAuthorizationResponse`` is set.
     /// 5. An `error` response becomes the matching error (RFC 6749 §4.1.2.1); `access_denied` has recovery `none`.
     /// 6. `code` is present (`invalidResponse`).
     ///

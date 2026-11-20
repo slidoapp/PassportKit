@@ -74,7 +74,7 @@ final class SecretHarvest: Sendable {
 
     private static let secretMembers: Set<String> = [
         "access_token", "refresh_token", "id_token", "device_code", "code", "code_verifier", "client_secret",
-        "subject_token", "token", "state",
+        "subject_token", "actor_token", "assertion", "token", "state",
     ]
     private let secrets = Locked<Set<String>>([])
     private let echo = Locked<Echo?>(nil)

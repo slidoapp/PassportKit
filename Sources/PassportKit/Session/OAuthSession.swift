@@ -73,7 +73,7 @@ public actor OAuthSession {
         client: OAuthClient,
         store: any CredentialStore,
         account: CredentialAccount,
-        acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
+        acceptancePolicy: any TokenAcceptancePolicy = .acceptAnyToken,
         acceptancePolicyTimeLimit: Duration = .seconds(10),
         rejectedTokenCacheDuration: Duration = .seconds(5),
         logger: Logger? = nil

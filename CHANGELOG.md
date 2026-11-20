@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The remaining names of the public API follow ADR 0016. Each rename breaks source compatibility, and no deprecated
+aliases are kept.
+
+### Added
+
+- `TokenAcceptancePolicy` lists its built-in policies as static members, so `acceptancePolicy: .acceptAnyToken` and
+  `acceptancePolicy: .requireAnyScope(["items.read"])` appear in autocomplete next to `.custom`.
+- `AuthorizationUserAgent` lists the built-in agent as a static member: `using: .webAuthenticationSession()` takes
+  the parameters of the `WebAuthenticationSessionUserAgent` initializer.
+
+### Changed
+
+- **Breaking:** the direct token requests have one entry point. `refresh(_:scope:resources:additionalParameters:)`,
+  `clientCredentials(scope:resources:additionalParameters:)`, `exchange(_:)` and `requestToken(grantType:parameters:)`
+  are `requestToken(_:)`, which takes a `TokenRequest` built with `.refreshToken(_:scope:resources:)`,
+  `.clientCredentials(scope:resources:)`, `.tokenExchange(subject:actor:requestedTokenType:audiences:resources:scope:)`
+  or `.extensionGrant(_:parameters:)`. The request parameters and the error handling are unchanged.
+- **Breaking:** `TokenExchangeRequest` is replaced by `.tokenExchange`, whose subject and actor are
+  `TokenRequest.SecurityToken` values. A token and its type are one value, so the `actor:` argument always sends
+  `actor_token` together with `actor_token_type` (RFC 8693 §2.1).
+- **Breaking:** `DeviceAuthorization` is `PendingDeviceAuthorization`, so both flows that wait for the user return a
+  `Pending…` value, and `verificationURIComplete` is `completeVerificationURI`.
+- **Breaking:** `ClientConfiguration` is `OAuthClient.Configuration`. `ClientAuthentication` and `Endpoints` keep their
+  names, because they name protocol concepts.
+- **Breaking:** `TokenTarget.exchange(resources:audiences:scope:)` is `TokenTarget.tokenExchange(resources:audiences:scope:)`,
+  matching `TokenTarget.Derivation.tokenExchange`.
+- **Breaking:** `revoke(_:typeHint:)` and `revokeBestEffort(_:typeHint:timeLimit:)` take `hint:`, because the
+  `TokenTypeHint` type already says what the hint is.
+- **Breaking:** `TargetSelector` is `TokenTarget.Selector`, and `RequireAnyScope(_:forTargets:)` is
+  `RequireAnyScope(_:for:)`, because `for:` names a target.
+- **Breaking:** `Discovery.Style` is `Discovery.WellKnownDocument`, because it chooses which well-known document
+  (RFC 8615) is fetched; its cases are unchanged. The labels of `Discovery.fetchMetadata` are `document:` and
+  `issuerValidation:` instead of `style:` and `validation:`.
+- **Breaking:** the members of `AuthorizationServerMetadata` that transliterated RFC 8414 field names have Swift
+  names: `codeChallengeMethodsSupported` is `supportedCodeChallengeMethods`, `grantTypesSupported` is
+  `supportedGrantTypes` and holds `GrantType` values, and `authorizationResponseIssParameterSupported` is
+  `supportsIssuerInAuthorizationResponse`. The JSON field names are unchanged.
+
 ## [1.1.0] - 2026-11-19
 
 This release renames the main objects so that each one says which OAuth party it talks to (ADR 0016):

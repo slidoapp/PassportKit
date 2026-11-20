@@ -21,7 +21,7 @@ struct DiscoveryTests {
     @Test(
         arguments: [
             (
-                "https://as.example.com", Discovery.Style.oauth,
+                "https://as.example.com", Discovery.WellKnownDocument.oauth,
                 "https://as.example.com/.well-known/oauth-authorization-server"
             ),
             ("https://as.example.com/", .oauth, "https://as.example.com/.well-known/oauth-authorization-server"),
@@ -56,9 +56,9 @@ struct DiscoveryTests {
                 "http://localhost:8080/.well-known/oauth-authorization-server/realm"
             ),
         ])
-    func wellKnownURLConstruction(issuer: String, style: Discovery.Style, expected: String) throws {
+    func wellKnownURLConstruction(issuer: String, document: Discovery.WellKnownDocument, expected: String) throws {
         let url = try Discovery.metadataURL(
-            for: URL(string: issuer)!, style: style, allowsInsecureLoopbackEndpoints: true)
+            for: URL(string: issuer)!, document: document, allowsInsecureLoopbackEndpoints: true)
         #expect(url.absoluteString == expected)
     }
 
@@ -110,9 +110,9 @@ struct DiscoveryTests {
         #expect(metadata.tokenEndpoint?.path == "/token")
         #expect(metadata.deviceAuthorizationEndpoint?.path == "/device")
         #expect(metadata.revocationEndpoint?.path == "/revoke")
-        #expect(metadata.codeChallengeMethodsSupported == ["S256"])
-        #expect(metadata.grantTypesSupported == ["authorization_code", "refresh_token"])
-        #expect(metadata.authorizationResponseIssParameterSupported == true)
+        #expect(metadata.supportedCodeChallengeMethods == ["S256"])
+        #expect(metadata.supportedGrantTypes == [.authorizationCode, .refreshToken])
+        #expect(metadata.supportsIssuerInAuthorizationResponse == true)
         #expect(metadata.additionalFields.isEmpty)
     }
 
@@ -146,7 +146,7 @@ struct DiscoveryTests {
     @Test func openIDConnectStyleUsesItsOwnPath() async throws {
         let transport = RecordingTransport([.json(200, Self.metadataJSON(issuer: "https://as.example.com/tenant"))])
         _ = try await Discovery.fetchMetadata(
-            issuer: URL(string: "https://as.example.com/tenant")!, style: .openIDConnect, transport: transport)
+            issuer: URL(string: "https://as.example.com/tenant")!, document: .openIDConnect, transport: transport)
         let sent = try #require(await transport.requests.first)
         #expect(sent.request.url?.absoluteString == "https://as.example.com/tenant/.well-known/openid-configuration")
     }
@@ -167,14 +167,14 @@ struct DiscoveryTests {
         let ok = RecordingTransport([.json(200, served)])
         let metadata = try await Discovery.fetchMetadata(
             issuer: URL(string: "https://as.example.com")!,
-            validation: .expected(URL(string: "https://login.example.com")!), transport: ok)
+            issuerValidation: .expected(URL(string: "https://login.example.com")!), transport: ok)
         #expect(metadata.issuer.host == "login.example.com")
 
         let wrong = RecordingTransport([.json(200, served)])
         let error = try await #require(throws: PassportError.self) {
             try await Discovery.fetchMetadata(
                 issuer: URL(string: "https://as.example.com")!,
-                validation: .expected(URL(string: "https://other.example.com")!), transport: wrong)
+                issuerValidation: .expected(URL(string: "https://other.example.com")!), transport: wrong)
         }
         #expect(error.code == .issuerMismatch)
     }
@@ -182,7 +182,7 @@ struct DiscoveryTests {
     @Test func disabledValidationAcceptsAnyIssuer() async throws {
         let transport = RecordingTransport([.json(200, Self.metadataJSON(issuer: "https://elsewhere.example.com"))])
         let metadata = try await Discovery.fetchMetadata(
-            issuer: URL(string: "https://as.example.com")!, validation: .disabled, transport: transport)
+            issuer: URL(string: "https://as.example.com")!, issuerValidation: .disabled, transport: transport)
         #expect(metadata.issuer.host == "elsewhere.example.com")
     }
 
@@ -246,7 +246,7 @@ struct DiscoveryTests {
         for methods in [#"["plain"]"#, "[]"] {
             let json = Self.metadataJSON().replacingOccurrences(of: #"["S256"]"#, with: methods)
             let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: Data(json.utf8))
-            let configuration = try ClientConfiguration(
+            let configuration = try OAuthClient.Configuration(
                 metadata: metadata, authentication: .publicClient(clientID: "app"))
             let client = try OAuthClient(configuration: configuration, transport: RecordingTransport())
             let pending = try client.beginAuthorization(
@@ -275,15 +275,15 @@ struct DiscoveryTests {
             issuer: local, tokenEndpoint: URL(string: "http://localhost:8080/token")!)
         #expect(throws: PassportError.self) { try Endpoints(metadata: metadata) }
         #expect(throws: PassportError.self) {
-            try ClientConfiguration(metadata: metadata, authentication: .publicClient(clientID: "app"))
+            try OAuthClient.Configuration(metadata: metadata, authentication: .publicClient(clientID: "app"))
         }
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: metadata, authentication: .publicClient(clientID: "app"), allowsInsecureLoopbackEndpoints: true)
         #expect(configuration.allowsInsecureLoopbackEndpoints)
         let remote = AuthorizationServerMetadata(
             issuer: local, tokenEndpoint: URL(string: "http://as.example.com/token")!)
         #expect(throws: PassportError.self) {
-            try ClientConfiguration(
+            try OAuthClient.Configuration(
                 metadata: remote, authentication: .publicClient(clientID: "app"), allowsInsecureLoopbackEndpoints: true)
         }
     }

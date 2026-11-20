@@ -39,7 +39,7 @@ struct RedactionCanaryTests {
             harvest.add(RedactionCanaryTests.clientSecret)
             harvest.add(RedactionCanaryTests.headerSecret)
             client = try OAuthClient(
-                configuration: ClientConfiguration(
+                configuration: OAuthClient.Configuration(
                     endpoints: Endpoints(
                         authorization: FakeAuthorizationServer.authorizationEndpoint,
                         token: FakeAuthorizationServer.tokenEndpoint,
@@ -106,21 +106,20 @@ struct RedactionCanaryTests {
         rig.renderings.look(pending)
         let grant = try #require(await rig.renderings.observe { try await rig.authorize() })
         let refreshed = try #require(
-            await rig.renderings.observe { try await client.refresh(grant.refreshToken!) })
-        _ = await rig.renderings.observe { try await client.clientCredentials(scope: ["read"]) }
+            await rig.renderings.observe { try await client.requestToken(.refreshToken(grant.refreshToken!)) })
+        _ = await rig.renderings.observe { try await client.requestToken(.clientCredentials(scope: ["read"])) }
 
         // Token exchange with both subject token types; the refresh token subject rotates.
         _ = await rig.renderings.observe {
-            try await client.exchange(
-                TokenExchangeRequest(
-                    subjectToken: refreshed.accessToken, subjectTokenType: .accessToken, audiences: ["service"]))
+            try await client.requestToken(
+                .tokenExchange(subject: .accessToken(refreshed.accessToken), audiences: ["service"]))
         }
         let exchanged = try #require(
             await rig.renderings.observe {
-                try await client.exchange(
-                    TokenExchangeRequest(
-                        subjectToken: refreshed.refreshToken!, subjectTokenType: .refreshToken,
-                        requestedTokenType: .refreshToken, audiences: ["service"]))
+                try await client.requestToken(
+                    .tokenExchange(
+                        subject: .refreshToken(refreshed.refreshToken!), requestedTokenType: .refreshToken,
+                        audiences: ["service"]))
             })
         _ = await rig.renderings.observe { try await client.revoke(exchanged.refreshToken ?? refreshed.refreshToken!) }
 
@@ -136,15 +135,28 @@ struct RedactionCanaryTests {
         // client secret covers both the 24-character run rule and the request-specific redaction.
         let spent = try #require(grant.refreshToken)
         rig.echo("invalid_grant", of: ["refresh_token", "client_secret", "basic_secret"])
-        _ = await rig.renderings.observe { try await client.refresh(spent) }
+        _ = await rig.renderings.observe { try await client.requestToken(.refreshToken(spent)) }
         rig.echo("access_denied", status: 401, of: ["subject_token", "client_secret", "basic_secret"])
         _ = await rig.renderings.observe {
-            try await client.exchange(
-                TokenExchangeRequest(
-                    subjectToken: refreshed.accessToken, subjectTokenType: .accessToken, audiences: ["service"]))
+            try await client.requestToken(
+                .tokenExchange(subject: .accessToken(refreshed.accessToken), audiences: ["service"]))
+        }
+        // An actor token and an extension grant carry credentials under other names. The values are shorter than
+        // the 24-character run rule, so only the request-specific redaction hides them.
+        rig.echo("access_denied", status: 401, of: ["actor_token", "client_secret", "basic_secret"])
+        _ = await rig.renderings.observe {
+            try await client.requestToken(
+                .tokenExchange(
+                    subject: .accessToken(refreshed.accessToken), actor: .jwt(Secret("canary-actor")),
+                    audiences: ["service"]))
+        }
+        rig.echo("invalid_grant", of: ["assertion", "client_secret", "basic_secret"])
+        _ = await rig.renderings.observe {
+            try await client.requestToken(
+                .extensionGrant(GrantType(rawValue: "urn:example:grant"), parameters: ["assertion": "canary-assert"]))
         }
         rig.echo("invalid_client", of: ["client_secret", "basic_secret"])
-        _ = await rig.renderings.observe { try await client.clientCredentials(scope: ["read"]) }
+        _ = await rig.renderings.observe { try await client.requestToken(.clientCredentials(scope: ["read"])) }
         rig.echo("unsupported_token_type", of: ["token", "client_secret", "basic_secret"])
         _ = await rig.renderings.observe { try await client.revoke(spent) }
         rig.echo("invalid_scope", path: "/device_authorization", of: ["client_secret", "basic_secret"])
@@ -183,7 +195,7 @@ struct RedactionCanaryTests {
 
         // Transport failure.
         await rig.server.configure { $0.override = { _ in .init(failure: URLError(.notConnectedToInternet)) } }
-        _ = await rig.renderings.observe { try await client.refresh(spent) }
+        _ = await rig.renderings.observe { try await client.requestToken(.refreshToken(spent)) }
 
         Self.assertNoCanary(rig)
     }
@@ -221,7 +233,7 @@ struct RedactionCanaryTests {
             try await manager.accessToken(for: TokenTarget.refreshGrant(resources: [apiA], scope: ["read"]))
         }
         await rig.renderings.observe {
-            try await manager.accessToken(for: TokenTarget.exchange(audiences: ["service"]))
+            try await manager.accessToken(for: TokenTarget.tokenExchange(audiences: ["service"]))
         }
         await rig.renderings.observe { try await manager.exchangeRefreshToken(audiences: ["service"]) }
         // A request that carries a token is the caller's value in Foundation's or swift-http-types' own type, which print their

@@ -21,7 +21,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   or the library's own roadmap is a struct with a `rawValue` or private
   storage and `static` members, like `GrantType`: `ClientAuthentication`,
   `TokenTarget.Derivation`, `RequestEvent.Endpoint`, `TokenTypeHint`,
-  `AuthorizationRequest.Prompt`, `TargetSelector`. A type that describes a
+  `AuthorizationRequest.Prompt`, `TokenTarget.Selector`. A type that describes a
   closed outcome the caller must handle stays an enum and is documented
   as not frozen, so callers switch with a `default`: `Recovery`,
   `ProtectedResourceClient.RetryDecision`, `OAuthSession.Event`, `OAuthSession.SignOutReason`,
@@ -30,15 +30,15 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   called `none` is named for what it does: `.publicClient(clientID:)`,
   `.noAction`, `.noInteraction` (the wire value `none`). Creating a value
   with several valid shapes goes through factories that cover exactly the
-  valid combinations (`TokenTarget.refreshGrant(...)`, `.exchange(...)`);
+  valid combinations (`TokenTarget.refreshGrant(...)`, `.tokenExchange(...)`);
   the memberwise initializer is `package`.
 - **Parameter objects instead of closures and long argument lists.** An
   extension point receives one struct (`TokenAcceptanceContext`) so a
   member can be added without breaking implementations. A choice among
-  behaviours is a named, open type (`TargetSelector`) rather than a bare
+  behaviours is a named, open type (`TokenTarget.Selector`) rather than a bare
   closure; a closure form stays available (`.matching`, `.custom`).
 - **Labels.** The first argument is unlabeled when the call reads as a
-  phrase about it (`refresh(_ refreshToken:)`, `sign(_ request:for:)`);
+  phrase about it (`TokenRequest.refreshToken(_ refreshToken:)`, `sign(_ request:for:)`);
   `for:` names a target, `using:` a collaborator that does the work for
   one call, and collaborators that live as long as the value are
   initializer parameters (`ProtectedResourceClient(session:transport:)`).

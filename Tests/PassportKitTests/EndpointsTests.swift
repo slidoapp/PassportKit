@@ -49,7 +49,7 @@ struct EndpointsTests {
 
     @Test func configurationAppliesTheOptInToEndpointsAndIssuer() throws {
         let local = Endpoints(token: try #require(URL(string: "http://localhost:8080/token")))
-        var configuration = ClientConfiguration(endpoints: local, authentication: .publicClient(clientID: "app"))
+        var configuration = OAuthClient.Configuration(endpoints: local, authentication: .publicClient(clientID: "app"))
         #expect(throws: PassportError.self) { try configuration.validate() }
         configuration.allowsInsecureLoopbackEndpoints = true
         try configuration.validate()
@@ -80,7 +80,8 @@ struct EndpointsTests {
 
     @Test func configurationValidatesEndpointsAndIssuer() {
         let endpoints = Endpoints(token: URL(string: "https://as.example.com/token")!)
-        var configuration = ClientConfiguration(endpoints: endpoints, authentication: .publicClient(clientID: "app"))
+        var configuration = OAuthClient.Configuration(
+            endpoints: endpoints, authentication: .publicClient(clientID: "app"))
         #expect((try? configuration.validate()) != nil)
         configuration.issuer = URL(string: "http://as.example.com")
         #expect {
@@ -91,7 +92,7 @@ struct EndpointsTests {
     }
 
     @Test func configurationDefaults() {
-        let configuration = ClientConfiguration(
+        let configuration = OAuthClient.Configuration(
             endpoints: Endpoints(token: URL(string: "https://as.example.com/token")!),
             authentication: .publicClient(clientID: "app")
         )
@@ -107,13 +108,13 @@ struct ConfigurationFromMetadataTests {
             issuer: URL(string: "https://as.example.com")!,
             authorizationEndpoint: URL(string: "https://as.example.com/authorize")!,
             tokenEndpoint: URL(string: "https://as.example.com/token")!,
-            authorizationResponseIssParameterSupported: issuerParameter
+            supportsIssuerInAuthorizationResponse: issuerParameter
         )
     }
 
     @Test(arguments: [(true as Bool?, true), (false, false), (nil, false)])
     func requiresIssuerWhenAdvertised(advertised: Bool?, expected: Bool) throws {
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: metadata(issuerParameter: advertised), authentication: .publicClient(clientID: "app"))
         #expect(configuration.requiresIssuerInAuthorizationResponse == expected)
         #expect(configuration.issuer == URL(string: "https://as.example.com"))
@@ -123,7 +124,7 @@ struct ConfigurationFromMetadataTests {
     @Test func rejectsMetadataWithoutTokenEndpoint() {
         let bare = AuthorizationServerMetadata(issuer: URL(string: "https://as.example.com")!)
         #expect(throws: PassportError.self) {
-            try ClientConfiguration(metadata: bare, authentication: .publicClient(clientID: "app"))
+            try OAuthClient.Configuration(metadata: bare, authentication: .publicClient(clientID: "app"))
         }
     }
 }

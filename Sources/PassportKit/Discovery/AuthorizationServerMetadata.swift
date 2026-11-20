@@ -16,13 +16,13 @@ public struct AuthorizationServerMetadata: Sendable, Codable, Hashable {
     public var deviceAuthorizationEndpoint: URL?
     /// `revocation_endpoint` (RFC 7009 §2).
     public var revocationEndpoint: URL?
-    /// `code_challenge_methods_supported` (RFC 8414 §2).
-    public var codeChallengeMethodsSupported: [String]?
-    /// `grant_types_supported`.
-    public var grantTypesSupported: [String]?
-    /// `authorization_response_iss_parameter_supported` (RFC 9207 §3): when `true`, set
-    /// ``ClientConfiguration/requiresIssuerInAuthorizationResponse``.
-    public var authorizationResponseIssParameterSupported: Bool?
+    /// The PKCE code challenge methods the server supports (`code_challenge_methods_supported`, RFC 8414 §2).
+    public var supportedCodeChallengeMethods: [String]?
+    /// The grant types the server supports (`grant_types_supported`, RFC 8414 §2).
+    public var supportedGrantTypes: [GrantType]?
+    /// Whether the server adds `iss` to authorization responses (`authorization_response_iss_parameter_supported`,
+    /// RFC 9207 §3). When `true`, set ``OAuthClient/Configuration/requiresIssuerInAuthorizationResponse``.
+    public var supportsIssuerInAuthorizationResponse: Bool?
     /// Every other member, unchanged, for example vendor extensions.
     public var additionalFields: [String: JSONValue]
 
@@ -33,9 +33,9 @@ public struct AuthorizationServerMetadata: Sendable, Codable, Hashable {
         tokenEndpoint: URL? = nil,
         deviceAuthorizationEndpoint: URL? = nil,
         revocationEndpoint: URL? = nil,
-        codeChallengeMethodsSupported: [String]? = nil,
-        grantTypesSupported: [String]? = nil,
-        authorizationResponseIssParameterSupported: Bool? = nil,
+        supportedCodeChallengeMethods: [String]? = nil,
+        supportedGrantTypes: [GrantType]? = nil,
+        supportsIssuerInAuthorizationResponse: Bool? = nil,
         additionalFields: [String: JSONValue] = [:]
     ) {
         self.issuer = issuer
@@ -43,9 +43,9 @@ public struct AuthorizationServerMetadata: Sendable, Codable, Hashable {
         self.tokenEndpoint = tokenEndpoint
         self.deviceAuthorizationEndpoint = deviceAuthorizationEndpoint
         self.revocationEndpoint = revocationEndpoint
-        self.codeChallengeMethodsSupported = codeChallengeMethodsSupported
-        self.grantTypesSupported = grantTypesSupported
-        self.authorizationResponseIssParameterSupported = authorizationResponseIssParameterSupported
+        self.supportedCodeChallengeMethods = supportedCodeChallengeMethods
+        self.supportedGrantTypes = supportedGrantTypes
+        self.supportsIssuerInAuthorizationResponse = supportsIssuerInAuthorizationResponse
         self.additionalFields = additionalFields
     }
 
@@ -61,13 +61,13 @@ public struct AuthorizationServerMetadata: Sendable, Codable, Hashable {
         static let tokenEndpoint = Key("token_endpoint")
         static let deviceAuthorizationEndpoint = Key("device_authorization_endpoint")
         static let revocationEndpoint = Key("revocation_endpoint")
-        static let codeChallengeMethodsSupported = Key("code_challenge_methods_supported")
-        static let grantTypesSupported = Key("grant_types_supported")
-        static let authorizationResponseIssParameterSupported = Key("authorization_response_iss_parameter_supported")
+        static let supportedCodeChallengeMethods = Key("code_challenge_methods_supported")
+        static let supportedGrantTypes = Key("grant_types_supported")
+        static let supportsIssuerInAuthorizationResponse = Key("authorization_response_iss_parameter_supported")
 
         static let known: Set<String> = [
             issuer, authorizationEndpoint, tokenEndpoint, deviceAuthorizationEndpoint, revocationEndpoint,
-            codeChallengeMethodsSupported, grantTypesSupported, authorizationResponseIssParameterSupported,
+            supportedCodeChallengeMethods, supportedGrantTypes, supportsIssuerInAuthorizationResponse,
         ].reduce(into: []) { $0.insert($1.stringValue) }
     }
 
@@ -79,11 +79,11 @@ public struct AuthorizationServerMetadata: Sendable, Codable, Hashable {
         tokenEndpoint = try container.decodeIfPresent(URL.self, forKey: .tokenEndpoint)
         deviceAuthorizationEndpoint = try container.decodeIfPresent(URL.self, forKey: .deviceAuthorizationEndpoint)
         revocationEndpoint = try container.decodeIfPresent(URL.self, forKey: .revocationEndpoint)
-        codeChallengeMethodsSupported = try container.decodeIfPresent(
-            [String].self, forKey: .codeChallengeMethodsSupported)
-        grantTypesSupported = try container.decodeIfPresent([String].self, forKey: .grantTypesSupported)
-        authorizationResponseIssParameterSupported = try container.decodeIfPresent(
-            Bool.self, forKey: .authorizationResponseIssParameterSupported)
+        supportedCodeChallengeMethods = try container.decodeIfPresent(
+            [String].self, forKey: .supportedCodeChallengeMethods)
+        supportedGrantTypes = try container.decodeIfPresent([GrantType].self, forKey: .supportedGrantTypes)
+        supportsIssuerInAuthorizationResponse = try container.decodeIfPresent(
+            Bool.self, forKey: .supportsIssuerInAuthorizationResponse)
         additionalFields = [:]
         for key in container.allKeys where !Key.known.contains(key.stringValue) {
             additionalFields[key.stringValue] = try container.decode(JSONValue.self, forKey: key)
@@ -99,10 +99,10 @@ public struct AuthorizationServerMetadata: Sendable, Codable, Hashable {
         try container.encodeIfPresent(tokenEndpoint, forKey: .tokenEndpoint)
         try container.encodeIfPresent(deviceAuthorizationEndpoint, forKey: .deviceAuthorizationEndpoint)
         try container.encodeIfPresent(revocationEndpoint, forKey: .revocationEndpoint)
-        try container.encodeIfPresent(codeChallengeMethodsSupported, forKey: .codeChallengeMethodsSupported)
-        try container.encodeIfPresent(grantTypesSupported, forKey: .grantTypesSupported)
+        try container.encodeIfPresent(supportedCodeChallengeMethods, forKey: .supportedCodeChallengeMethods)
+        try container.encodeIfPresent(supportedGrantTypes, forKey: .supportedGrantTypes)
         try container.encodeIfPresent(
-            authorizationResponseIssParameterSupported, forKey: .authorizationResponseIssParameterSupported)
+            supportsIssuerInAuthorizationResponse, forKey: .supportsIssuerInAuthorizationResponse)
         for (name, value) in additionalFields where !Key.known.contains(name) {
             try container.encode(value, forKey: Key(name))
         }

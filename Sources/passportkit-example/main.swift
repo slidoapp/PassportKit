@@ -79,7 +79,7 @@ func signIn(arguments: Arguments, client: OAuthClient) async throws -> TokenResp
     switch arguments.flow {
     case .device:
         let authorization = try await client.beginDeviceAuthorization(scope: arguments.scope)
-        print("Open \(authorization.verificationURIComplete ?? authorization.verificationURI)")
+        print("Open \(authorization.completeVerificationURI ?? authorization.verificationURI)")
         print("and enter the code \(display(authorization.userCode)) if asked.")
         print("Waiting for approval (polling every \(authorization.interval))...")
         return try await client.completeDeviceAuthorization(authorization)
@@ -111,7 +111,7 @@ func run() async throws {
     // RFC 8414 discovery; the configuration follows what the server advertises (endpoints, RFC 9207).
     let metadata = try await Discovery.fetchMetadata(
         issuer: arguments.issuer, allowsInsecureLoopbackEndpoints: arguments.allowsInsecureLoopback)
-    let configuration = try ClientConfiguration(
+    let configuration = try OAuthClient.Configuration(
         metadata: metadata, authentication: .publicClient(clientID: arguments.clientID),
         allowsInsecureLoopbackEndpoints: arguments.allowsInsecureLoopback)
     print("Discovered \(display(metadata.issuer.absoluteString))")

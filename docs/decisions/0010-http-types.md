@@ -97,7 +97,7 @@ public protocol HTTPTransport: Sendable {
   `(HTTPResponse, Data)`.
 
 **Names.** Public API that took `HTTPHeaders` takes `HTTPFields`
-(`ClientConfiguration.additionalHeaders`, `ProtectedResourceClient.evaluate`).
+(`OAuthClient.Configuration.additionalHeaders`, `ProtectedResourceClient.evaluate`).
 `AuthenticationChallenge.parse` keeps `[String]`, which is what
 `fields[values: .wwwAuthenticate]` returns. The recording types of
 `PassportKitTesting` expose `headerFields`, as `HTTPRequest` does.
@@ -107,7 +107,7 @@ public protocol HTTPTransport: Sendable {
 
 - Every public type that *stores* `HTTPFields` or a request or response
   gets a redacting `description` and `debugDescription` and a `customMirror`
-  that shows header names only: `ClientConfiguration`, `RecordedRequest`,
+  that shows header names only: `OAuthClient.Configuration`, `RecordedRequest`,
   `RecordingTransport.Step`, `FakeAuthorizationServer.ResponseOverride`.
   Their summaries use a `package` helper (`HTTPFields.names`) and
   `URL.redactedTarget`, which replace the former per-type code.
@@ -120,7 +120,7 @@ public protocol HTTPTransport: Sendable {
   signing) with `indexingStrategy = .disallow`.
 - Inside the library, headers, requests and responses are never logged or put
   into errors; this was already the rule and the redaction canary enforces
-  it: it now gives `ClientConfiguration` an additional header whose value is a
+  it: it now gives `OAuthClient.Configuration` an additional header whose value is a
   canary, and keeps covering every flow.
 
 **URLSessionTransport** converts with `URLRequest(httpRequest:)` and
@@ -136,7 +136,7 @@ Apps and transports use types they may already know, and an adapter to
 another HTTP client is a small transport, because the types are shared across
 the ecosystem; a transport on AsyncHTTPClient is listed in the plan as an
 option, not built. Consumers `import HTTPTypes` to implement a transport
-or build a request. `ClientConfiguration` is no longer a plain struct for
+or build a request. `OAuthClient.Configuration` is no longer a plain struct for
 reflection purposes: `dump` shows the header names, not the values. Header
 field names are `HTTPField.Name` values, which cannot hold an invalid name;
 invalid values are sanitized by `HTTPField`. There is no longer a
