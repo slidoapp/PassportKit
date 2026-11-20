@@ -3,7 +3,7 @@ import PassportKit
 import Testing
 
 @Suite(
-    "Token manager against the server",
+    "Session against the server",
     .enabled(if: IntegrationServer.isConfigured, "Set PASSPORTKIT_INTEGRATION_ISSUER or run `make integration`."),
     .timeLimit(.minutes(1))
 )

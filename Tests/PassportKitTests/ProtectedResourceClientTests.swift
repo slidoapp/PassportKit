@@ -139,7 +139,7 @@ struct ProtectedResourceClientTests {
         #expect(result == (allowed ? nil : .invalidConfiguration))
     }
 
-    @Test("an authorizer without an allow-list sends to any https origin")
+    @Test("a resource client without an allow-list sends to any https origin")
     func noAllowList() async throws {
         let authorizer = try await signedIn()
         let url = try #require(URL(string: "https://evil.example/"))
