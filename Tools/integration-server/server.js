@@ -286,6 +286,16 @@ provider.use(async (ctx, next) => {
   }
 });
 
+// RFC 8628 section 3.2: oidc-provider leaves out `interval`, so a client would wait the default 5 s between polls.
+// The server advertises a short interval to keep the device flow tests fast; the offline tests cover the default.
+const deviceInterval = seconds('DEVICE_INTERVAL', 1);
+provider.use(async (ctx, next) => {
+  await next();
+  if (ctx.oidc?.route === 'device_authorization' && ctx.status === 200 && ctx.body) {
+    ctx.body = { ...ctx.body, interval: deviceInterval };
+  }
+});
+
 http.createServer(provider.callback()).listen(port, '127.0.0.1', () => {
   console.log(`integration server listening on ${issuer}`);
 });

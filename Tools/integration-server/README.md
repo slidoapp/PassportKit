@@ -15,7 +15,8 @@ node server.js            # http://localhost:9400 (PORT overrides; issuer follow
 ```
 
 Environment: `PORT`, `ISSUER`, `ACCESS_TOKEN_TTL` (600 s), `REFRESH_TOKEN_TTL` (86400),
-`AUTHORIZATION_CODE_TTL` (60), `DEVICE_CODE_TTL` (600).
+`AUTHORIZATION_CODE_TTL` (60), `DEVICE_CODE_TTL` (600), `DEVICE_INTERVAL` (1, the polling interval the device
+authorization response advertises).
 One log line per request (`METHOD path status`), never queries, bodies or tokens.
 
 The server speaks plain `http`, so a client of it sets `allowsInsecureLoopbackEndpoints` (ADR 0012); the
@@ -64,7 +65,7 @@ Resources: any `https://api.example.com/...` is accepted (opaque token, `aud` = 
 - No consent or login UI; no real user accounts (`test-user` only); `profile`/`email` claims are fixed.
 - Metadata at the RFC 8414 path is the OIDC document (extra OIDC fields included, `token_endpoint`, `revocation_endpoint` etc. present).
 - Exchanged tokens are not bound to the subject token's resource audience; actor tokens, `requested_token_type` and `may_act` are ignored.
-- The device flow does not enforce polling `interval`/`slow_down`.
+- The device flow advertises `DEVICE_INTERVAL` but does not enforce it, and it never answers `slow_down`.
 - Revocation does not restrict which client may revoke (default policy; logs a notice).
 - Unknown scope values and resources outside `https://api.example.com/` are rejected exactly as `oidc-provider` does, with its error wording.
 - No DPoP, mTLS, PAR, JAR, introspection, dynamic registration.
