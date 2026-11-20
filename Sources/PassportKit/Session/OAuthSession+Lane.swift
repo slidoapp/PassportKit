@@ -45,10 +45,10 @@ extension OAuthSession {
                 let response = try await spendRefreshToken(
                     turn: turn, session: session, adoptsIDToken: false, returnsAnsweredResponse: true
                 ) {
-                    try await self.client.exchange(
-                        TokenExchangeRequest(
-                            subjectToken: $0, subjectTokenType: .refreshToken, requestedTokenType: requestedTokenType,
-                            audiences: audiences, resources: resources, scope: scope))
+                    try await self.client.requestToken(
+                        .tokenExchange(
+                            subject: .refreshToken($0), requestedTokenType: requestedTokenType, audiences: audiences,
+                            resources: resources, scope: scope))
                 }
                 // The rotated subject stays with the session (persisted above, or handed to its revocation).
                 var issued = response
@@ -178,7 +178,7 @@ extension OAuthSession {
             defer { turn.finish() }
             let refreshToken = revocableTokens.removeValue(forKey: session) ?? refreshToken
             // The task is never cancelled, so the outcome is never `cancelled`.
-            let outcome = await client.revokeBestEffort(refreshToken, typeHint: .refreshToken)
+            let outcome = await client.revokeBestEffort(refreshToken, hint: .refreshToken)
             completion.complete(.success(outcome))
         }
         return completion

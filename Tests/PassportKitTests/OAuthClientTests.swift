@@ -11,7 +11,7 @@ struct OAuthClientTests {
     private func pairs(_ request: RecordedRequest) -> [String] { request.form.map { "\($0.0)=\($0.1)" } }
 
     @Test func initRejectsInsecureConfiguration() {
-        let configuration = ClientConfiguration(
+        let configuration = OAuthClient.Configuration(
             endpoints: Endpoints(token: URL(string: "http://as.example.com/token")!),
             authentication: .publicClient(clientID: "app")
         )
@@ -26,12 +26,13 @@ struct OAuthClientTests {
             transport,
             additionalHeaders: [HTTPField.Name("X-Trace")!: "t1"]
         )
-        _ = try await client.refresh(
-            Secret("rt-1"),
-            scope: ["b", "a"],
-            resources: [URL(string: "https://api.example.com/v1")!, URL(string: "https://other.example.com")!],
-            additionalParameters: ["tenant": "x", "tenant2": "y"]
-        )
+        _ = try await client.requestToken(
+            .refreshToken(
+                Secret("rt-1"),
+                scope: ["b", "a"],
+                resources: [URL(string: "https://api.example.com/v1")!, URL(string: "https://other.example.com")!],
+                additionalParameters: ["tenant": "x", "tenant2": "y"]
+            ))
         let sent = try #require(await transport.requests.first)
         #expect(sent.request.method == .post)
         #expect(sent.request.url == ClientFixtures.tokenURL)
@@ -50,7 +51,7 @@ struct OAuthClientTests {
         let transport = RecordingTransport([.tokens()])
         let client = try ClientFixtures.client(
             transport, authentication: .clientSecretBasic(clientID: "app", secret: Secret("s3cret")))
-        _ = try await client.clientCredentials(scope: ["read"])
+        _ = try await client.requestToken(.clientCredentials(scope: ["read"]))
         let sent = try #require(await transport.requests.first)
         #expect(pairs(sent) == ["grant_type=client_credentials", "scope=read"])
         #expect(sent.headerFields[.authorization]?.hasPrefix("Basic ") == true)
@@ -61,7 +62,7 @@ struct OAuthClientTests {
         let transport = RecordingTransport([.tokens()])
         let client = try ClientFixtures.client(
             transport, authentication: .clientSecretPost(clientID: "app", secret: Secret("s3cret")))
-        _ = try await client.clientCredentials()
+        _ = try await client.requestToken(.clientCredentials())
         let sent = try #require(await transport.requests.first)
         #expect(pairs(sent) == ["grant_type=client_credentials", "client_id=app", "client_secret=s3cret"])
         #expect(sent.headerFields[.authorization] == nil)
@@ -70,7 +71,7 @@ struct OAuthClientTests {
     @Test func exchangeResponseWithoutIssuedTokenTypeIsInvalid() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.tokens()]))
         let error = await #expect(throws: PassportError.self) {
-            try await client.exchange(TokenExchangeRequest(subjectToken: Secret("s"), subjectTokenType: .accessToken))
+            try await client.requestToken(.tokenExchange(subject: .accessToken(Secret("s"))))
         }
         #expect(error?.code == .invalidResponse)
     }
@@ -80,17 +81,11 @@ struct OAuthClientTests {
             .tokens(extra: #","issued_token_type":"urn:ietf:params:oauth:token-type:access_token""#)
         ])
         let client = try ClientFixtures.client(transport)
-        _ = try await client.exchange(
-            TokenExchangeRequest(
-                subjectToken: Secret("subject"),
-                subjectTokenType: .refreshToken,
-                actorToken: Secret("actor"),
-                actorTokenType: .jwt,
-                requestedTokenType: .accessToken,
-                audiences: ["svc-a", "svc-b"],
-                resources: [URL(string: "https://api.example.com")!],
-                scope: ["x"],
-                additionalParameters: ["extra": "1"]
+        _ = try await client.requestToken(
+            .tokenExchange(
+                subject: .refreshToken(Secret("subject")), actor: .jwt(Secret("actor")),
+                requestedTokenType: .accessToken, audiences: ["svc-a", "svc-b"],
+                resources: [URL(string: "https://api.example.com")!], scope: ["x"], additionalParameters: ["extra": "1"]
             ))
         let sent = try #require(await transport.requests.first)
         #expect(
@@ -105,20 +100,12 @@ struct OAuthClientTests {
             ])
     }
 
-    @Test func actorTokenNeedsType() async throws {
-        let client = try ClientFixtures.client(RecordingTransport())
-        await #expect(throws: PassportError.self) {
-            try await client.exchange(
-                TokenExchangeRequest(
-                    subjectToken: Secret("s"), subjectTokenType: .accessToken, actorToken: Secret("a")))
-        }
-    }
-
     @Test func extensionGrantRequestShape() async throws {
         let transport = RecordingTransport([.tokens()])
         let client = try ClientFixtures.client(transport)
         _ = try await client.requestToken(
-            grantType: GrantType(rawValue: "urn:example:custom"), parameters: ["assertion": "a b", "assertion2": "c"])
+            .extensionGrant(
+                GrantType(rawValue: "urn:example:custom"), parameters: ["assertion": "a b", "assertion2": "c"]))
         let sent = try #require(await transport.requests.first)
         #expect(pairs(sent) == ["grant_type=urn:example:custom", "client_id=app", "assertion=a b", "assertion2=c"])
     }
@@ -130,9 +117,10 @@ struct OAuthClientTests {
         var parameters = AdditionalParameters()
         parameters.append(name, "evil")
         await #expect(throws: PassportError.self) {
-            try await client.refresh(
-                Secret("rt"), scope: ["a"], resources: [URL(string: "https://api.example.com")!],
-                additionalParameters: parameters)
+            try await client.requestToken(
+                .refreshToken(
+                    Secret("rt"), scope: ["a"], resources: [URL(string: "https://api.example.com")!],
+                    additionalParameters: parameters))
         }
         #expect(await transport.requests.isEmpty)
     }
@@ -142,7 +130,7 @@ struct OAuthClientTests {
         let transport = RecordingTransport([.tokens()])
         let client = try ClientFixtures.client(transport)
         let error = await #expect(throws: PassportError.self) {
-            try await client.clientCredentials(resources: [URL(string: text)!])
+            try await client.requestToken(.clientCredentials(resources: [URL(string: text)!]))
         }
         #expect(error?.code == .invalidConfiguration)
         #expect(await transport.requests.isEmpty)
@@ -153,7 +141,7 @@ struct OAuthClientTests {
     @Test func parsesTokenResponse() async throws {
         let transport = RecordingTransport([.tokens("new", extra: #","refresh_token":"rt2","scope":"a""#)])
         let client = try ClientFixtures.client(transport)
-        let response = try await client.refresh(Secret("rt"))
+        let response = try await client.requestToken(.refreshToken(Secret("rt")))
         #expect(response.accessToken.reveal() == "new")
         #expect(response.refreshToken?.reveal() == "rt2")
         #expect(response.scope == ["a"])
@@ -163,16 +151,16 @@ struct OAuthClientTests {
         let body = #"{"access_token":"x","issued_token_type":"urn:ietf:params:oauth:token-type:jwt"}"#
         let transport = RecordingTransport([.json(200, body), .json(200, #"{"access_token":"x"}"#)])
         let client = try ClientFixtures.client(transport)
-        let request = TokenExchangeRequest(subjectToken: Secret("s"), subjectTokenType: .accessToken)
-        let response = try await client.exchange(request)
+        let request = TokenRequest.tokenExchange(subject: .accessToken(Secret("s")))
+        let response = try await client.requestToken(request)
         #expect(response.tokenType == "N_A")
-        let error = await #expect(throws: PassportError.self) { try await client.exchange(request) }
+        let error = await #expect(throws: PassportError.self) { try await client.requestToken(request) }
         #expect(error?.code == .invalidResponse)
     }
 
     @Test func malformedSuccessBodyIsInvalidResponse() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.json(200, "not json")]))
-        let error = await #expect(throws: PassportError.self) { try await client.clientCredentials() }
+        let error = await #expect(throws: PassportError.self) { try await client.requestToken(.clientCredentials()) }
         #expect(error?.code == .invalidResponse)
     }
 
@@ -180,15 +168,36 @@ struct OAuthClientTests {
 
     @Test func refreshInvalidGrantMeansReauthenticate() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.oauthError("invalid_grant")]))
-        let error = await #expect(throws: PassportError.self) { try await client.refresh(Secret("rt")) }
+        let error = await #expect(throws: PassportError.self) {
+            try await client.requestToken(.refreshToken(Secret("rt")))
+        }
         #expect(error?.code == .invalidGrant)
         #expect(error?.recovery == .reauthenticate)
+    }
+
+    @Test func refreshExtensionGrantInvalidGrantMeansReauthenticate() async throws {
+        let client = try ClientFixtures.client(RecordingTransport([.oauthError("invalid_grant")]))
+        let error = await #expect(throws: PassportError.self) {
+            try await client.requestToken(.extensionGrant(.refreshToken, parameters: ["refresh_token": "rt"]))
+        }
+        #expect(error?.recovery == .reauthenticate)
+    }
+
+    @Test func exchangeWithoutActorSendsNoActorParameters() async throws {
+        let transport = RecordingTransport([
+            .tokens(extra: #","issued_token_type":"urn:ietf:params:oauth:token-type:access_token""#)
+        ])
+        let client = try ClientFixtures.client(transport)
+        _ = try await client.requestToken(.tokenExchange(subject: .accessToken(Secret("subject"))))
+        let sent = try #require(await transport.requests.first)
+        #expect(!sent.formNames.contains("actor_token"))
+        #expect(!sent.formNames.contains("actor_token_type"))
     }
 
     @Test func exchangeWithRefreshTokenSubjectInvalidGrantMeansReauthenticate() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.oauthError("invalid_grant")]))
         let error = await #expect(throws: PassportError.self) {
-            try await client.exchange(TokenExchangeRequest(subjectToken: Secret("rt"), subjectTokenType: .refreshToken))
+            try await client.requestToken(.tokenExchange(subject: .refreshToken(Secret("rt"))))
         }
         #expect(error?.recovery == .reauthenticate)
     }
@@ -196,7 +205,7 @@ struct OAuthClientTests {
     @Test func exchangeWithAccessTokenSubjectInvalidGrantIsNotSessionEnding() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.oauthError("invalid_grant")]))
         let error = await #expect(throws: PassportError.self) {
-            try await client.exchange(TokenExchangeRequest(subjectToken: Secret("at"), subjectTokenType: .accessToken))
+            try await client.requestToken(.tokenExchange(subject: .accessToken(Secret("at"))))
         }
         #expect(error?.recovery == PassportError.Recovery.noAction)
     }
@@ -204,7 +213,7 @@ struct OAuthClientTests {
     @Test func exchange401AccessDeniedIsResourceDenied() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.oauthError("access_denied", status: 401)]))
         let error = await #expect(throws: PassportError.self) {
-            try await client.exchange(TokenExchangeRequest(subjectToken: Secret("rt"), subjectTokenType: .refreshToken))
+            try await client.requestToken(.tokenExchange(subject: .refreshToken(Secret("rt"))))
         }
         #expect(error?.code == .accessDenied)
         #expect(error?.recovery == .resourceDenied)
@@ -214,14 +223,14 @@ struct OAuthClientTests {
     @Test func serviceUnavailableHonoursRetryAfter() async throws {
         let transport = RecordingTransport([.json(503, "<html>", headers: [.retryAfter: "7"])])
         let client = try ClientFixtures.client(transport)
-        let error = await #expect(throws: PassportError.self) { try await client.clientCredentials() }
+        let error = await #expect(throws: PassportError.self) { try await client.requestToken(.clientCredentials()) }
         #expect(error?.code == .temporarilyUnavailable)
         #expect(error?.recovery == .retryLater(after: .seconds(7)))
     }
 
     @Test func transportErrorIsTransportFailure() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.fail(URLError(.notConnectedToInternet))]))
-        let error = await #expect(throws: PassportError.self) { try await client.clientCredentials() }
+        let error = await #expect(throws: PassportError.self) { try await client.requestToken(.clientCredentials()) }
         #expect(error?.code == .transportFailure)
         #expect(error?.recovery == .retryLater(after: nil))
         #expect(error?.underlying is URLError)
@@ -229,7 +238,7 @@ struct OAuthClientTests {
 
     @Test func cancellationErrorPropagatesUnchanged() async throws {
         let client = try ClientFixtures.client(RecordingTransport([.fail(CancellationError())]))
-        await #expect(throws: CancellationError.self) { try await client.clientCredentials() }
+        await #expect(throws: CancellationError.self) { try await client.requestToken(.clientCredentials()) }
     }
 
     // MARK: Revocation
@@ -237,7 +246,7 @@ struct OAuthClientTests {
     @Test func revokeRequestShape() async throws {
         let transport = RecordingTransport([.json(200, "")])
         let client = try ClientFixtures.client(transport)
-        try await client.revoke(Secret("rt"), typeHint: .refreshToken)
+        try await client.revoke(Secret("rt"), hint: .refreshToken)
         let sent = try #require(await transport.requests.first)
         #expect(sent.request.url == ClientFixtures.revocationURL)
         #expect(pairs(sent) == ["token=rt", "token_type_hint=refresh_token", "client_id=app"])
@@ -250,7 +259,7 @@ struct OAuthClientTests {
         try await ClientFixtures.client(
             post, authentication: .clientSecretPost(clientID: "app", secret: Secret("s3cret"))
         )
-        .revoke(Secret("rt"), typeHint: .refreshToken)
+        .revoke(Secret("rt"), hint: .refreshToken)
         let sentPost = try #require(await post.requests.first)
         #expect(
             pairs(sentPost) == ["token=rt", "token_type_hint=refresh_token", "client_id=app", "client_secret=s3cret"])
@@ -323,7 +332,7 @@ struct OAuthClientTests {
     @Test("RFC 7009 §2: the best-effort revoke reports revoked and failed without throwing")
     func bestEffortRevokeOutcomes() async throws {
         let revoked = try ClientFixtures.client(RecordingTransport([.json(200, "")]))
-        #expect(await revoked.revokeBestEffort(Secret("a"), typeHint: .refreshToken) == .revoked)
+        #expect(await revoked.revokeBestEffort(Secret("a"), hint: .refreshToken) == .revoked)
 
         let failing = try ClientFixtures.client(RecordingTransport([.json(503, "", headers: [.retryAfter: "3"])]))
         guard case .failed(let error) = await failing.revokeBestEffort(Secret("a")) else {

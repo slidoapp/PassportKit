@@ -37,7 +37,7 @@ enum IntegrationServer {
         authentication: ClientAuthentication = .publicClient(clientID: publicClientID),
         minimumTokenLifetime: Duration = .seconds(5)
     ) async throws -> OAuthClient {
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: try await metadata(),
             authentication: authentication,
             minimumTokenLifetime: minimumTokenLifetime,

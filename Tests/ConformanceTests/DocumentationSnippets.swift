@@ -12,7 +12,7 @@ enum DocumentationSnippets {
     static func gettingStarted() async throws {
         let issuer = URL(string: "https://as.example.com")!
         let metadata = try await Discovery.fetchMetadata(issuer: issuer)
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: metadata, authentication: .publicClient(clientID: "my-app"))
         let client = try OAuthClient(configuration: configuration)
 
@@ -35,10 +35,10 @@ enum DocumentationSnippets {
     }
 
     // GettingStarted.md, local development servers
-    static func localDevelopment() async throws -> ClientConfiguration {
+    static func localDevelopment() async throws -> OAuthClient.Configuration {
         let issuer = URL(string: "http://localhost:8080")!
         let metadata = try await Discovery.fetchMetadata(issuer: issuer, allowsInsecureLoopbackEndpoints: true)
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: metadata, authentication: .publicClient(clientID: "my-app"),
             allowsInsecureLoopbackEndpoints: true)
         return configuration
@@ -48,7 +48,7 @@ enum DocumentationSnippets {
     static func readmeQuickStart() async throws {
         let issuer = URL(string: "https://as.example.com")!
         let metadata = try await Discovery.fetchMetadata(issuer: issuer)
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: metadata, authentication: .publicClient(clientID: "my-app"))
         let client = try OAuthClient(configuration: configuration)
 
@@ -70,7 +70,7 @@ enum DocumentationSnippets {
     }
 
     // GettingStarted.md, logging
-    static func logging(configuration: ClientConfiguration) throws -> OAuthClient {
+    static func logging(configuration: OAuthClient.Configuration) throws -> OAuthClient {
         var logger = Logger(label: "com.example.app.auth")
         logger.logLevel = .debug
         let client = try OAuthClient(configuration: configuration, logger: logger)
@@ -92,7 +92,7 @@ enum DocumentationSnippets {
         let bound = try await session.accessToken(
             for: .refreshGrant(resources: [items], scope: ["items.read"]))
         let exchanged = try await session.accessToken(
-            for: .exchange(audiences: ["reports"]))
+            for: .tokenExchange(audiences: ["reports"]))
         _ = (general, bound, exchanged)
     }
 

@@ -16,13 +16,13 @@ about redirect URIs and does not extend to endpoints that receive the client sec
 ## Decision
 
 - Every protocol endpoint, the issuer and the metadata URL must be `https`.
-- `ClientConfiguration.allowsInsecureLoopbackEndpoints` (default `false`) is the one explicit opt-in. With it, an
+- `OAuthClient.Configuration.allowsInsecureLoopbackEndpoints` (default `false`) is the one explicit opt-in. With it, an
   `http` URL whose host is `localhost`, `127.0.0.1` or `::1` is accepted. A non-loopback `http` URL is refused with or
   without it. The name follows ADR 0008: a Boolean that reads as a statement at the call site, and `Endpoints`
   rather than `URLs` because that is the term the RFCs and this API use for the server's URLs.
 - The same parameter is accepted where a URL is validated before a configuration exists:
   `Discovery.fetchMetadata(issuer:allowsInsecureLoopbackEndpoints:…)`, `Endpoints.init(metadata:allowsInsecureLoopbackEndpoints:)` and
-  `ClientConfiguration.init(metadata:…allowsInsecureLoopbackEndpoints:)`. Passing it to one does not imply the others,
+  `OAuthClient.Configuration.init(metadata:…allowsInsecureLoopbackEndpoints:)`. Passing it to one does not imply the others,
   but the configuration stores it so the client does not need a second source of truth.
 - Verification URIs of the device flow and the resource URLs a `ProtectedResourceClient` signs follow the same rule through
   the configuration of the session's client: both put a credential or a code in front of a person or a server, and a

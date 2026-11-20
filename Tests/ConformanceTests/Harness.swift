@@ -81,7 +81,7 @@ struct Harness {
             revokesGrantOnReuse: true, accessTokenLifetime: accessTokenLifetime)
         let server = FakeAuthorizationServer(clients: [registration], wallClock: wallClock, clock: clock)
         self.server = server
-        let configuration = ClientConfiguration(
+        let configuration = OAuthClient.Configuration(
             endpoints: Endpoints(
                 authorization: FakeAuthorizationServer.authorizationEndpoint,
                 token: FakeAuthorizationServer.tokenEndpoint,

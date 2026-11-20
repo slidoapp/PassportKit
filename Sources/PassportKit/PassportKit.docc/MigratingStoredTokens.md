@@ -59,7 +59,7 @@ carried over, because its expiry is unknown; the first
 
 - **Configure the client as before.** The migrated token belongs to a
   client ID and an issuer. ``OAuthSession/restore()`` ignores a stored credential
-  of another client or issuer, so use the same ``ClientConfiguration`` values
+  of another client or issuer, so use the same ``OAuthClient/Configuration`` values
   as the previous library did.
 - **Do not delete the old item first.** Until the first token request
   succeeded, nothing proves the refresh token still works. If the request

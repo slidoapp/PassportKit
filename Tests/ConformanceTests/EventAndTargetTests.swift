@@ -42,8 +42,8 @@ struct EventAndTargetTests {
         let target = TokenTarget.refreshGrant(resources: [apiA, apiB], scope: ["write", "read"])
         #expect(reordered == target)
         #expect(Set([reordered, target]).count == 1)
-        let exchange = TokenTarget.exchange(audiences: ["a", "b"])
-        #expect(exchange == TokenTarget.exchange(audiences: ["b", "a", "a"]))
+        let exchange = TokenTarget.tokenExchange(audiences: ["a", "b"])
+        #expect(exchange == TokenTarget.tokenExchange(audiences: ["b", "a", "a"]))
         #expect(exchange != TokenTarget(derivation: .refreshGrant, audiences: ["a", "b"]))
         #expect(TokenTarget.refreshGrant(resources: [apiA]) != TokenTarget.refreshGrant(resources: [apiA, apiB]))
         // No scope asked for and an empty scope asked for are different requests.

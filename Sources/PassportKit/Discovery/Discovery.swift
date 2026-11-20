@@ -38,7 +38,7 @@ public enum Discovery {
     /// that fails `issuerValidation` is ``PassportError/Code-swift.struct/issuerMismatch``. The issuer must be an
     /// `https` URL without query or fragment, else `invalidConfiguration`; with `allowsInsecureLoopbackEndpoints`
     /// it may be an `http` URL on a loopback host, for local development only (RFC 8414 §3 requires TLS).
-    /// The endpoints inside the returned metadata are checked when a ``ClientConfiguration`` or ``Endpoints``
+    /// The endpoints inside the returned metadata are checked when a ``OAuthClient/Configuration`` or ``Endpoints``
     /// is created from it, with the same opt-in.
     ///
     /// With an `observer`, the request is reported as ``RequestEvent`` values with

@@ -40,7 +40,7 @@ struct ExpiryTests {
         let harness = try await Harness()
         let stale = try await harness.manager.accessToken()
         harness.wallClock.advance(by: .seconds(850))
-        let target = TokenTarget.exchange(resources: [apiA])
+        let target = TokenTarget.tokenExchange(resources: [apiA])
         let derived = try await harness.manager.accessToken(for: target)
 
         let grants = await harness.server.requests(to: "/token").compactMap { $0.value("grant_type") }
@@ -61,7 +61,7 @@ struct ExpiryTests {
         let subject = try await harness.manager.accessToken()
         harness.wallClock.advance(by: .seconds(800))
         let derived = try await harness.manager.accessToken(
-            for: TokenTarget.exchange(resources: [apiA]))
+            for: TokenTarget.tokenExchange(resources: [apiA]))
         #expect(await harness.tokenRequests(.refreshToken).isEmpty)
         #expect(derived.expiresAt == subject.expiresAt)
     }
@@ -80,7 +80,7 @@ struct ExpiryTests {
             }
         }
         let derived = try await harness.manager.accessToken(
-            for: TokenTarget.exchange(audiences: ["billing"]))
+            for: TokenTarget.tokenExchange(audiences: ["billing"]))
         #expect(derived.value.reveal() == "derived")
         #expect(await harness.currentRefreshToken() == before)
         #expect(await harness.storedRefreshToken() == before)

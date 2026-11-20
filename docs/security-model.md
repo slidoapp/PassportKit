@@ -23,7 +23,7 @@ not constant time; the library compares `state` in constant time itself.
 
 HTTP header values can carry credentials (`Authorization`, `Cookie`, API keys), and swift-http-types prints them:
 `HTTPFields` shows every value in `description`, `debugDescription` and `dump`, and `HTTPRequest` shows its URL with
-query. Public PassportKit types that store header fields (`ClientConfiguration`, `RecordedRequest` and the scripted
+query. Public PassportKit types that store header fields (`OAuthClient.Configuration`, `RecordedRequest` and the scripted
 responses of `PassportKitTesting`) therefore have redacting descriptions and mirrors that show header names only.
 An `HTTPRequest` with a token or a response that the library returns is the caller's value and prints like any
 `HTTPTypes` value: do not log it. The library marks `Authorization` as never indexed (RFC 7541 §7.1.3); the marking
@@ -86,7 +86,7 @@ follow the same rules as errors and events:
 - HTTPS for every protocol endpoint (authorization, token, device authorization, revocation, discovery and the
   endpoints in fetched metadata), the issuer and tokens sent to resources (RFC 6749 §3.1, §3.2, RFC 7009 §2.1,
   RFC 8414 §3). Plain `http` is never implied by a host name: an app that talks to a local development server
-  sets `ClientConfiguration.allowsInsecureLoopbackEndpoints` (and passes it to `Discovery.fetchMetadata`), which
+  sets `OAuthClient.Configuration.allowsInsecureLoopbackEndpoints` (and passes it to `Discovery.fetchMetadata`), which
   admits `http` on `localhost`, `127.0.0.1` and `::1` only; any other `http` URL is refused with or without it
   (ADR 0012). Redirect URIs are not endpoints: the RFC 8252 §7.3 `http` loopback redirect URI needs no opt-in,
   because no credential is sent to it. The `localhost` name is also

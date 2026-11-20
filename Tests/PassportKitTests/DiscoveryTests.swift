@@ -246,7 +246,7 @@ struct DiscoveryTests {
         for methods in [#"["plain"]"#, "[]"] {
             let json = Self.metadataJSON().replacingOccurrences(of: #"["S256"]"#, with: methods)
             let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: Data(json.utf8))
-            let configuration = try ClientConfiguration(
+            let configuration = try OAuthClient.Configuration(
                 metadata: metadata, authentication: .publicClient(clientID: "app"))
             let client = try OAuthClient(configuration: configuration, transport: RecordingTransport())
             let pending = try client.beginAuthorization(
@@ -275,15 +275,15 @@ struct DiscoveryTests {
             issuer: local, tokenEndpoint: URL(string: "http://localhost:8080/token")!)
         #expect(throws: PassportError.self) { try Endpoints(metadata: metadata) }
         #expect(throws: PassportError.self) {
-            try ClientConfiguration(metadata: metadata, authentication: .publicClient(clientID: "app"))
+            try OAuthClient.Configuration(metadata: metadata, authentication: .publicClient(clientID: "app"))
         }
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: metadata, authentication: .publicClient(clientID: "app"), allowsInsecureLoopbackEndpoints: true)
         #expect(configuration.allowsInsecureLoopbackEndpoints)
         let remote = AuthorizationServerMetadata(
             issuer: local, tokenEndpoint: URL(string: "http://as.example.com/token")!)
         #expect(throws: PassportError.self) {
-            try ClientConfiguration(
+            try OAuthClient.Configuration(
                 metadata: remote, authentication: .publicClient(clientID: "app"), allowsInsecureLoopbackEndpoints: true)
         }
     }

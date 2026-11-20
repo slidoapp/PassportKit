@@ -17,11 +17,11 @@ struct AuthorizationTests {
         #expect(metadata.issuer == issuer)
         #expect(metadata.supportsIssuerInAuthorizationResponse == true)
 
-        let configuration = try ClientConfiguration(
+        let configuration = try OAuthClient.Configuration(
             metadata: metadata, authentication: .publicClient(clientID: IntegrationServer.publicClientID),
             allowsInsecureLoopbackEndpoints: true)
         #expect(throws: PassportError.self) {
-            try ClientConfiguration(
+            try OAuthClient.Configuration(
                 metadata: metadata, authentication: .publicClient(clientID: IntegrationServer.publicClientID))
         }
         #expect(configuration.issuer == issuer)

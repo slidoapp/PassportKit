@@ -54,7 +54,7 @@ public struct ProtectedResourceClient: Sendable, CustomStringConvertible, Custom
     /// ``PassportError/Code-swift.struct/invalidResponse`` when the token is not a valid `b64token`
     /// (RFC 6750 §2.1), and ``PassportError/Code-swift.struct/invalidConfiguration`` when the URL is neither
     /// `https` (nor `http` on a loopback host, only when the session's client sets
-    /// ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), so a token never travels in clear text, when its
+    /// ``OAuthClient/Configuration/allowsInsecureLoopbackEndpoints``), so a token never travels in clear text, when its
     /// origin is not in `allowedOrigins`, or when the token's
     /// ``AccessToken/tokenType`` is not `Bearer` (compared case-insensitively): other types, such as
     /// sender-constrained `DPoP` tokens, need proof this client cannot produce. Never returns a

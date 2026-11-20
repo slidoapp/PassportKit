@@ -57,7 +57,7 @@ public struct TokenTarget: Sendable, Hashable {
 
     /// A token obtained by exchanging the default access token for one bound to `resources` and `audiences`
     /// (RFC 8693 §2.1).
-    public static func exchange(
+    public static func tokenExchange(
         resources: [URL] = [],
         audiences: [String] = [],
         scope: ScopeSet? = nil

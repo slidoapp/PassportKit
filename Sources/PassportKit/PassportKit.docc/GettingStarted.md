@@ -14,7 +14,7 @@ import PassportKit
 
 let issuer = URL(string: "https://as.example.com")!
 let metadata = try await Discovery.fetchMetadata(issuer: issuer)
-let configuration = try ClientConfiguration(
+let configuration = try OAuthClient.Configuration(
     metadata: metadata, authentication: .publicClient(clientID: "my-app"))
 let client = try OAuthClient(configuration: configuration)
 ```
@@ -38,7 +38,7 @@ stored in the configuration:
 ```swift
 let issuer = URL(string: "http://localhost:8080")!
 let metadata = try await Discovery.fetchMetadata(issuer: issuer, allowsInsecureLoopbackEndpoints: true)
-let configuration = try ClientConfiguration(
+let configuration = try OAuthClient.Configuration(
     metadata: metadata, authentication: .publicClient(clientID: "my-app"),
     allowsInsecureLoopbackEndpoints: true)
 ```
@@ -94,10 +94,10 @@ split the flow when you present the URL yourself.
 ### Mix-up protection
 
 A client that talks to more than one authorization server can be tricked into sending a code to the wrong one (a
-mix-up attack). The code flow therefore needs ``ClientConfiguration/issuer``: ``OAuthClient/beginAuthorization(_:)``,
+mix-up attack). The code flow therefore needs ``OAuthClient/Configuration/issuer``: ``OAuthClient/beginAuthorization(_:)``,
 ``OAuthClient/authorize(_:using:)`` and ``OAuthClient/completeAuthorization(_:callbackURL:additionalParameters:)``
 throw ``PassportError/Code-swift.struct/invalidConfiguration`` without one, and the `iss` of the response (RFC 9207)
-must equal it exactly. ``ClientConfiguration/init(metadata:authentication:additionalHeaders:minimumTokenLifetime:defaultTokenLifetime:allowsInsecureLoopbackEndpoints:)``
+must equal it exactly. ``OAuthClient/Configuration/init(metadata:authentication:additionalHeaders:minimumTokenLifetime:defaultTokenLifetime:allowsInsecureLoopbackEndpoints:)``
 sets the issuer, and requires `iss` when the server advertises `authorization_response_iss_parameter_supported`.
 
 A server that does not support RFC 9207 sends no `iss`, so a response without it is accepted and PassportKit cannot tell
@@ -154,7 +154,7 @@ let request = URLRequest(url: URL(string: "https://api.example.com/items")!)
 let (data, response) = try await api.data(for: request, urlSession: urlSession)
 ```
 
-Tokens are only sent over `https` (an `http` loopback URL needs ``ClientConfiguration/allowsInsecureLoopbackEndpoints``), to the origins you
+Tokens are only sent over `https` (an `http` loopback URL needs ``OAuthClient/Configuration/allowsInsecureLoopbackEndpoints``), to the origins you
 list in `allowedOrigins`, and only when the token type is `Bearer`. A 403 is delivered to you unchanged: a new token
 would not carry more scope. Read <doc:ResourceAccessAndScopes> before you
 rely on a token for a particular resource.

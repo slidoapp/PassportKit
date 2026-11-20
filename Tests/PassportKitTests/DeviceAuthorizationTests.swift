@@ -14,7 +14,7 @@ struct DeviceAuthorizationTests {
     private func start(
         _ steps: [RecordingTransport.Step],
         clock: ManualClock = ManualClock()
-    ) async throws -> (OAuthClient, RecordingTransport, ManualClock, DeviceAuthorization) {
+    ) async throws -> (OAuthClient, RecordingTransport, ManualClock, PendingDeviceAuthorization) {
         let transport = RecordingTransport([.json(200, Self.deviceJSON)] + steps)
         let client = try ClientFixtures.client(transport, clock: clock)
         let authorization = try await client.beginDeviceAuthorization()
@@ -24,7 +24,7 @@ struct DeviceAuthorizationTests {
     /// Runs polling to its end, answering exactly `sleeps` sleeps, and returns each wait with the final result.
     private func poll(
         _ client: OAuthClient,
-        _ authorization: DeviceAuthorization,
+        _ authorization: PendingDeviceAuthorization,
         clock: ManualClock,
         sleeps: Int,
         additionalParameters: AdditionalParameters = [:]
@@ -91,7 +91,7 @@ struct DeviceAuthorizationTests {
         #expect(authorization.userCode == "WDJB-MJHT")
         #expect(authorization.verificationURI.absoluteString == "https://as.example.com/device")
         #expect(
-            authorization.verificationURIComplete?.absoluteString == "https://as.example.com/device?user_code=WDJB-MJHT"
+            authorization.completeVerificationURI?.absoluteString == "https://as.example.com/device?user_code=WDJB-MJHT"
         )
         #expect(authorization.expiresIn == .seconds(900))
         #expect(authorization.interval == .seconds(7))
@@ -104,7 +104,7 @@ struct DeviceAuthorizationTests {
         let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]))
         let authorization = try await client.beginDeviceAuthorization()
         #expect(authorization.verificationURI.absoluteString == "https://as.example.com/v")
-        #expect(authorization.verificationURIComplete == nil)
+        #expect(authorization.completeVerificationURI == nil)
         #expect(authorization.interval == .seconds(5))
         #expect(authorization.expiresIn == .seconds(120))
     }
@@ -165,7 +165,7 @@ struct DeviceAuthorizationTests {
         let client = try ClientFixtures.client(RecordingTransport([.json(200, body)]), allowsInsecureLoopback: true)
         let authorization = try await client.beginDeviceAuthorization()
         #expect(authorization.verificationURI.absoluteString == "http://localhost:8080/device")
-        #expect(authorization.verificationURIComplete == nil)
+        #expect(authorization.completeVerificationURI == nil)
     }
 
     @Test(arguments: ["1e25", "3601", "1e999"])
@@ -200,7 +200,7 @@ struct DeviceAuthorizationTests {
     }
 
     @Test func startWithoutEndpointIsInvalidConfiguration() async throws {
-        let configuration = ClientConfiguration(
+        let configuration = OAuthClient.Configuration(
             endpoints: Endpoints(token: ClientFixtures.tokenURL), authentication: .publicClient(clientID: "app"))
         let client = try OAuthClient(configuration: configuration, transport: RecordingTransport())
         let error = await #expect(throws: PassportError.self) { try await client.beginDeviceAuthorization() }

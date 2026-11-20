@@ -140,3 +140,19 @@ public struct WebAuthenticationSessionUserAgent: AuthorizationUserAgent {
         #endif
     }
 }
+
+extension AuthorizationUserAgent where Self == WebAuthenticationSessionUserAgent {
+    /// An agent backed by `ASWebAuthenticationSession`, for `using: .webAuthenticationSession()`.
+    ///
+    /// The parameters are those of
+    /// ``WebAuthenticationSessionUserAgent/init(prefersEphemeralWebBrowserSession:presentationAnchor:logger:)``.
+    public static func webAuthenticationSession(
+        prefersEphemeralWebBrowserSession: Bool = false,
+        presentationAnchor: (@MainActor @Sendable () -> ASPresentationAnchor)? = nil,
+        logger: Logger = Logger(label: "PassportKit")
+    ) -> WebAuthenticationSessionUserAgent {
+        WebAuthenticationSessionUserAgent(
+            prefersEphemeralWebBrowserSession: prefersEphemeralWebBrowserSession,
+            presentationAnchor: presentationAnchor, logger: logger)
+    }
+}

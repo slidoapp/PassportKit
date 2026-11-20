@@ -95,7 +95,7 @@ struct PersistenceTests {
             $0.isResourceUnauthorized = { $0.path.hasPrefix("/denied") }
             $0.exchangeForUnauthorizedResource = behavior
         }
-        let target = TokenTarget.exchange(resources: [deniedResource])
+        let target = TokenTarget.tokenExchange(resources: [deniedResource])
         let error = await thrownError { try await harness.manager.accessToken(for: target) }
         #expect(error?.code == (behavior == .accessDenied401 ? .accessDenied : .tokenRejected))
         #expect(error?.recovery == .resourceDenied)
@@ -106,7 +106,7 @@ struct PersistenceTests {
         #expect(await harness.tokenRequests(.refreshToken).isEmpty)
         // And an accessible resource can be exchanged.
         let allowed = try await harness.manager.accessToken(
-            for: TokenTarget.exchange(resources: [apiA]))
+            for: TokenTarget.tokenExchange(resources: [apiA]))
         #expect(allowed.grantedScope == ["read", "write"])
     }
 }

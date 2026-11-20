@@ -112,7 +112,7 @@ extension OAuthSession {
         let response = try await spendRefreshToken(
             turn: turn, session: session, adoptsIDToken: true, adoptsScope: isRootRefresh
         ) {
-            try await self.client.refresh($0, scope: target.scope, resources: target.resources)
+            try await self.client.requestToken(.refreshToken($0, scope: target.scope, resources: target.resources))
         }
         // An omitted `scope` means the scope that was requested, and without a request, the scope originally
         // granted (RFC 6749 §5.1, §6).
@@ -129,10 +129,10 @@ extension OAuthSession {
         guard session == generation else { throw SessionSuperseded() }
         let response: TokenResponse
         do {
-            response = try await client.exchange(
-                TokenExchangeRequest(
-                    subjectToken: subject.value, subjectTokenType: .accessToken, requestedTokenType: .accessToken,
-                    audiences: target.audiences, resources: target.resources, scope: target.scope))
+            response = try await client.requestToken(
+                .tokenExchange(
+                    subject: .accessToken(subject.value), requestedTokenType: .accessToken, audiences: target.audiences,
+                    resources: target.resources, scope: target.scope))
         } catch {
             guard session == generation else { throw SessionSuperseded() }
             // The server no longer accepts the subject: do not offer it again.

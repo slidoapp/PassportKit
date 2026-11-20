@@ -34,7 +34,7 @@ struct FormRequest {
     /// Applies client authentication and additional parameters and encodes the request.
     ///
     /// Library-owned headers win over `additionalHeaders` with the same name.
-    func build(configuration: ClientConfiguration) throws -> (request: HTTPRequest, body: Data) {
+    func build(configuration: OAuthClient.Configuration) throws -> (request: HTTPRequest, body: Data) {
         var headers = configuration.additionalHeaders
         var standard = parameters.items
         configuration.authentication.apply(to: &standard, headers: &headers)
@@ -53,7 +53,7 @@ struct FormRequest {
 
     /// The credential values of this request and of the client authentication, which a server must not be able
     /// to make the library repeat in an error.
-    func secretValues(configuration: ClientConfiguration) -> [String] {
+    func secretValues(configuration: OAuthClient.Configuration) -> [String] {
         var values = (parameters.items + additionalParameters.items.map { ($0.name, $0.value) })
             .filter { Self.secretParameterNames.contains($0.0) }.map(\.1)
         if let secret = configuration.authentication.secret { values.append(secret.reveal()) }

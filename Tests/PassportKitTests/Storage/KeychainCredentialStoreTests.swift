@@ -217,7 +217,7 @@ struct KeychainCredentialStoreTests {
         let server = FakeAuthorizationServer(
             clients: [registration], wallClock: wallClock, clock: ManualClock())
         let client = try OAuthClient(
-            configuration: ClientConfiguration(
+            configuration: OAuthClient.Configuration(
                 endpoints: Endpoints(
                     authorization: FakeAuthorizationServer.authorizationEndpoint,
                     token: FakeAuthorizationServer.tokenEndpoint,

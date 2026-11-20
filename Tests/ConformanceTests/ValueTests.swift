@@ -19,10 +19,10 @@ struct ValueTests {
         #expect(keychain is KeychainCredentialStore)
     }
 
-    @Test("a DeviceAuthorization can be created for previews and keeps its device code private")
+    @Test("a PendingDeviceAuthorization can be created for previews and keeps its device code private")
     func deviceAuthorizationForPreviews() {
         let clock = ManualClock()
-        let authorization = DeviceAuthorization(
+        let authorization = PendingDeviceAuthorization(
             deviceCode: Secret(Self.canaries[1]), userCode: "ABCD-EFGH",
             verificationURI: URL(string: "https://as.example.com/device")!, expiresIn: .seconds(600),
             expiresAt: Date(timeIntervalSince1970: 600), clock: clock)
@@ -54,6 +54,26 @@ struct ValueTests {
         }
         #expect(token.description.contains("<redacted>"))
         #expect(credential.description.contains("clientID: app"))
+    }
+
+    @Test("descriptions and reflection of TokenRequest never show the tokens it carries")
+    func tokenRequestRedaction() {
+        let requests: [TokenRequest] = [
+            .refreshToken(Secret(Self.canaries[1])),
+            .tokenExchange(subject: .accessToken(Secret(Self.canaries[0])), actor: .jwt(Secret(Self.canaries[2]))),
+            .extensionGrant(.refreshToken, parameters: ["refresh_token": Self.canaries[3]]),
+        ]
+        let token = TokenRequest.SecurityToken.refreshToken(Secret(Self.canaries[1]))
+        var outputs = [String(describing: token), String(reflecting: token)]
+        for request in requests {
+            outputs += [String(describing: request), String(reflecting: request), "\(request)"]
+            var dumped = ""
+            dump(request, to: &dumped)
+            outputs.append(dumped)
+        }
+        for output in outputs {
+            for canary in Self.canaries { #expect(!output.contains(canary)) }
+        }
     }
 
     @Test("stored credentials are versioned JSON and round trip")
@@ -107,7 +127,7 @@ struct ValueTests {
         #expect(tokens != TokenResponse(accessToken: Secret("b"), tokenType: "Bearer", scope: ["read"]))
         let authorization = AuthorizationRequest(redirectURI: url, prompt: [.login])
         #expect(Set([authorization, authorization]).count == 1)
-        let exchange = TokenExchangeRequest(subjectToken: Secret("a"), subjectTokenType: .accessToken)
+        let exchange = TokenRequest.tokenExchange(subject: .accessToken(Secret("a")))
         #expect(Set([exchange, exchange]).count == 1)
         #expect(Set([OAuthSession.Event.signedIn, .signedIn, .storageFailed]).count == 2)
     }

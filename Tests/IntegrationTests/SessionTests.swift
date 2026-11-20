@@ -20,14 +20,14 @@ struct SessionTests {
         #expect(rotated != original)
         #expect(try await session.store.load(session.account)?.refreshToken == rotated)
 
-        let reuse = await passportError { _ = try await session.client.refresh(original) }
+        let reuse = await passportError { _ = try await session.client.requestToken(.refreshToken(original)) }
         #expect(reuse?.code == .invalidGrant)
         #expect(reuse?.recovery == .reauthenticate)
     }
 
     @Test func exchangedAccessTokenForAnAllowedResourceSucceeds() async throws {
         let session = try await IntegrationServer.signIn()
-        let target = TokenTarget.exchange(resources: [IntegrationServer.allowedResource])
+        let target = TokenTarget.tokenExchange(resources: [IntegrationServer.allowedResource])
         let token = try await session.manager.accessToken(for: target)
         #expect(token.grantedScope?.contains("api:read") == true)
         #expect(token.target == target)
@@ -35,7 +35,7 @@ struct SessionTests {
 
     @Test func exchangeForADeniedResourceFailsAndKeepsTheSession() async throws {
         let session = try await IntegrationServer.signIn()
-        let target = TokenTarget.exchange(resources: [IntegrationServer.deniedResource])
+        let target = TokenTarget.tokenExchange(resources: [IntegrationServer.deniedResource])
 
         let error = await passportError { _ = try await session.manager.accessToken(for: target) }
         #expect(error?.code == .accessDenied)
@@ -43,7 +43,7 @@ struct SessionTests {
 
         #expect(await session.manager.credential != nil)
         _ = try await session.manager.accessToken()
-        let allowed = TokenTarget.exchange(resources: [IntegrationServer.allowedResource])
+        let allowed = TokenTarget.tokenExchange(resources: [IntegrationServer.allowedResource])
         _ = try await session.manager.accessToken(for: allowed)
     }
 
@@ -82,7 +82,7 @@ struct SessionTests {
         // The audience's refresh token is usable by the audience client.
         let audienceClient = try await IntegrationServer.client(
             authentication: .publicClient(clientID: IntegrationServer.audienceClientID))
-        let audienceTokens = try await audienceClient.refresh(response.accessToken)
+        let audienceTokens = try await audienceClient.requestToken(.refreshToken(response.accessToken))
         #expect(audienceTokens.refreshToken != nil)
 
         // The rotated subject keeps working: a refresh with a resource sends it.
@@ -99,7 +99,7 @@ struct SessionTests {
         #expect(result.isStoredCredentialDeleted)
         #expect(await session.manager.credential == nil)
 
-        let error = await passportError { _ = try await session.client.refresh(refreshToken) }
+        let error = await passportError { _ = try await session.client.requestToken(.refreshToken(refreshToken)) }
         #expect(error?.code == .invalidGrant)
     }
 }
@@ -120,7 +120,7 @@ struct ClientCredentialsTests {
     )
     func clientCredentialsGrantIssuesAnAccessToken(authentication: ClientAuthentication) async throws {
         let client = try await IntegrationServer.client(authentication: authentication)
-        let response = try await client.clientCredentials(resources: [IntegrationServer.allowedResource])
+        let response = try await client.requestToken(.clientCredentials(resources: [IntegrationServer.allowedResource]))
         #expect(response.tokenType.lowercased() == "bearer")
         #expect(response.refreshToken == nil)
     }
@@ -129,7 +129,7 @@ struct ClientCredentialsTests {
         let client = try await IntegrationServer.client(
             authentication: .clientSecretBasic(clientID: IntegrationServer.serviceClientID, secret: Secret("wrong")))
         let error = await passportError {
-            _ = try await client.clientCredentials(resources: [IntegrationServer.allowedResource])
+            _ = try await client.requestToken(.clientCredentials(resources: [IntegrationServer.allowedResource]))
         }
         #expect(error?.code == .invalidClient)
     }

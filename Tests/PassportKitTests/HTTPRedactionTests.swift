@@ -13,7 +13,7 @@ struct HTTPRedactionTests {
     )
 
     @Test func configurationNeverShowsHeaderValuesOrSecrets() {
-        let configuration = ClientConfiguration(
+        let configuration = OAuthClient.Configuration(
             endpoints: Endpoints(token: URL(string: "https://as.example.com/token")!),
             authentication: .clientSecretBasic(clientID: "app", secret: Secret(Canary.value)),
             additionalHeaders: [HTTPField.Name("X-Api-Key")!: Canary.value]

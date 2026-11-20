@@ -10,8 +10,7 @@ enum DocumentationSnippets {
         let request = AuthorizationRequest(
             redirectURI: URL(string: "com.example.app:/callback")!,
             scope: ["openid", "offline_access"])
-        let userAgent = WebAuthenticationSessionUserAgent(prefersEphemeralWebBrowserSession: false)
-        return try await client.authorize(request, using: userAgent)
+        return try await client.authorize(request, using: .webAuthenticationSession())
     }
 
     static func loopback(client: OAuthClient) async throws -> TokenResponse {

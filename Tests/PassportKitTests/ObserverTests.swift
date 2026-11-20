@@ -12,7 +12,7 @@ struct ObserverTests {
         let clock = ManualClock()
         let transport = SlowTransport(clock: clock, delay: .seconds(2), response: .tokens())
         let client = try ClientFixtures.client(transport, clock: clock, observer: observer)
-        async let result = client.clientCredentials()
+        async let result = client.requestToken(.clientCredentials())
         try await clock.advanceToNextSleeper()
         _ = try await result
         #expect(
@@ -46,7 +46,7 @@ struct ObserverTests {
         let observer = RecordingObserver()
         let transport = RecordingTransport([.oauthError("invalid_grant"), .json(200, "")])
         let client = try ClientFixtures.client(transport, observer: observer)
-        _ = try? await client.refresh(Secret("rt"))
+        _ = try? await client.requestToken(.refreshToken(Secret("rt")))
         try await client.revoke(Secret("rt"))
         let events = observer.events
         #expect(events.count == 4)
@@ -65,7 +65,7 @@ struct ObserverTests {
         let clock = ManualClock()
         let transport = SlowTransport(clock: clock, delay: .seconds(3), response: .fail(URLError(.timedOut)))
         let client = try ClientFixtures.client(transport, clock: clock, observer: observer)
-        async let result: TokenResponse = client.clientCredentials()
+        async let result: TokenResponse = client.requestToken(.clientCredentials())
         try await clock.advanceToNextSleeper()
         do {
             _ = try await result
@@ -84,7 +84,7 @@ struct ObserverTests {
         let observer = RecordingObserver()
         let transport = RecordingTransport([.fail(CancellationError())])
         let client = try ClientFixtures.client(transport, observer: observer)
-        await #expect(throws: CancellationError.self) { try await client.clientCredentials() }
+        await #expect(throws: CancellationError.self) { try await client.requestToken(.clientCredentials()) }
         let events = observer.events
         #expect(events.count == 2)
         guard case .transportFailure(.token, .clientCredentials, _) = events[1] else {
@@ -101,9 +101,10 @@ struct ObserverTests {
         let client = try ClientFixtures.client(
             transport, authentication: .clientSecretPost(clientID: "app", secret: Secret(Canary.value)),
             observer: observer)
-        _ = try? await client.refresh(Secret(Canary.value), additionalParameters: ["k": Canary.value])
-        _ = try? await client.clientCredentials()
-        _ = try await client.requestToken(grantType: .tokenExchange, parameters: ["subject_token": Canary.value])
+        _ = try? await client.requestToken(
+            .refreshToken(Secret(Canary.value), additionalParameters: ["k": Canary.value]))
+        _ = try? await client.requestToken(.clientCredentials())
+        _ = try await client.requestToken(.extensionGrant(.tokenExchange, parameters: ["subject_token": Canary.value]))
         let text = observer.events.map { "\($0)" }.joined()
         #expect(!text.isEmpty)
         #expect(!text.contains(Canary.value))

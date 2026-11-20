@@ -37,6 +37,11 @@ struct WebAuthenticationSessionUserAgentTests {
         )
     }
 
+    @Test func isAStaticMemberOfAuthorizationUserAgent() {
+        let agent: any AuthorizationUserAgent = .webAuthenticationSession(prefersEphemeralWebBrowserSession: true)
+        #expect(agent is WebAuthenticationSessionUserAgent)
+    }
+
     @Test func canceledLoginBecomesUserCancelled() async throws {
         let cancelled = agent(.failure(ASWebAuthenticationSessionError(.canceledLogin)))
         let redirect = try #require(URL(string: "com.example.app:/callback"))

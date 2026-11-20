@@ -1,7 +1,7 @@
 import Foundation
 import HTTPTypes
 
-extension ClientConfiguration {
+extension OAuthClient.Configuration {
     /// Creates a configuration from discovered metadata (RFC 8414 §2, RFC 9207 §3).
     ///
     /// Takes the endpoints and the ``issuer`` from `metadata` and sets ``requiresIssuerInAuthorizationResponse``

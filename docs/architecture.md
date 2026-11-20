@@ -20,7 +20,7 @@ Testing depends on the core, never the reverse. External dependencies follow ADR
 | Folder | Holds |
 |---|---|
 | `Core` | Value types and seams: `Secret`, `ScopeSet`, `AdditionalParameters`, `JSONValue`, `GrantType`, token type identifiers, `WallClock`, `RandomSource`, wire-name constants |
-| `Configuration` | `ClientConfiguration`, `ClientAuthentication`, `Endpoints`, loopback host rules |
+| `Configuration` | `OAuthClient.Configuration`, `ClientAuthentication`, `Endpoints`, loopback host rules |
 | `Client` | `OAuthClient` (stateless protocol operations, one file per grant family), request and pending-authorization types, form requests |
 | `Tokens` | `TokenResponse` and its parsing |
 | `Errors` | `PassportError`, its codes, classification and recovery mapping |

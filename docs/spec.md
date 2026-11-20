@@ -163,7 +163,7 @@ public struct URLSessionTransport: HTTPTransport {
 Redaction: `HTTPFields` prints header values (`description`, `debugDescription`
 and `dump`), and `HTTPRequest` prints its URL with query under `dump` as well as
 its fields. PassportKit therefore never holds an `HTTPFields` in a public type
-that can be printed unredacted: `ClientConfiguration`, `RecordedRequest`,
+that can be printed unredacted: `OAuthClient.Configuration`, `RecordedRequest`,
 `RecordingTransport.Step` and `FakeAuthorizationServer.ResponseOverride` show
 header names only. A request or response handed back to the caller (the request
 returned by `ProtectedResourceClient.addingToken(to:for:)`, the response of `send`) is the caller's
@@ -196,7 +196,8 @@ public struct ClientAuthentication: Sendable, Hashable {            // open: fac
     public var clientID: String { get }
 }
 
-public struct ClientConfiguration: Sendable {
+extension OAuthClient {
+public struct Configuration: Sendable {
     public var endpoints: Endpoints
     public var authentication: ClientAuthentication
     public var issuer: URL?                          // required by the code flow: the expected `iss` (RFC 9207)
@@ -209,9 +210,10 @@ public struct ClientConfiguration: Sendable {
                 additionalHeaders: HTTPFields = [:], minimumTokenLifetime: Duration = .seconds(60),
                 defaultTokenLifetime: Duration? = nil, allowsInsecureLoopbackEndpoints: Bool = false) throws
 }
+}
 ```
 
-`ClientConfiguration.init(metadata:authentication:…)` is the discovery path:
+`OAuthClient.Configuration.init(metadata:authentication:…)` is the discovery path:
 it takes the endpoints and `issuer` from the metadata and sets
 `requiresIssuerInAuthorizationResponse` to
 `metadata.supportsIssuerInAuthorizationResponse == true` (RFC 9207 §3),
@@ -223,7 +225,7 @@ revocation, the endpoints in fetched metadata), the `issuer` and the
 metadata URL must be `https`: RFC 6749 §3.1, §3.2, RFC 7009 §2.1 and
 RFC 8414 §3 require TLS. A deliberate opt-in,
 `allowsInsecureLoopbackEndpoints` (default `false`; `Discovery.fetchMetadata`
-and `ClientConfiguration.init(metadata:…)` take the same parameter), lets
+and `OAuthClient.Configuration.init(metadata:…)` take the same parameter), lets
 those URLs use `http` when the host is a loopback address (`localhost`,
 `127.0.0.1`, `::1`), for local development servers only. A non-loopback
 `http` URL is refused with or without the opt-in, always with
@@ -334,43 +336,35 @@ not an error by itself.
 public struct OAuthClient: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     /// Throws `.invalidConfiguration` when an endpoint or the issuer is not `https`
     /// (or loopback `http` with `allowsInsecureLoopbackEndpoints`).
-    public init(configuration: ClientConfiguration,
+    public init(configuration: OAuthClient.Configuration,
                 transport: any HTTPTransport = URLSessionTransport(),
                 wallClock: any WallClock = SystemWallClock(),
                 clock: any Clock<Duration> = ContinuousClock(),
                 random: any RandomSource = SystemRandomSource(),
                 observer: (any RequestObserver)? = nil,
                 logger: Logger = Logger(label: "PassportKit")) throws
-    public let configuration: ClientConfiguration
+    public let configuration: OAuthClient.Configuration
     public let wallClock: any WallClock
 
-    // RFC 6749 §6 (+ RFC 8707 resources)
-    public func refresh(_ refreshToken: Secret, scope: ScopeSet? = nil, resources: [URL] = [],
-                        additionalParameters: AdditionalParameters = [:]) async throws -> TokenResponse
-    // RFC 6749 §4.4
-    public func clientCredentials(scope: ScopeSet? = nil, resources: [URL] = [],
-                                  additionalParameters: AdditionalParameters = [:]) async throws -> TokenResponse
-    // RFC 8693
-    public func exchange(_ request: TokenExchangeRequest) async throws -> TokenResponse
+    // RFC 6749 §6, §4.4, §4.5 and RFC 8693: refresh, client credentials, extension grants, token exchange
+    public func requestToken(_ request: TokenRequest) async throws -> TokenResponse
     // RFC 7009
-    public func revoke(_ token: Secret, typeHint: TokenTypeHint? = nil) async throws
+    public func revoke(_ token: Secret, hint: TokenTypeHint? = nil) async throws
     // RFC 7009, best effort: never throws; .skipped without a revocation endpoint, .timedOut after
     // `timeLimit` on the client's clock, .cancelled when the caller is cancelled (both cancel the request)
-    public func revokeBestEffort(_ token: Secret, typeHint: TokenTypeHint? = nil,
+    public func revokeBestEffort(_ token: Secret, hint: TokenTypeHint? = nil,
                                  timeLimit: Duration = OAuthClient.revocationTimeLimit) async -> RevocationOutcome
     public static let revocationTimeLimit: Duration   // 5 s, the limit OAuthSession applies on sign-out
     // RFC 8628
     public func beginDeviceAuthorization(scope: ScopeSet? = nil, resources: [URL] = [],
-                                         additionalParameters: AdditionalParameters = [:]) async throws -> DeviceAuthorization
-    public func completeDeviceAuthorization(_ authorization: DeviceAuthorization,
+                                         additionalParameters: AdditionalParameters = [:]) async throws -> PendingDeviceAuthorization
+    public func completeDeviceAuthorization(_ authorization: PendingDeviceAuthorization,
                                             additionalParameters: AdditionalParameters = [:]) async throws -> TokenResponse
     // RFC 6749 §4.1 + RFC 7636 + RFC 9207
     public func beginAuthorization(_ request: AuthorizationRequest) throws -> PendingAuthorization
     public func completeAuthorization(_ pending: PendingAuthorization, callbackURL: URL,
                                       additionalParameters: AdditionalParameters = [:]) async throws -> TokenResponse
     public func authorize(_ request: AuthorizationRequest, using userAgent: any AuthorizationUserAgent) async throws -> TokenResponse
-    // Extension grants (e.g. vendor-specific): full error parsing and redaction
-    public func requestToken(grantType: GrantType, parameters: AdditionalParameters) async throws -> TokenResponse
 }
 ```
 
@@ -379,16 +373,25 @@ client ID and the token endpoint only, so a dump never reaches the injected
 transport or observer.
 
 ```swift
-public struct TokenExchangeRequest: Sendable, Hashable {
-    public var subjectToken: Secret
-    public var subjectTokenType: TokenTypeIdentifier
-    public var actorToken: Secret?
-    public var actorTokenType: TokenTypeIdentifier?
-    public var requestedTokenType: TokenTypeIdentifier?
-    public var audiences: [String] = []
-    public var resources: [URL] = []
-    public var scope: ScopeSet?
-    public var additionalParameters: AdditionalParameters = [:]
+public struct TokenRequest: Sendable, Hashable {   // open: factories named after the grant type they send
+    public var grantType: GrantType { get }
+    public static func refreshToken(_ refreshToken: Secret, scope: ScopeSet? = nil, resources: [URL] = [],
+                                    additionalParameters: AdditionalParameters = [:]) -> TokenRequest
+    public static func clientCredentials(scope: ScopeSet? = nil, resources: [URL] = [],
+                                         additionalParameters: AdditionalParameters = [:]) -> TokenRequest
+    public static func tokenExchange(subject: SecurityToken, actor: SecurityToken? = nil,
+                                     requestedTokenType: TokenTypeIdentifier? = nil, audiences: [String] = [],
+                                     resources: [URL] = [], scope: ScopeSet? = nil,
+                                     additionalParameters: AdditionalParameters = [:]) -> TokenRequest
+    public static func extensionGrant(_ grantType: GrantType, parameters: AdditionalParameters) -> TokenRequest  // e.g. vendor-specific
+}
+extension TokenRequest {
+    public struct SecurityToken: Sendable, Hashable {   // RFC 8693 §2.1: a token and its type, never one without the other
+        public var value: Secret
+        public var type: TokenTypeIdentifier
+        public init(_ value: Secret, type: TokenTypeIdentifier)
+        public static func accessToken(_ value: Secret) -> SecurityToken   // also refreshToken(_:), idToken(_:), jwt(_:)
+    }
 }
 public struct TokenTypeHint: RawRepresentable, Sendable, Hashable {   // open: RFC 7009 §4.1.2 registry
     public static let accessToken, refreshToken: TokenTypeHint     // "access_token", "refresh_token"
@@ -398,19 +401,19 @@ public struct TokenTypeHint: RawRepresentable, Sendable, Hashable {   // open: R
 ### Device authorization (RFC 8628)
 
 ```swift
-public struct DeviceAuthorization: Sendable {
+public struct PendingDeviceAuthorization: Sendable {
     /// At most 64 characters without control, line-separator or invisible format characters, else the
     /// response is `invalidResponse`. Showing it to the person is the app's job (RFC 8628 §3.3).
     public internal(set) var userCode: String
     public internal(set) var verificationURI: URL
-    public internal(set) var verificationURIComplete: URL?     // used verbatim; may already contain a query
+    public internal(set) var completeVerificationURI: URL?     // used verbatim; may already contain a query
     public internal(set) var expiresIn: Duration                 // as granted; see ADR 0006
     public internal(set) var expiresAt: Date                     // for display only
     public var remainingLifetime: Duration { get } // measured on the injected clock
     public internal(set) var interval: Duration                  // 5 s when omitted
     // internal: deviceCode (Secret)
     // Public memberwise init for previews and UI tests (deviceCode: Secret, clock: defaults to ContinuousClock).
-    public init(deviceCode: Secret, userCode: String, verificationURI: URL, verificationURIComplete: URL? = nil,
+    public init(deviceCode: Secret, userCode: String, verificationURI: URL, completeVerificationURI: URL? = nil,
                 expiresIn: Duration, expiresAt: Date, interval: Duration = .seconds(5),
                 clock: any Clock<Duration> = ContinuousClock())
 }
@@ -473,7 +476,7 @@ fragment, or is `http` on a non-loopback host (RFC 8252 §7.3, §8.3), a
 §3.1.2.1), and when no issuer is configured. A loopback
 redirect URI carries the actual port; the callback is compared with it.
 
-**Mix-up protection.** The code flow requires `ClientConfiguration.issuer`:
+**Mix-up protection.** The code flow requires `OAuthClient.Configuration.issuer`:
 `beginAuthorization`, `authorize` and `completeAuthorization` throw
 `.invalidConfiguration` when it is `nil`, before any other check and before any
 request, so a response `iss` is never accepted unchecked (RFC 9207 §2.4,
@@ -691,7 +694,7 @@ Invariants (each has a conformance test):
    (RFC 6749 §5.1, §6). A refresh that names neither scope nor resource
    renews the whole grant, so a `scope` in its response replaces the
    credential's recorded scope; narrower targets never change it.
-9. **Derived tokens.** `.tokenExchange` targets (`TokenTarget.exchange`) obtain the
+9. **Derived tokens.** `.tokenExchange` targets (`TokenTarget.tokenExchange`) obtain the
    default access token, exchange it (`subject_token_type` and
    `requested_token_type` = access token), and cache the result per
    target. A `refresh_token` in such a response is ignored: it is not the
@@ -714,7 +717,7 @@ returned response (`refreshToken` is `nil`): it belongs to the session, and
 presenting it elsewhere could trigger reuse detection. A server whose
 exchange response carries a refresh token for the issued token's context
 (RFC 8693 §2.2.1) instead of the rotated subject is not supported by
-`exchangeRefreshToken`; use `OAuthClient.exchange(_:)` (ADR 0015). An exchange the server
+`exchangeRefreshToken`; use `OAuthClient.requestToken(_:)` (ADR 0015). An exchange the server
 answered is returned even if the session ended or was replaced meanwhile (ADR
 0015): its rotated subject then goes to the ended session's revocation and the
 current session is not touched, and a caller that must not use a token of an

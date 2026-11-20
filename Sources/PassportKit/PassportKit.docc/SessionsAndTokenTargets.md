@@ -39,7 +39,7 @@ let bound = try await session.accessToken(
 
 // A token for another service, exchanged from the default token (RFC 8693).
 let exchanged = try await session.accessToken(
-    for: .exchange(audiences: ["reports"]))
+    for: .tokenExchange(audiences: ["reports"]))
 ```
 
 The session keeps at most 256 tokens and 256 remembered rejections, dropping
@@ -56,7 +56,7 @@ request.
 
 - ``TokenTarget/refreshGrant(resources:scope:)`` sends a refresh grant that names the
   resources and scope. It narrows what the root grant allows.
-- ``TokenTarget/exchange(resources:audiences:scope:)`` exchanges the default access
+- ``TokenTarget/tokenExchange(resources:audiences:scope:)`` exchanges the default access
   token for one bound to resources or audiences. The server decides whether
   the exchange is allowed. A derived token never outlives the token it came
   from.
