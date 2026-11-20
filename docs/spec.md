@@ -523,7 +523,7 @@ One actor per signed-in root grant.
 ```swift
 public actor OAuthSession {
     public init(client: OAuthClient, store: any CredentialStore, account: CredentialAccount,
-                acceptancePolicy: any TokenAcceptancePolicy = AcceptAnyToken(),
+                acceptancePolicy: any TokenAcceptancePolicy = .acceptAnyToken,
                 acceptancePolicyTimeLimit: Duration = .seconds(10),    // no answer in time = rejection
                 rejectedTokenCacheDuration: Duration = .seconds(5),    // .zero: ask the server every time; short, so a newly granted permission is not hidden
                 logger: Logger? = nil)                                 // nil: the client's logger
@@ -739,15 +739,23 @@ public enum TokenAcceptance: Sendable { case accept; case reject(reason: String)
 /// The default: accepts everything, scope narrowing included (documented hazard on `OAuthSession.init`).
 public struct AcceptAnyToken: TokenAcceptancePolicy {}
 /// Which targets a policy applies to. Open struct.
-public struct TargetSelector: Sendable {
-    public static let all: TargetSelector
-    public static let withResources: TargetSelector
-    public static func matching(_ predicate: @escaping @Sendable (TokenTarget) -> Bool) -> TargetSelector
-    public func isSelected(_ target: TokenTarget) -> Bool
+extension TokenTarget {
+    public struct Selector: Sendable {
+        public static let all: Selector
+        public static let withResources: Selector
+        public static func matching(_ predicate: @escaping @Sendable (TokenTarget) -> Bool) -> Selector
+        public func isSelected(_ target: TokenTarget) -> Bool
+    }
 }
 /// Accepts a token for a selected target (default: targets with resources) only if at least one of `scopes` was granted.
 public struct RequireAnyScope: TokenAcceptancePolicy {
-    public init(_ scopes: ScopeSet, forTargets targets: TargetSelector = .withResources)
+    public init(_ scopes: ScopeSet, for targets: TokenTarget.Selector = .withResources)
+}
+extension TokenAcceptancePolicy where Self == AcceptAnyToken {
+    public static var acceptAnyToken: AcceptAnyToken { get }
+}
+extension TokenAcceptancePolicy where Self == RequireAnyScope {
+    public static func requireAnyScope(_ scopes: ScopeSet, for targets: TokenTarget.Selector = .withResources) -> RequireAnyScope
 }
 /// A policy from a closure: `acceptancePolicy: .custom { context in ... }`.
 public struct ClosureTokenAcceptancePolicy: TokenAcceptancePolicy {

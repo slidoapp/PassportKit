@@ -44,29 +44,6 @@ public struct AcceptAnyToken: TokenAcceptancePolicy {
     public func evaluate(_ context: TokenAcceptanceContext) async -> TokenAcceptance { .accept }
 }
 
-/// Chooses the targets a policy applies to. An open set: new selectors can be added without breaking source
-/// compatibility.
-public struct TargetSelector: Sendable {
-    private let selects: @Sendable (TokenTarget) -> Bool
-
-    /// Every target.
-    public static let all = TargetSelector { _ in true }
-    /// Targets that name at least one resource indicator (RFC 8707), where servers are seen to narrow the scope.
-    public static let withResources = TargetSelector { !$0.resources.isEmpty }
-
-    /// The targets for which `predicate` is true.
-    public static func matching(_ predicate: @escaping @Sendable (TokenTarget) -> Bool) -> TargetSelector {
-        TargetSelector(predicate)
-    }
-
-    private init(_ selects: @escaping @Sendable (TokenTarget) -> Bool) {
-        self.selects = selects
-    }
-
-    /// Whether `target` is selected.
-    public func isSelected(_ target: TokenTarget) -> Bool { selects(target) }
-}
-
 /// Accepts a token for a selected target only if at least one of the given scopes was granted.
 ///
 /// By default the policy applies to targets with resources, where servers are seen to answer 200 with a
@@ -77,10 +54,10 @@ public struct TargetSelector: Sendable {
 /// should be accepted, or use ``TokenAcceptancePolicy/custom(_:)`` for prefix rules or other cases.
 public struct RequireAnyScope: TokenAcceptancePolicy {
     private let scopes: ScopeSet
-    private let targets: TargetSelector
+    private let targets: TokenTarget.Selector
 
     /// Creates the policy. Tokens of targets that `targets` does not select are always accepted.
-    public init(_ scopes: ScopeSet, forTargets targets: TargetSelector = .withResources) {
+    public init(_ scopes: ScopeSet, for targets: TokenTarget.Selector = .withResources) {
         self.scopes = scopes
         self.targets = targets
     }
@@ -105,6 +82,24 @@ public struct ClosureTokenAcceptancePolicy: TokenAcceptancePolicy {
 
     /// Runs the closure.
     public func evaluate(_ context: TokenAcceptanceContext) async -> TokenAcceptance { await body(context) }
+}
+
+extension TokenAcceptancePolicy where Self == AcceptAnyToken {
+    /// A policy that accepts every token: `acceptancePolicy: .acceptAnyToken`.
+    public static var acceptAnyToken: AcceptAnyToken { AcceptAnyToken() }
+}
+
+extension TokenAcceptancePolicy where Self == RequireAnyScope {
+    /// A policy that accepts a token for a selected target only if at least one of `scopes` was granted:
+    /// `acceptancePolicy: .requireAnyScope(["items.read"])`.
+    ///
+    /// By default it selects only targets that name resources, so it accepts every token of a target without
+    /// resources, including ``TokenTarget/default``. Pass `for: .all` to check every target. See ``RequireAnyScope``.
+    public static func requireAnyScope(
+        _ scopes: ScopeSet, for targets: TokenTarget.Selector = .withResources
+    ) -> RequireAnyScope {
+        RequireAnyScope(scopes, for: targets)
+    }
 }
 
 extension TokenAcceptancePolicy where Self == ClosureTokenAcceptancePolicy {

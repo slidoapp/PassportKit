@@ -153,9 +153,9 @@ enum DocumentationSnippets {
 
     // ResourceAccessAndScopes.md
     static func policy(client: OAuthClient, account: CredentialAccount) {
-        let policy = RequireAnyScope(["items.read", "items.write"])
         let session = OAuthSession(
-            client: client, store: .inMemory(), account: account, acceptancePolicy: policy)
+            client: client, store: .inMemory(), account: account,
+            acceptancePolicy: .requireAnyScope(["items.read", "items.write"]))
         _ = session
     }
 

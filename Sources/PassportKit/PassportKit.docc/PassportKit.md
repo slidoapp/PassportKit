@@ -89,7 +89,7 @@ appear in descriptions, errors or events.
 - ``TokenAcceptanceContext``
 - ``AcceptAnyToken``
 - ``RequireAnyScope``
-- ``TargetSelector``
+- ``TokenTarget/Selector``
 - ``ClosureTokenAcceptancePolicy``
 
 ### Credential storage

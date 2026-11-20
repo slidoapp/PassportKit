@@ -21,7 +21,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
   or the library's own roadmap is a struct with a `rawValue` or private
   storage and `static` members, like `GrantType`: `ClientAuthentication`,
   `TokenTarget.Derivation`, `RequestEvent.Endpoint`, `TokenTypeHint`,
-  `AuthorizationRequest.Prompt`, `TargetSelector`. A type that describes a
+  `AuthorizationRequest.Prompt`, `TokenTarget.Selector`. A type that describes a
   closed outcome the caller must handle stays an enum and is documented
   as not frozen, so callers switch with a `default`: `Recovery`,
   `ProtectedResourceClient.RetryDecision`, `OAuthSession.Event`, `OAuthSession.SignOutReason`,
@@ -35,7 +35,7 @@ them. They follow the Swift API Design Guidelines and `AGENTS.md`.
 - **Parameter objects instead of closures and long argument lists.** An
   extension point receives one struct (`TokenAcceptanceContext`) so a
   member can be added without breaking implementations. A choice among
-  behaviours is a named, open type (`TargetSelector`) rather than a bare
+  behaviours is a named, open type (`TokenTarget.Selector`) rather than a bare
   closure; a closure form stays available (`.matching`, `.custom`).
 - **Labels.** The first argument is unlabeled when the call reads as a
   phrase about it (`refresh(_ refreshToken:)`, `sign(_ request:for:)`);

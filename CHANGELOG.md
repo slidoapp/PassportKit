@@ -10,8 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The remaining names of the public API follow ADR 0016. Each rename breaks source compatibility, and no deprecated
 aliases are kept.
 
+### Added
+
+- `TokenAcceptancePolicy` lists its built-in policies as static members, so `acceptancePolicy: .acceptAnyToken` and
+  `acceptancePolicy: .requireAnyScope(["items.read"])` appear in autocomplete next to `.custom`.
+
 ### Changed
 
+- **Breaking:** `TargetSelector` is `TokenTarget.Selector`, and `RequireAnyScope(_:forTargets:)` is
+  `RequireAnyScope(_:for:)`, because `for:` names a target.
 - **Breaking:** `Discovery.Style` is `Discovery.WellKnownDocument`, because it chooses which well-known document
   (RFC 8615) is fetched; its cases are unchanged. The labels of `Discovery.fetchMetadata` are `document:` and
   `issuerValidation:` instead of `style:` and `validation:`.

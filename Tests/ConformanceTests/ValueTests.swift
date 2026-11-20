@@ -114,8 +114,8 @@ struct ValueTests {
 
     @Test("target selectors and closure policies")
     func selectorsAndClosures() async {
-        let all = RequireAnyScope(["read"], forTargets: .all)
-        let named = RequireAnyScope(["read"], forTargets: .matching { $0.scope == ["admin"] })
+        let all = RequireAnyScope(["read"], for: .all)
+        let named = RequireAnyScope(["read"], for: .matching { $0.scope == ["admin"] })
         let response = TokenResponse(accessToken: Secret("a"), tokenType: "Bearer")
         func context(_ target: TokenTarget) -> TokenAcceptanceContext {
             TokenAcceptanceContext(
@@ -125,6 +125,12 @@ struct ValueTests {
         #expect(await !all.evaluate(context(.default)).isAccepted)
         #expect(await !named.evaluate(context(.refreshGrant(scope: ["admin"]))).isAccepted)
         #expect(await named.evaluate(context(.default)).isAccepted)
+        let required: any TokenAcceptancePolicy = .requireAnyScope(["read"], for: .all)
+        #expect(required is RequireAnyScope)
+        #expect(await !required.evaluate(context(.default)).isAccepted)
+        let anyToken: any TokenAcceptancePolicy = .acceptAnyToken
+        #expect(anyToken is AcceptAnyToken)
+        #expect(await anyToken.evaluate(context(.default)).isAccepted)
         let custom: any TokenAcceptancePolicy = .custom { $0.target == .default ? .reject(reason: "no") : .accept }
         #expect(await !custom.evaluate(context(.default)).isAccepted)
         #expect(await custom.evaluate(context(.refreshGrant(scope: ["admin"]))).isAccepted)
