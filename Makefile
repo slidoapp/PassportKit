@@ -36,7 +36,7 @@ docs:
 	scripts/build-docs.sh
 
 # Runs the integration tests against the local server in Tools/integration-server (needs Node.js and, on the
-# first run, network access for `npm ci`). Not part of `check`.
+# first run, network access for `npm ci`). Not part of `check`. It uses the flags of `build`, so it reuses that build.
 integration:
 	@set -e; \
 	[ -d $(INTEGRATION_SERVER)/node_modules ] || npm ci --prefix $(INTEGRATION_SERVER); \
@@ -51,5 +51,5 @@ integration:
 	done; \
 	[ -n "$$ready" ] || { echo "integration server did not start:"; cat "$$log"; exit 1; }; \
 	status=0; \
-	PASSPORTKIT_INTEGRATION_ISSUER=$$issuer swift test --filter IntegrationTests || status=$$?; \
+	PASSPORTKIT_INTEGRATION_ISSUER=$$issuer swift test --filter IntegrationTests $(WARNINGS_AS_ERRORS) || status=$$?; \
 	exit $$status
