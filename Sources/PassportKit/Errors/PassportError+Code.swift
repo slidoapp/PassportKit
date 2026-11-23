@@ -26,8 +26,9 @@ extension PassportError {
         static let maximumServerLength = 64
 
         /// Accepts a code received from the network only when it is a well-formed `error` value of
-        /// RFC 6749 §5.2 (`%x20-21 / %x23-5B / %x5D-7E`) of at most 64 characters, so hostile text never
-        /// becomes a code that callers log or switch on. Returns `nil` otherwise.
+        /// RFC 6749 §5.2 (`%x20-21 / %x23-5B / %x5D-7E`) of at most 64 characters, so control characters, quotes
+        /// and long text never become a code that callers log or switch on. Returns `nil` otherwise. The content is
+        /// kept as sent: RFC 6749 §5.2 and §8.5 make it an error code, so it is not searched for credentials.
         static func fromServer(_ text: String) -> Code? {
             let scalars = text.unicodeScalars
             guard !scalars.isEmpty, scalars.count <= maximumServerLength,

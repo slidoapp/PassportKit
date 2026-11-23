@@ -66,6 +66,11 @@ sent replaced by `<redacted>`. `errorURI` keeps only `http` and `https`
 links. Show the detail for diagnostics, never branch on it, and never put it into
 a place that interprets markup.
 
+``PassportError/code`` comes from the network too. The library checks its
+characters and length and then keeps it as the server sent it, because
+RFC 6749 §5.2 limits the `error` member to an error code. A server that puts a
+credential in `error` makes ``PassportError/description`` show that credential.
+
 ## Cancellation
 
 A cancelled task throws `CancellationError`, not a ``PassportError``. A person

@@ -49,6 +49,14 @@ aliases are kept.
   `supportedGrantTypes` and holds `GrantType` values, and `authorizationResponseIssParameterSupported` is
   `supportsIssuerInAuthorizationResponse`. The JSON field names are unchanged.
 
+### Fixed
+
+- The documentation of `PassportError`, `RequestEvent`, the spec and the security model said that a server which
+  repeats a request credential cannot make the library print it. That holds for `error_description` only. The
+  library trusts the `error` member to be an error code (RFC 6749 §5.2, §8.5) and shows it as the server sent it in
+  `PassportError.code`, every description of the error, `RequestEvent.response(errorCode:)` and the `error_code` log
+  metadata. The security model lists a credential in `error` as a known limit. The behaviour is unchanged.
+
 ## [1.1.0] - 2026-11-19
 
 This release renames the main objects so that each one says which OAuth party it talks to (ADR 0016):

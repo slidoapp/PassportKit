@@ -67,7 +67,9 @@ CI runs the same target in the `build` job, on the build of the offline tests.
 `RedactionCanaryTests` runs every flow against the fake server with a client
 secret and every token, code, verifier and device code that crosses the wire
 treated as a canary. Error paths make the server repeat the secrets it was
-sent in `error_description` and in `WWW-Authenticate`. The test then renders
+sent in `error_description` and in `WWW-Authenticate`; the `error` code is
+outside the canary, because the library trusts it to be an RFC 6749 §5.2 code
+(`docs/security-model.md`, Known limits). The test then renders
 every public value and error (`String(describing:)`, `String(reflecting:)`,
 `dump`, `localizedDescription`), every `RequestEvent` and `OAuthSession.Event`, and every log line (`LogCapture`),
 and fails if any canary appears. A new flow, public value or log line that could carry a secret gets coverage here.

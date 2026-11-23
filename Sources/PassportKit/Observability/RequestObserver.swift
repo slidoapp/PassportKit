@@ -13,8 +13,9 @@ public protocol RequestObserver: Sendable {
 public enum RequestEvent: Sendable, Equatable {
     /// A request is about to be sent. `grantType` is set for token endpoint requests.
     case request(endpoint: Endpoint, grantType: GrantType?)
-    /// A response arrived. `errorCode` is the OAuth `error` member of a non-2xx response when it is a plain token.
-    /// `duration` is measured with the client's injected clock.
+    /// A response arrived. `errorCode` is the OAuth `error` member of a non-2xx response when it is a plain token
+    /// of at most 64 characters. It is passed on as the server sent it, because RFC 6749 §5.2 limits the member to
+    /// an error code. `duration` is measured with the client's injected clock.
     case response(endpoint: Endpoint, statusCode: Int, errorCode: String?, duration: Duration)
     /// A request ended without an HTTP response: no connection, TLS failure, timeout, or task cancellation.
     /// Every ``request(endpoint:grantType:)`` is followed by exactly one

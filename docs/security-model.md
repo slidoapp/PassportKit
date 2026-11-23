@@ -34,8 +34,9 @@ A server can make a library repeat what it was sent, for example by echoing
 a token in `error_description`. Every credential of a request (refresh,
 subject and actor tokens, authorization code, PKCE verifier, device code,
 client secret, the token of a revocation, the bearer token of a resource
-request) is therefore replaced by `<redacted>` in the error built from the
-response, whatever its length. `dump` of an `OAuthClient` shows a summary, so
+request) is therefore replaced by `<redacted>` in the `detail` of the error
+built from the response, whatever its length. The `error` code is not
+searched (Known limits). `dump` of an `OAuthClient` shows a summary, so
 it cannot reach the injected transport or observer.
 
 Text that arrives from the network and may reach a log or a UI is
@@ -52,8 +53,8 @@ follow the same rules as errors and events:
 
 - Messages are constant strings; data goes in metadata.
 - Only low-cardinality, non-secret metadata: endpoint kind, grant type,
-  HTTP status, the sanitized OAuth `error` code, duration, session
-  reason, Keychain `OSStatus`.
+  HTTP status, the OAuth `error` code as the server sent it (Known
+  limits), duration, session reason, Keychain `OSStatus`.
 - Never tokens, authorization codes, `state`, PKCE verifiers, device
   codes, client secrets, URLs with a query, headers, request or response
   bodies, or a server's `error_description`.
@@ -74,7 +75,7 @@ follow the same rules as errors and events:
 | Header injection through a token | A token that is not a `b64token` (RFC 6750 §2.1) is refused before it reaches a header |
 | Memory growth from many targets | The token cache and the remembered rejections are limited to 256 entries each |
 | Server text shown to a person | Error text is sanitized; a device `user_code` with control or invisible characters, or over 64 characters, is an invalid response; apps show it themselves (RFC 8628 §3.3), and the example executable prints server text through a sanitizer |
-| Token theft from logs | Redaction rules above, enforced by tests and by the redaction canary, which searches every error, event, log line and description of every flow for the secrets it used |
+| Token theft from logs | Redaction rules above, enforced by tests and by the redaction canary, which searches every error, event, log line and description of every flow for the secrets it used; a credential that a server puts in the `error` code is a known limit |
 | Token sent with the wrong scheme | Only `Bearer` tokens are sent by `ProtectedResourceClient`; sender-constrained types fail before any request |
 | Token theft from storage | Platform secure storage (Keychain) with the strictest workable accessibility class, enforced on iOS; the macOS login keychain does not enforce it (Known limits) |
 | Refresh token replay after rotation | Persist rotated refresh token before use; serialize refresh-token-consuming operations |
@@ -114,6 +115,12 @@ follow the same rules as errors and events:
 - **ID tokens are stored, never validated.** PassportKit is an OAuth 2.0 client, not an OpenID Connect relying
   party: an `id_token` is kept in the credential without checking its signature, issuer, audience or nonce. Do not
   treat it as proof of identity.
+- **A credential in the `error` code is not redacted.** RFC 6749 §5.2 and §8.5 limit the `error` member of an error
+  response to an error code. The library checks the code's characters and length and then trusts its content:
+  `PassportError.code`, every description of the error, `RequestEvent.response(errorCode:)` and the `error_code` log
+  metadata show it as the server sent it. A server that puts a credential in `error` breaks RFC 6749 and makes the
+  library print that credential. The fix belongs in the server, and [SECURITY.md](../SECURITY.md) sends such reports
+  to the server's owner.
 - **401-triggered invalidation is not rate limited.** A resource that answers 401 `invalid_token` to every fresh
   token makes each request cost one refresh (a request retries once; concurrent requests for the same token share
   one refresh). A rate limit needs a policy for what to do over the limit and is left to the app, which can wrap

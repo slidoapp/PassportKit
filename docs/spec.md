@@ -303,9 +303,16 @@ become `<redacted>`, and it is cut to 200 characters. In addition, every
 credential the library sent in the request (refresh, subject, actor and
 device codes, authorization code, PKCE verifier, client secret, the token of
 a revocation, the bearer token of a resource request) is replaced by
-`<redacted>` wherever it appears, however short it is, so a server that
-repeats a request value cannot make the library print it. Values of fewer
-than four characters are left alone.
+`<redacted>` wherever it appears in `detail`, however short it is, so a
+server that repeats a request value in `error_description` cannot make the
+library print it. Values of fewer than four characters are left alone.
+
+The `error` member is not searched for credentials. RFC 6749 §5.2 and §8.5
+limit it to an error code, and the library keeps a code that passes rule 1
+as the server sent it: in `code`, in every description of the error, in
+`RequestEvent.response(errorCode:)` and in the `error_code` log metadata
+(§12). A server that puts a credential in `error` breaks RFC 6749, and
+`docs/security-model.md` lists this as a known limit.
 
 ## 7. Token responses
 
@@ -984,7 +991,9 @@ extension RequestEvent {
 Every `.request` is followed by exactly one `.response` or one
 `.transportFailure` (no HTTP response: connection, TLS, timeout or task
 cancellation). Events carry no URLs with query strings, no bodies and no
-secrets.
+secrets. `errorCode` is the server's `error` member when it has 1 to 64
+ASCII letters, digits, `_`, `-` and `.`, passed on as the server sent it
+(§6).
 
 ### Logging
 
@@ -1009,7 +1018,9 @@ public.
 Messages are constant strings and variable data goes in metadata with
 snake_case keys. Logs never contain tokens, codes, `state`, verifiers,
 client secrets, URLs with queries, headers, bodies or server
-`error_description`; an error is logged as its `error_code` only.
+`error_description`; an error is logged as its `error_code` only. The
+`error_code` is the server's `error` member, which the library does not
+search for credentials (§6).
 
 ## 13. Apple integrations
 
@@ -1132,7 +1143,8 @@ slow wake-up fails only the waiting test; `waitForSleeper(timeout:)` returns
   run by `make lint` and therefore by CI.
 - Redaction canary test (`Tests/ConformanceTests/RedactionCanaryTests.swift`):
   a run of every flow with canary secrets, including error paths where the
-  server repeats the secrets it was sent, finds no canary in any error
+  server repeats the secrets it was sent in `error_description` and
+  `WWW-Authenticate`, finds no canary in any error
   description, event, `String(describing:)`, `String(reflecting:)` or `dump`
   of public values.
 - DocC comments on every public symbol; the article samples are compiled in

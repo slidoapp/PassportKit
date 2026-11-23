@@ -4,7 +4,8 @@ import Foundation
 ///
 /// ``code`` preserves the server's OAuth error code; ``recovery`` tells the caller what to do.
 /// Cancellation is never wrapped: `CancellationError` propagates unchanged. Descriptions never
-/// include the underlying error, response bodies or any credential.
+/// include the underlying error or response bodies, and ``detail`` never shows a credential the library sent.
+/// ``code`` is shown as the server sent it, because RFC 6749 §5.2 limits the `error` member to an error code.
 public struct PassportError: LocalizedError, Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible,
     CustomReflectable
 {
@@ -76,7 +77,9 @@ public struct PassportError: LocalizedError, Sendable, Equatable, CustomStringCo
     }
 
     /// What `localizedDescription` returns: the redacted ``description``, so a generic `catch` that prints an error
-    /// shows the code and the sanitized ``detail`` and never a credential.
+    /// shows the code and the sanitized ``detail``. The detail never shows a credential the library sent. The code
+    /// is the server's `error` value, which RFC 6749 §5.2 limits to an error code, so it is not searched for
+    /// credentials.
     public var errorDescription: String? { description }
 
     /// Same as ``description``.
