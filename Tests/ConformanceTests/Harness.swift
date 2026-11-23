@@ -1,5 +1,6 @@
 import Foundation
 import HTTPTypes
+import Logging
 import PassportKit
 import PassportKitTesting
 import Testing
@@ -72,6 +73,7 @@ struct Harness {
         accessTokenLifetime: Duration = .seconds(900),
         store: any CredentialStore = InMemoryCredentialStore(),
         rejectedTokenCacheDuration: Duration = .seconds(5),
+        logger: Logger = Logger(label: "PassportKit"),
         signedIn: Bool = true
     ) async throws {
         self.store = store
@@ -90,7 +92,7 @@ struct Harness {
             minimumTokenLifetime: minimumTokenLifetime, defaultTokenLifetime: defaultTokenLifetime)
         client = try OAuthClient(
             configuration: configuration, transport: GaugedTransport(server: server, gauge: gauge),
-            wallClock: wallClock, clock: clock, random: SequenceRandomSource())
+            wallClock: wallClock, clock: clock, random: SequenceRandomSource(), logger: logger)
         manager = OAuthSession(
             client: client, store: store, account: account, acceptancePolicy: policy,
             rejectedTokenCacheDuration: rejectedTokenCacheDuration)
